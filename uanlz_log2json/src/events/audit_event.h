@@ -3,6 +3,7 @@
 
 
 #include <list>
+#include <chrono>
 #include "audit_class.h"
 
 namespace UANLZ { namespace LOG2JSON { namespace AuditdEvents {
@@ -27,11 +28,11 @@ class Audit_Event
 {
 public:
     Audit_Event();
-    ~Audit_Event();
+    ~Audit_Event() = default;
 
     uint64_t timeSinceCreation();
 
-    bool insertClassContents(const std::string & eventType, std::string * varData);
+    bool insertClassContents(const std::string & eventType, std::string varData);
 
     std::tuple<time_t, uint32_t, uint64_t> getEventId() const;
     void setEventId(const std::tuple<time_t, uint32_t, uint64_t> &value);
@@ -50,10 +51,10 @@ public:
 
 private:
     // eventType -> ClassEvent
-    std::multimap<std::string, Audit_ClassType *> classVars;
+    std::multimap<std::string, Audit_ClassType> classVars;
     std::tuple<time_t, uint32_t, uint64_t> eventId;
     auditHostID hostId;
-    time_t creationTime;
+    std::chrono::steady_clock::time_point creationTime;
 };
 
 }}}

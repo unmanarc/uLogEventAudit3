@@ -14,41 +14,29 @@ using namespace UANLZ::LOG2JSON::AuditdEvents;
 
 Audit_Event::Audit_Event()
 {
-    creationTime = time(nullptr);
+    creationTime = std::chrono::steady_clock::now();
     eventId = std::make_tuple<time_t, uint32_t, uint64_t>(0,0,0);
-}
-
-Audit_Event::~Audit_Event()
-{
-    for (auto & i : classVars)
-    {
-        delete i.second;
-    }
 }
 
 uint64_t Audit_Event::timeSinceCreation()
 {
-    return time(nullptr)-creationTime;
+    return std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - creationTime).count();
 }
 
-bool Audit_Event::insertClassContents(const string &eventType, std::string * varData)
+bool Audit_Event::insertClassContents(const string &eventType, std::string varData)
 {
-    if (eventType == "PATH" || classVars.find(eventType) == classVars.end() )
+    auto existing = classVars.find(eventType);
+    if (eventType == "PATH" || existing == classVars.end())
     {
-        // This is multi...
-        Audit_ClassType * avars = new Audit_ClassType;
-        avars->setRawInput(varData);
-        avars->setClassTypeName(eventType);
-        classVars.insert( make_pair( eventType, avars ) );
+        auto entry = classVars.emplace(eventType, Audit_ClassType{});
+        entry->second.setRawInput(std::move(varData));
+        entry->second.setClassTypeName(eventType);
     }
     else
     {
-        Audit_ClassType * avars = classVars.find(eventType)->second;
-        avars->getRawInput()->append(" ");
-        avars->getRawInput()->append(*varData);
-        delete varData;
+        existing->second.getRawInput().append(" ").append(varData);
     }
-
     return NameDefs::isEndEventType(eventType);
 }
 
@@ -76,7 +64,7 @@ bool Audit_Event::process()
 {
     for (auto & i : classVars)
     {
-        i.second->processToVarContent();
+        i.second.processToVarContent();
     }
 
     // TODO: classVars -> sql string?
@@ -101,9 +89,9 @@ bool Audit_Event::isMultiContainer(const string &groupName)
 std::list<Audit_ClassType *> Audit_Event::getMultiLineClassVars(const string &groupName)
 {
     list<Audit_ClassType *> r;
-    for (const auto & i : classVars)
+    for (auto & i : classVars)
     {
-        if (i.first == groupName) r.push_back(i.second);
+        if (i.first == groupName) r.push_back(&i.second);
     }
     return r;
 }
@@ -111,10 +99,8 @@ std::list<Audit_ClassType *> Audit_Event::getMultiLineClassVars(const string &gr
 
 Audit_ClassType *Audit_Event::getClassVars(const string &groupName)
 {
-    if (classVars.find(groupName) != classVars.end())
-    {
-        return classVars.find(groupName)->second;
-    }
+    if (auto it = classVars.find(groupName); it != classVars.end())
+        return &it->second;
     return nullptr;
 }
 
@@ -123,7 +109,11 @@ json Audit_Event::getJSON()
     boost::json::object x{{"AUDITD", boost::json::object{}}, {"INFO", boost::json::object{}}};
 
     time_t unixTime = std::get<0>(eventId);
-    std::string  sTime = std::asctime(std::localtime(&unixTime));
+    std::tm localTime{};
+    char formattedTime[32]{};
+    if (localtime_r(&unixTime, &localTime))
+        std::strftime(formattedTime, sizeof(formattedTime), "%a %b %e %H:%M:%S %Y", &localTime);
+    std::string sTime = formattedTime;
     while (ends_with(sTime,"\n")) sTime.pop_back();
 
     std::string auditdID =  to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
@@ -145,13 +135,12 @@ json Audit_Event::getJSON()
     for (const string & className : classes)
     {
         boost::json::array entries;
-        typedef std::multimap<std::string, Audit_ClassType *>::iterator MMAPIterator;
-        std::pair<MMAPIterator, MMAPIterator> result = classVars.equal_range(className);
-        for (MMAPIterator it = result.first; it != result.second; it++)
+        auto [first, last] = classVars.equal_range(className);
+        for (auto it = first; it != last; ++it)
         {
             if (className != "INFO")
             {
-                entries.emplace_back(it->second->getJSON());
+                entries.emplace_back(it->second.getJSON());
             }
             // TODO: limit max classes
         }
