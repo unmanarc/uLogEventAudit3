@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_alert/src/input/inputs.
+ */
 #include "inputs.h"
 #include <fstream>
 #include <Mantids30/Core/Helpers/random.h>
@@ -8,171 +12,185 @@
 using namespace UANLZ::JSONALERT::Input;
 using namespace Mantids30::Runtime;
 
-std::list<std::unique_ptr<TCPServer>> Inputs::tcpServers;
-std::mutex Inputs::mt;
-std::string Inputs::sConfigFilePath;
+std::list<std::unique_ptr<TcpServer>> Inputs::tcpServers;
+std::mutex Inputs::registryMutex;
+std::string Inputs::configFilePath;
 bool Inputs::modified = false;
 
-Inputs::Inputs()
-{
-
-}
+Inputs::Inputs() {}
 
 json Inputs::getStats()
 {
-    boost::json::array v;
+    boost::json::array inputStats;
 
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &i : tcpServers)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &inputServer : tcpServers)
     {
-        v.emplace_back(i->getStats());
+        inputStats.emplace_back(inputServer->getStats());
     }
 
-    return v;
+    return inputStats;
 }
 
-json Inputs::readInputs(bool * readOK)
+json Inputs::readInputs(bool *readOk)
 {
-    json root;
-    if (readOK) *readOK = false;
+    json configuredInputs;
+    if (readOk)
+        *readOk = false;
 
-    if (access(sConfigFilePath.c_str(),R_OK))
+    if (access(configFilePath.c_str(), R_OK))
     {
         // Create empty JSON for unexistent file:
         boost::json::array r;
 
-        LOG_APP->log0(__func__,Logs::INFO,"Inputs file '%s' not found, creating an empty file.", sConfigFilePath.c_str());
+        LOG_APP->log0(__func__, Logs::INFO, "Inputs file '%s' not found, creating an empty file.",
+                      configFilePath.c_str());
 
-        std::ofstream config_doc(sConfigFilePath, std::ifstream::binary);
-        if (!config_doc.is_open()) return false;
-        config_doc << r;
-        config_doc.close();
+        std::ofstream configFile(configFilePath, std::ifstream::binary);
+        if (!configFile.is_open())
+            return false;
+        configFile << r;
+        configFile.close();
     }
 
     // Read JSON from file:
-    std::ifstream config_doc(sConfigFilePath, std::ifstream::binary);
+    std::ifstream configFile(configFilePath, std::ifstream::binary);
 
-    if (!config_doc.is_open())
+    if (!configFile.is_open())
     {
-        if ( readOK) *readOK = false;
-        return root;
+        if (readOk)
+            *readOk = false;
+        return configuredInputs;
     }
 
-    if (!UANLZ::JSON::readConfigArray(config_doc, root)) return {};
+    if (!UANLZ::JSON::readConfigArray(configFile, configuredInputs))
+        return {};
 
-    if ( readOK) *readOK = true;
+    if (readOk)
+        *readOk = true;
 
-    return root;
+    return configuredInputs;
 }
 
-bool Inputs::writeInputs(const json &jConfig)
+bool Inputs::writeInputs(const json &configValue)
 {
-    if (!jConfig.is_array()) return false;
-    if (readInputs() == jConfig)
+    if (!configValue.is_array())
+        return false;
+    if (readInputs() == configValue)
         return true;
 
-    std::ofstream config_doc(sConfigFilePath, std::ifstream::binary);
-    if (!config_doc.is_open()) return false;
-    config_doc << jConfig;
-    config_doc.close();
+    std::ofstream configFile(configFilePath, std::ifstream::binary);
+    if (!configFile.is_open())
+        return false;
+    configFile << configValue;
+    configFile.close();
     modified = true;
     return true;
 }
 
-bool Inputs::addInput(json jConfig)
+bool Inputs::addInput(json configValue)
 {
-    bool readOK;
-    json root = readInputs(&readOK);
-    boost::json::array rt;
-    if (!readOK)
+    bool readOk;
+    json configuredInputs = readInputs(&readOk);
+    boost::json::array updatedInputs;
+    if (!readOk)
         return false;
 
-    if (!jConfig.is_object()) return false;
-    jConfig.as_object()["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
+    if (!configValue.is_object())
+        return false;
+    configValue.as_object()["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
 
-    std::string listenAddr, description;
+    std::string listenAddress, description;
     uint16_t listenPort;
 
-    listenAddr = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"ListenAddr",""));
-    listenPort = UANLZ::JSON::asUInt32(jConfig,"ListenPort",0);
-    description = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"Description",""));
+    listenAddress = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "ListenAddr", ""));
+    listenPort = UANLZ::JSON::asUint32(configValue, "ListenPort", 0);
+    description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
-    LOG_APP->log0(__func__,Logs::INFO,"Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, Mantids30::DataFormat::JSON::ASCSTRING(jConfig,"id",""),description.c_str(),listenAddr.c_str(),listenPort );
+    LOG_APP->log0(__func__, Logs::INFO, "Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16,
+                  Mantids30::DataFormat::JSON::ASCSTRING(configValue, "id", ""), description.c_str(),
+                  listenAddress.c_str(), listenPort);
 
-    rt.emplace_back(jConfig);
+    updatedInputs.emplace_back(configValue);
     // Read array:
-    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
+    for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
-        rt.emplace_back(root.as_array()[i]);
+        updatedInputs.emplace_back(configuredInputs.as_array()[inputIndex]);
     }
 
-    return writeInputs(rt);
+    return writeInputs(updatedInputs);
 }
 
-bool Inputs::remInput(const std::string &inputId)
+bool Inputs::removeInput(const std::string &inputId)
 {
-    bool readOK;
-    json root = readInputs(&readOK);
-    boost::json::array rt;
-    if (!readOK)
+    bool readOk;
+    json configuredInputs = readInputs(&readOk);
+    boost::json::array updatedInputs;
+    if (!readOk)
         return false;
     // Read array:
-    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
+    for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
-        if ( std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"id","")) != inputId )
-            rt.emplace_back(root.as_array()[i]);
+        if (std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "id", "")) !=
+            inputId)
+            updatedInputs.emplace_back(configuredInputs.as_array()[inputIndex]);
         else
         {
-            std::string listenAddr, description;
+            std::string listenAddress, description;
             uint16_t listenPort;
 
-            listenAddr = std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"ListenAddr",""));
-            listenPort = UANLZ::JSON::asUInt32(root.as_array()[i],"ListenPort",0);
-            description = std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"Description",""));
+            listenAddress = std::string(
+                Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "ListenAddr", ""));
+            listenPort = UANLZ::JSON::asUint32(configuredInputs.as_array()[inputIndex], "ListenPort", 0);
+            description = std::string(
+                Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "Description", ""));
 
-            LOG_APP->log0(__func__,Logs::INFO,"Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16, Mantids30::DataFormat::JSON::ASCSTRING(root.as_array()[i],"id",""),description.c_str(),listenAddr.c_str(),listenPort );
-
+            LOG_APP->log0(__func__, Logs::INFO,
+                          "Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16,
+                          Mantids30::DataFormat::JSON::ASCSTRING(configuredInputs.as_array()[inputIndex], "id", ""),
+                          description.c_str(), listenAddress.c_str(), listenPort);
         }
     }
 
-    return writeInputs(rt);
+    return writeInputs(updatedInputs);
 }
 
 bool Inputs::loadConfig()
 {
-    LOG_APP->log0(__func__,Logs::INFO,"Loading inputs from file: %s", sConfigFilePath.c_str());
+    LOG_APP->log0(__func__, Logs::INFO, "Loading inputs from file: %s", configFilePath.c_str());
 
-    bool readOK;
-    json root = readInputs(&readOK);
+    bool readOk;
+    json configuredInputs = readInputs(&readOk);
 
-    if (!readOK)
+    if (!readOk)
     {
         return false;
     }
 
     // Read array:
-    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
+    for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
-        auto in = std::make_unique<TCPServer>();
-        if (!in->loadConfig(root.as_array()[i])) continue;
-        std::lock_guard<std::mutex> lock(mt);
-        tcpServers.push_back(std::move(in));
+        auto inputServer = std::make_unique<TcpServer>();
+        if (!inputServer->loadConfig(configuredInputs.as_array()[inputIndex]))
+            continue;
+        std::lock_guard<std::mutex> lock(registryMutex);
+        tcpServers.push_back(std::move(inputServer));
     }
     return true;
 }
 
 void Inputs::startThreads()
 {
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &i : tcpServers)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &inputServer : tcpServers)
     {
-        i->startThreaded();
+        inputServer->startListener();
     }
 }
 
 void Inputs::setConfigFilePath(const std::string &value)
 {
-    sConfigFilePath = value;
+    configFilePath = value;
 }
 
 bool Inputs::getModified()

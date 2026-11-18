@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_alert/src/rpcimpl.
+ */
 #include "rpcimpl.h"
 #include "audit_rpc.h"
 #include <inttypes.h>
@@ -13,245 +17,238 @@
 using namespace Mantids30::Runtime;
 using namespace UANLZ::JSONALERT;
 
-RPCImpl::RPCImpl()
+RpcImpl::RpcImpl() {}
+
+void RpcImpl::runRpcClient()
 {
-}
+    uint16_t remotePort = Globals::getMainConfig()->get<uint16_t>("RPCConnector.RemotePort", 33001);
+    std::string remoteAddress = Globals::getMainConfig()->get<std::string>("RPCConnector.RemoteAddr", "127.0.0.1");
+    std::string rpcApiKey =
+        Globals::getMainConfig()->get<std::string>("RPCConnector.AlertsApiKey", "REPLACEME_XABCXAPIX_ALERT");
 
-void RPCImpl::runRPClient()
-{
-    uint16_t remotePort = Globals::getConfig_main()->get<uint16_t>("RPCConnector.RemotePort",33001);
-    std::string remoteAddr = Globals::getConfig_main()->get<std::string>("RPCConnector.RemoteAddr","127.0.0.1");
-    std::string rpcApiKey = Globals::getConfig_main()->get<std::string>("RPCConnector.AlertsApiKey","REPLACEME_XABCXAPIX_ALERT");
+    Mantids30::Protocol::FastRPC1 fastRpc;
 
-    Mantids30::Protocol::FastRPC1 fastRPC;
+    fastRpc.addMethod("control.RulesReload", UANLZ::JSON::rpcMethod<&controlRulesReload>());
+    fastRpc.addMethod("control.RulesActions", UANLZ::JSON::rpcMethod<&controlActionsReload>());
+    fastRpc.addMethod("control.RemoveRule", UANLZ::JSON::rpcMethod<&controlRemoveRule>());
+    fastRpc.addMethod("control.SaveRunningRules", UANLZ::JSON::rpcMethod<&controlSaveRunningRules>());
+    fastRpc.addMethod("control.WriteRulesFileConfig", UANLZ::JSON::rpcMethod<&controlWriteRulesFileConfig>());
+    fastRpc.addMethod("stats.ReadRunningRules", UANLZ::JSON::rpcMethod<&statReadRunningRules>());
+    fastRpc.addMethod("stats.ReadRunningRule", UANLZ::JSON::rpcMethod<&statReadRunningRule>());
+    fastRpc.addMethod("stats.ReadRulesFileConfig", UANLZ::JSON::rpcMethod<&statReadRulesFileConfig>());
+    fastRpc.addMethod("stats.AreRulesModified", UANLZ::JSON::rpcMethod<&statAreRulesModified>());
+    fastRpc.addMethod("control.AddRule", UANLZ::JSON::rpcMethod<&controlAddRule>());
+    fastRpc.addMethod("control.EditRule", UANLZ::JSON::rpcMethod<&controlEditRule>());
+    fastRpc.addMethod("control.RuleUp", UANLZ::JSON::rpcMethod<&controlRuleUp>());
+    fastRpc.addMethod("control.RuleDown", UANLZ::JSON::rpcMethod<&controlRuleDown>());
 
-    // RULES:
-    fastRPC.addMethod( "control.RulesReload",            UANLZ::JSON::rpcMethod<&controlRulesReload>() );
-    fastRPC.addMethod( "control.RulesActions",           UANLZ::JSON::rpcMethod<&controlActionsReload>() );
-    fastRPC.addMethod( "control.RemoveRule",             UANLZ::JSON::rpcMethod<&controlRemoveRule>() );
-    fastRPC.addMethod( "control.SaveRunningRules",       UANLZ::JSON::rpcMethod<&controlSaveRunningRules>() );
-    fastRPC.addMethod( "control.WriteRulesFileConfig",   UANLZ::JSON::rpcMethod<&controlWriteRulesFileConfig>() );
-    fastRPC.addMethod( "stats.ReadRunningRules",         UANLZ::JSON::rpcMethod<&statReadRunningRules>() );
-    fastRPC.addMethod( "stats.ReadRunningRule",          UANLZ::JSON::rpcMethod<&statReadRunningRule>() );
-    fastRPC.addMethod( "stats.ReadRulesFileConfig",      UANLZ::JSON::rpcMethod<&statReadRulesFileConfig>() );
-    fastRPC.addMethod( "stats.AreRulesModified",         UANLZ::JSON::rpcMethod<&statAreRulesModified>() );
-    fastRPC.addMethod( "control.AddRule",                UANLZ::JSON::rpcMethod<&controlAddRule>() );
-    fastRPC.addMethod( "control.EditRule",               UANLZ::JSON::rpcMethod<&controlEditRule>() );
-    fastRPC.addMethod( "control.RuleUp",                 UANLZ::JSON::rpcMethod<&controlRuleUp>() );
-    fastRPC.addMethod( "control.RuleDown",               UANLZ::JSON::rpcMethod<&controlRuleDown>() );
+    fastRpc.addMethod("control.WriteActionsFileConfig", UANLZ::JSON::rpcMethod<&controlWriteActionsFileConfig>());
+    fastRpc.addMethod("control.AddAction", UANLZ::JSON::rpcMethod<&controlAddAction>());
+    fastRpc.addMethod("control.EditAction", UANLZ::JSON::rpcMethod<&controlEditAction>());
+    fastRpc.addMethod("control.RemoveAction", UANLZ::JSON::rpcMethod<&controlRemoveAction>());
+    fastRpc.addMethod("control.SaveRunningActions", UANLZ::JSON::rpcMethod<&controlSaveRunningActions>());
+    fastRpc.addMethod("stats.AreActionsModified", UANLZ::JSON::rpcMethod<&statAreActionsModified>());
+    fastRpc.addMethod("stats.ReadRunningActions", UANLZ::JSON::rpcMethod<&statReadRunningActions>());
+    fastRpc.addMethod("stats.ReadRunningAction", UANLZ::JSON::rpcMethod<&statReadRunningAction>());
+    fastRpc.addMethod("stats.ReadActionsFileConfig", UANLZ::JSON::rpcMethod<&statReadActionsFileConfig>());
 
-    // ACTIONS:
-    fastRPC.addMethod( "control.WriteActionsFileConfig", UANLZ::JSON::rpcMethod<&controlWriteActionsFileConfig>() );
-    fastRPC.addMethod( "control.AddAction",              UANLZ::JSON::rpcMethod<&controlAddAction>() );
-    fastRPC.addMethod( "control.EditAction",             UANLZ::JSON::rpcMethod<&controlEditAction>() );
-    fastRPC.addMethod( "control.RemoveAction",           UANLZ::JSON::rpcMethod<&controlRemoveAction>() );
-    fastRPC.addMethod( "control.SaveRunningActions",     UANLZ::JSON::rpcMethod<&controlSaveRunningActions>() );
-    fastRPC.addMethod( "stats.AreActionsModified",       UANLZ::JSON::rpcMethod<&statAreActionsModified>() );
-    fastRPC.addMethod( "stats.ReadRunningActions",       UANLZ::JSON::rpcMethod<&statReadRunningActions>() );
-    fastRPC.addMethod( "stats.ReadRunningAction",        UANLZ::JSON::rpcMethod<&statReadRunningAction>() );
-    fastRPC.addMethod( "stats.ReadActionsFileConfig",    UANLZ::JSON::rpcMethod<&statReadActionsFileConfig>() );
+    fastRpc.addMethod("stats.ReadRunningInputs", UANLZ::JSON::rpcMethod<&statReadRunningInputs>());
+    fastRpc.addMethod("stats.ReadInputsFileConfig", UANLZ::JSON::rpcMethod<&statReadInputsFileConfig>());
+    fastRpc.addMethod("control.AddInputToFileConfig", UANLZ::JSON::rpcMethod<&controlAddInput>());
+    fastRpc.addMethod("control.RemInputFromFileConfig", UANLZ::JSON::rpcMethod<&controlRemoveInput>());
 
-    // INPUTS:
-    fastRPC.addMethod( "stats.ReadRunningInputs",        UANLZ::JSON::rpcMethod<&statGetRunningInputs>() );
-    fastRPC.addMethod( "stats.ReadInputsFileConfig",     UANLZ::JSON::rpcMethod<&statReadInputsFileConfig>() );
-    fastRPC.addMethod( "control.AddInputToFileConfig",   UANLZ::JSON::rpcMethod<&AddInputToFileConfig>() );
-    fastRPC.addMethod( "control.RemInputFromFileConfig",   UANLZ::JSON::rpcMethod<&RemInputFromFileConfig>() );
-
-
-    fastRPC.addMethod( "stats.SystemStats",              UANLZ::JSON::rpcMethod<&statSystemStats>() );
-    fastRPC.addMethod( "control.ReloadApp",              UANLZ::JSON::rpcMethod<&controlReloadApp>() );
+    fastRpc.addMethod("stats.SystemStats", UANLZ::JSON::rpcMethod<&statSystemStats>());
+    fastRpc.addMethod("control.ReloadApp", UANLZ::JSON::rpcMethod<&controlReloadApp>());
 
     for (;;)
     {
-        auto sockRPCClient = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
+        auto rpcSocket = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
 
-
-        // Set the SO default security level:
-
-
-
-        if (!sockRPCClient->tlsKeys.loadCAFromPEMFile( Globals::getConfig_main()->get<std::string>("RPCConnector.CAFile","rpcca.crt").c_str() ))
+        if (!rpcSocket->tlsKeys.loadCAFromPEMFile(
+                Globals::getMainConfig()->get<std::string>("RPCConnector.CAFile", "rpcca.crt").c_str()))
         {
-            LOG_APP->log0(__func__,Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
+            LOG_APP->log0(__func__, Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s",
+                          remoteAddress.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
             _exit(-3);
         }
 
-        sockRPCClient->tlsKeys.setValidateServerHostname(true);
-        if ( sockRPCClient->connectTo( remoteAddr.c_str(), remotePort ) )
+        rpcSocket->tlsKeys.setValidateServerHostname(true);
+        if (rpcSocket->connectTo(remoteAddress.c_str(), remotePort))
         {
-            LOG_APP->log0(__func__,Logs::INFO,  "Connected to %s:%" PRIu16, remoteAddr.c_str(), remotePort);
-            if (sockRPCClient->writeStringEx<uint16_t>(rpcApiKey))
-                fastRPC.processConnection(sockRPCClient,"SERVER");
+            LOG_APP->log0(__func__, Logs::INFO, "Connected to %s:%" PRIu16, remoteAddress.c_str(), remotePort);
+            if (rpcSocket->writeStringEx<uint16_t>(rpcApiKey))
+                fastRpc.processConnection(rpcSocket, "SERVER");
             sleep(3);
         }
         else
         {
-            LOG_APP->log0(__func__,Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, sockRPCClient->getLastError().c_str());
+            LOG_APP->log0(__func__, Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s",
+                          remoteAddress.c_str(), remotePort, rpcSocket->getLastError().c_str());
             sleep(3);
         }
     }
 }
 
-json RPCImpl::controlWriteRulesFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *,
+                                          const std::string &)
 {
-    return Filters::Rules::writeRulesFileConfig(jConfig);
+    return Filters::Rules::writeRulesFileConfig(configValue);
 }
 
-json RPCImpl::statReadRulesFileConfig(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadRulesFileConfig(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::readRulesFileConfig();
 }
 
-json RPCImpl::statReadRunningRules(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadRunningRules(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningRules();
 }
 
-json RPCImpl::statReadRunningRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::statReadRunningRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningRule(UANLZ::JSON::asUInt32(jConfig,"id",0xFFFFFFFF));
+    return Filters::Rules::getCurrentRunningRule(UANLZ::JSON::asUint32(configValue, "id", 0xFFFFFFFF));
 }
 
-json RPCImpl::statAreRulesModified(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statAreRulesModified(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::getRulesModified();
 }
 
-json RPCImpl::controlRemoveRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlRemoveRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::removeRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::removeRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RPCImpl::controlRemoveAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlRemoveAction(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::removeAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name","")));
+    return Filters::Rules::removeAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
-json RPCImpl::controlSaveRunningRules(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::controlSaveRunningRules(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(Filters::Rules::getCurrentRunningRules());
 }
 
-json RPCImpl::controlSaveRunningActions(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::controlSaveRunningActions(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(Filters::Rules::getCurrentRunningActions());
 }
 
-json RPCImpl::controlAddAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlAddAction(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::addAction(jConfig);
+    return Filters::Rules::addAction(configValue);
 }
 
-json RPCImpl::controlEditAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlEditAction(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::editAction(jConfig);
+    return Filters::Rules::editAction(configValue);
 }
 
-json RPCImpl::controlEditRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlEditRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::editRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF),Mantids30::DataFormat::JSON::MEMBER_OR_NULL(jConfig, "rule"));
+    return Filters::Rules::editRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF),
+                                    Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-json RPCImpl::controlAddRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlAddRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::addRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF),Mantids30::DataFormat::JSON::MEMBER_OR_NULL(jConfig, "rule"));
+    return Filters::Rules::addRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF),
+                                   Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-json RPCImpl::controlRuleUp(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlRuleUp(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::ruleUp(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::moveRuleUp(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RPCImpl::controlRuleDown(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlRuleDown(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::ruleDown(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::moveRuleDown(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RPCImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *,
+                                            const std::string &)
 {
-    return Filters::Rules::writeActionsFileConfig(jConfig);
+    return Filters::Rules::writeActionsFileConfig(configValue);
 }
 
-json RPCImpl::statReadActionsFileConfig(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadActionsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::readActionsFileConfig();
 }
 
-json RPCImpl::statAreActionsModified(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statAreActionsModified(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::getActionsModified();
 }
 
-json RPCImpl::statReadRunningActions(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadRunningActions(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningActions();
 }
 
-json RPCImpl::statReadRunningAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::statReadRunningAction(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name","")));
+    return Filters::Rules::getCurrentRunningAction(
+        std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
-json RPCImpl::RemInputFromFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlRemoveInput(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Input::Inputs::remInput(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"id","")));
+    return Input::Inputs::removeInput(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "id", "")));
 }
 
-json RPCImpl::AddInputToFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
+json RpcImpl::controlAddInput(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Input::Inputs::addInput(jConfig);
+    return Input::Inputs::addInput(configValue);
 }
 
-json RPCImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
 {
-    boost::json::object j{};
-    j["modified"] = Input::Inputs::getModified();
-    j["inputs"] = Input::Inputs::readInputs();
-    return j;
+    boost::json::object response{};
+    response["modified"] = Input::Inputs::getModified();
+    response["inputs"] = Input::Inputs::readInputs();
+    return response;
 }
 
-json RPCImpl::statGetRunningInputs(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statReadRunningInputs(void *, const std::string &, const json &, void *, const std::string &)
 {
     return Input::Inputs::getStats();
 }
 
+/**
+ * @brief Delay exit long enough to return the RPC reply before a service-manager restart.
+ */
 void sleepAndExit()
 {
     sleep(2);
     _exit(0);
 }
 
-json RPCImpl::controlReloadApp(void *, const std::string &, const json &, void*, const std::string &)
+json RpcImpl::controlReloadApp(void *, const std::string &, const json &, void *, const std::string &)
 {
-    json j = true;
-    LOG_APP->log0(__func__,Logs::WARNING,  "Reload requested via RPC");
+    json response = true;
+    LOG_APP->log0(__func__, Logs::WARNING, "Reload requested via RPC");
 
     std::thread(sleepAndExit).detach();
-    return j;
+    return response;
 }
 
-json RPCImpl::statSystemStats(void *,const std::string &, const json &, void*, const std::string &)
+json RpcImpl::statSystemStats(void *, const std::string &, const json &, void *, const std::string &)
 {
-    json j = Filters::Rules::getStats();
-    return j;
+    json response = Filters::Rules::getStats();
+    return response;
 }
 
-json RPCImpl::controlRulesReload(void *,const std::string &, const json &, void*, const std::string &)
+json RpcImpl::controlRulesReload(void *, const std::string &, const json &, void *, const std::string &)
 {
-    json j = Filters::Rules::reloadRules();
-    return j;
+    json response = Filters::Rules::reloadRules();
+    return response;
 }
 
-json RPCImpl::controlActionsReload(void *,const std::string &, const json &, void*, const std::string &)
+json RpcImpl::controlActionsReload(void *, const std::string &, const json &, void *, const std::string &)
 {
-    json j = Filters::Rules::reloadActions();
-    return j;
+    json response = Filters::Rules::reloadActions();
+    return response;
 }
-/*
-json RPCImpl::helloWorld(void *, const json &)
-{
-    boost::json::object hw;
-    hw["MSG"] = "Hello World!";
-    return hw;
-}
-*/

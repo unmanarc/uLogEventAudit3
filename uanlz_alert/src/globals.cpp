@@ -1,27 +1,28 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_alert/src/globals.
+ */
 #include "globals.h"
 
 using namespace UANLZ::JSONALERT;
 
-std::unique_ptr<Mantids30::Runtime::Logs::AppLog> Globals::applog;
-std::mutex Globals::mDatabase, Globals::mDirs;
-boost::property_tree::ptree Globals::config_main;
+std::unique_ptr<Mantids30::Runtime::Logs::AppLog> Globals::appLog;
+std::mutex Globals::databaseMutex, Globals::directoriesMutex;
+boost::property_tree::ptree Globals::mainConfig;
 
-Globals::Globals()
-{
-}
+Globals::Globals() {}
 
 Mantids30::Runtime::Logs::AppLog *Globals::getAppLog()
 {
-    return applog.get();
+    return appLog.get();
 }
 
 void Globals::setAppLog(std::unique_ptr<Mantids30::Runtime::Logs::AppLog> value)
 {
-    applog = std::move(value);
+    appLog = std::move(value);
 }
 
-boost::property_tree::ptree *Globals::getConfig_main()
+boost::property_tree::ptree *Globals::getMainConfig()
 {
-    return &config_main;
+    return &mainConfig;
 }
-

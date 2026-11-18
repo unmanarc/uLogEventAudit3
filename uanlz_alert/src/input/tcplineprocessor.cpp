@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_alert/src/input/tcplineprocessor.
+ */
 #include "tcplineprocessor.h"
 #include "tcpserver.h"
 
@@ -12,36 +16,38 @@ using namespace std;
 using namespace UANLZ::JSONALERT::Input;
 using namespace UANLZ::JSONALERT;
 
-TCPLineProcessor::TCPLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, TCPServer &server) : LineRecv(sock), server(server)
+TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket,
+                                   TcpServer &server)
+    : LineRecv(socket), server(server)
 {
-    processedLinesCount=0;
-    droppedElements=0;
-    setMaxLineSize(1024*1024); // 1Mb per line
+    processedLinesCount = 0;
+    droppedElements = 0;
+    setMaxLineSize(1024 * 1024); // 1Mb per line
 }
 
-TCPLineProcessor::~TCPLineProcessor()
+TcpLineProcessor::~TcpLineProcessor() {}
+
+json TcpLineProcessor::getStats()
 {
+    boost::json::object connectionStats{};
+    connectionStats["ip"] = remoteIp;
+    connectionStats["processedLinesCount"] = (uint64_t)processedLinesCount;
+    connectionStats["droppedElements"] = (uint64_t)droppedElements;
+    return connectionStats;
 }
 
-json TCPLineProcessor::getStats()
+bool TcpLineProcessor::processParsedLine(const string &line)
 {
-    boost::json::object v{};
-    v["ip"] = remoteIP;
-    v["processedLinesCount"] = (uint64_t)processedLinesCount;
-    v["droppedElements"] = (uint64_t)droppedElements;
-    return v;
-}
-
-bool TCPLineProcessor::processParsedLine(const string &line)
-{
-    if (line.empty()) return true;
+    if (line.empty())
+        return true;
     processedLinesCount++;
 
-    if (!Filters::Rules::pushElementOnEvaluationQueue(line)) droppedElements++;
+    if (!Filters::Rules::enqueueLine(line))
+        droppedElements++;
     return true;
 }
 
-void TCPLineProcessor::setRemoteIP(const std::string &value)
+void TcpLineProcessor::setRemoteIp(const std::string &value)
 {
-    remoteIP = value;
+    remoteIp = value;
 }
