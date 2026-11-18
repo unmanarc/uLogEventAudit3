@@ -11,7 +11,7 @@ using namespace UANLZ::LOG2JSON::AuditdEvents;
 using namespace UANLZ::LOG2JSON;
 
 
-Mantids::Threads::Safe::Queue<Audit_Event> Events_DistributionThreads::eventsQueue;
+Mantids30::Core::Threads::Safe::Queue<Audit_Event> Events_DistributionThreads::eventsQueue;
 uint32_t Events_DistributionThreads::pushTimeoutInMS = 0;
 
 //std::atomic<double> ProcessorThreads_Output::lastRulesEvaluationTime;
@@ -23,7 +23,7 @@ std::atomic<uint64_t> Events_DistributionThreads::eventsDropped;
 // TOOD: remover rules de aqui.
 
 void outputDistributionThread(int threadid)
-{   
+{
     std::string threadName = "EVENTS_DEQUEUE";
 #ifndef WIN32
     pthread_setname_np(pthread_self(), threadName.c_str());
@@ -63,7 +63,7 @@ void outputDistributionThread(int threadid)
         }
         else
         {
-            LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_DEBUG, "No events so far for output thread #%d, triggering no event alert JSON...", threadid);
+            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::DEBUG, "No events so far for output thread #%d, triggering no event alert JSON...", threadid);
             json noEventsAlertJSON;
             noEventsAlertJSON["noEventsAlert"] = true;
             Output::Outputs::pushToOutputBases(noEventsAlertJSON, std::make_tuple<time_t, uint32_t, uint64_t>(0,0,0));

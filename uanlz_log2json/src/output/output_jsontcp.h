@@ -2,10 +2,10 @@
 #define OUTPUT_JSONTCP_H
 
 #include "output_base.h"
-#include <mdz_net_sockets/socket_tcp.h>
-#include <mdz_thr_safecontainers/queue.h>
+#include <Mantids30/Network/Sockets/socket_tcp.h>
+#include <Mantids30/Core/Threads/safe_queue.h>
 
-#include <mdz_hlp_functions/json.h>
+#include <audit_json.h>
 #include <boost/property_tree/ptree.hpp>
 
 namespace UANLZ { namespace LOG2JSON { namespace Output {
@@ -26,11 +26,11 @@ public:
 private:
     bool reconnect();
 
-    Mantids::Threads::Safe::Queue<json> queueValues;
+    Mantids30::Core::Threads::Safe::Queue<json> queueValues;
 
     std::string server;
     uint16_t port;
-    Mantids::Network::Sockets::Socket_TCP * connection;
+    Mantids30::Network::Sockets::Socket_TCP * connection;
     std::atomic<bool> connected;
     std::atomic<uint64_t> dropped, processed;
     uint32_t push_tmout_msecs;

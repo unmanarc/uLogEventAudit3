@@ -20,7 +20,7 @@ Mar 19 03:28:34 asd audispd: node=asd.com type=PATH msg=audit(1552987714.396:292
 */
 
 TCPLineProcessor::TCPLineProcessor(
-    Mantids::Memory::Streams::StreamableObject *sock, void *server)
+    const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, void *server)
     : LineRecv(sock)
 {
     this->server = server;
@@ -112,7 +112,7 @@ void TCPLineProcessor::addInvalidLine(
 {
     ((TCPServer *) server)->incInvalidLines();
     invalidLinesCount++;
-    LOG_APP->log1(__func__, remoteIP, Mantids::Application::Logs::LEVEL_WARN, "Incoming invalid line: %s", line.c_str());
+    LOG_APP->log1(__func__, remoteIP, Mantids30::Runtime::Logs::WARNING, "Incoming invalid line: %s", line.c_str());
 }
 
 bool TCPLineProcessor::extractIPAddress(
@@ -257,17 +257,17 @@ bool TCPLineProcessor::extractAuditdHeader(
 
     std::vector<std::string> tokens;
     boost::split(tokens, auditdHeaderStr, boost::is_any_of(" "), boost::token_compress_on);
-    for (const auto& token : tokens) 
+    for (const auto& token : tokens)
     {
-        if (token.find("node=") != std::string::npos) 
+        if (token.find("node=") != std::string::npos)
         {
             auditdHeader.node = token.substr(5);
-        } 
-        else if (token.find("type=") != std::string::npos) 
+        }
+        else if (token.find("type=") != std::string::npos)
         {
             auditdHeader.type = token.substr(5);
-        } 
-        else if (token.find("msg=audit(") != std::string::npos && token.back() == ')') 
+        }
+        else if (token.find("msg=audit(") != std::string::npos && token.back() == ')')
         {
             size_t pos = token.find('(');
             size_t timePos = token.find('.', pos + 1);

@@ -1,7 +1,7 @@
 #ifndef OUTPUT_DISTRIBUTIONTHREADS_H
 #define OUTPUT_DISTRIBUTIONTHREADS_H
 
-#include <mdz_thr_safecontainers/queue.h>
+#include <Mantids30/Core/Threads/safe_queue.h>
 
 #include "../events/audit_event.h"
 
@@ -27,7 +27,7 @@ public:
 private:
   //  static std::atomic<double> lastRulesEvaluationTime;
     static std::atomic<uint64_t> eventsProcessed, eventsProcessedInLast10Second, eventsProcessedInThisPeriod, eventsDropped;
-    static Mantids::Threads::Safe::Queue<Audit_Event> eventsQueue;
+    static Mantids30::Core::Threads::Safe::Queue<Audit_Event> eventsQueue;
     static uint32_t pushTimeoutInMS;
 };
 

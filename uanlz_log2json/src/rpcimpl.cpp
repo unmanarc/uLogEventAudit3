@@ -1,4 +1,5 @@
 #include "rpcimpl.h"
+#include "audit_rpc.h"
 
 #include "globals.h"
 
@@ -7,11 +8,11 @@
 #include "events/events_manager.h"
 #include "events/events_distributionthreads.h"
 
-#include <mdz_net_sockets/socket_tls.h>
-#include <mdz_xrpc_fast/fastrpc.h>
+#include <Mantids30/Network/Sockets/socket_tls.h>
+#include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 #include <inttypes.h>
 
-using namespace Mantids::Application;
+using namespace Mantids30::Runtime;
 using namespace UANLZ::LOG2JSON;
 
 RPCImpl::RPCImpl()
@@ -23,37 +24,39 @@ void RPCImpl::runRPClient()
 {
     uint16_t remotePort = Globals::getConfig_main()->get<uint16_t>("RPCConnector.RemotePort",33001);
     std::string remoteAddr = Globals::getConfig_main()->get<std::string>("RPCConnector.RemoteAddr","127.0.0.1");
-    std::string rpcApiKey = Globals::getConfig_main()->get<std::string>("RPCConnector.AlertsApiKey","REPLACEME_XABCXAPIX_LOG2JSON");
+    std::string rpcApiKey = Globals::getConfig_main()->get<std::string>("RPCConnector.Log2JSONApiKey","REPLACEME_XABCXAPIX_LOG2JSON");
 
-    Mantids::RPC::Fast::FastRPC fastRPC;
+    Mantids30::Protocol::FastRPC1 fastRPC;
 
-    fastRPC.addMethod( "stats.EventsPerHost",              {&statEventsPerHost,nullptr} );
-    fastRPC.addMethod( "stats.OutputsDistributionThreads", {&statOutputsDistributionThreads,nullptr} );
-    fastRPC.addMethod( "stats.Outputs",                    {&statOutputs,nullptr} );
-    fastRPC.addMethod( "stats.Inputs",                     {&statInputs,nullptr} );
+    fastRPC.addMethod( "stats.EventsPerHost",              UANLZ::JSON::rpcMethod<&statEventsPerHost>() );
+    fastRPC.addMethod( "stats.OutputsDistributionThreads", UANLZ::JSON::rpcMethod<&statOutputsDistributionThreads>() );
+    fastRPC.addMethod( "stats.Outputs",                    UANLZ::JSON::rpcMethod<&statOutputs>() );
+    fastRPC.addMethod( "stats.Inputs",                     UANLZ::JSON::rpcMethod<&statInputs>() );
 
     for (;;)
     {
-        Mantids::Network::Sockets::Socket_TLS sockRPCClient;
+        auto sockRPCClient = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
 
         // Set the SO default security level:
-        sockRPCClient.keys.setSecurityLevel(-1);
 
-        if (!sockRPCClient.keys.loadCAFromPEMFile( "rpcca.crt" ))
+
+        if (!sockRPCClient->tlsKeys.loadCAFromPEMFile( Globals::getConfig_main()->get<std::string>("RPCConnector.CAFile","rpcca.crt").c_str() ))
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
+            LOG_APP->log0(__func__,Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
             _exit(-3);
         }
 
-        if ( sockRPCClient.connectTo( remoteAddr.c_str(), remotePort ) )
+        sockRPCClient->tlsKeys.setValidateServerHostname(true);
+        if ( sockRPCClient->connectTo( remoteAddr.c_str(), remotePort ) )
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Connected to @%s:%" PRIu16, remoteAddr.c_str(), remotePort);
-            sockRPCClient.writeStringEx<uint16_t>(rpcApiKey);
-            fastRPC.processConnection(&sockRPCClient,"SERVER");
+            LOG_APP->log0(__func__,Logs::INFO,  "Connected to @%s:%" PRIu16, remoteAddr.c_str(), remotePort);
+            if (sockRPCClient->writeStringEx<uint16_t>(rpcApiKey))
+                fastRPC.processConnection(sockRPCClient,"SERVER");
+            sleep(3);
         }
         else
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, sockRPCClient.getLastError().c_str());
+            LOG_APP->log0(__func__,Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, sockRPCClient->getLastError().c_str());
             sleep(3);
         }
     }

@@ -1,16 +1,16 @@
 #ifndef LINERECEPTOR_H
 #define LINERECEPTOR_H
 
-#include <mdz_hlp_functions/json.h>
-#include <mdz_proto_linerecv/linerecv.h>
+#include <audit_json.h>
+#include <Mantids30/Protocol/LineRecv/linerecv.h>
 #include <atomic>
 
 namespace UANLZ { namespace LOG2JSON { namespace Input {
 
-class TCPLineProcessor : public Mantids::Protocols::Line2Line::LineRecv
+class TCPLineProcessor : public Mantids30::Protocol::LineRecv::LineRecv
 {
 public:
-    TCPLineProcessor(Mantids::Memory::Streams::StreamableObject *sock, void * server);
+    TCPLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, void * server);
     virtual ~TCPLineProcessor();
 
     void setRemoteIP(const std::string &value);

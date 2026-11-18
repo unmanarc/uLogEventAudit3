@@ -3,7 +3,7 @@
 
 #include "audit_var.h"
 
-#include <mdz_hlp_functions/json.h>
+#include <audit_json.h>
 
 #include <map>
 #include <set>

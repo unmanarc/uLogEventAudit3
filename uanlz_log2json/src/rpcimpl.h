@@ -1,7 +1,7 @@
 #ifndef RPCIMPL_H
 #define RPCIMPL_H
 
-#include <mdz_hlp_functions/json.h>
+#include <audit_json.h>
 
 namespace UANLZ { namespace LOG2JSON {
 

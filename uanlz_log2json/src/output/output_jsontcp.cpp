@@ -18,7 +18,7 @@ void tcpOutputProcessorThread( Output_JSONTCP * output )
 
 Output_JSONTCP::Output_JSONTCP() : Output_Base()
 {
-    connection = new Mantids::Network::Sockets::Socket_TCP;
+    connection = new Mantids30::Network::Sockets::Socket_TCP;
 }
 
 Output_JSONTCP::~Output_JSONTCP()
@@ -32,7 +32,7 @@ bool Output_JSONTCP::loadConfig(const std::string &file)
         boost::property_tree::ini_parser::read_ini( file.c_str(),config);
     else
     {
-        LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_ERR, "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
+        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
         return false;
     }
 
@@ -61,7 +61,7 @@ void Output_JSONTCP::logAuditEvent(const json & eventJSON, const std::tuple<time
     // push, if not report and go.
     if (!queueValues.push(value,push_tmout_msecs))
     {
-        LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_WARN, "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId),get<1>(eventId),get<2>(eventId));
+        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::WARNING, "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId),get<1>(eventId),get<2>(eventId));
         dropped++;
         delete value;
     }
@@ -89,7 +89,7 @@ void Output_JSONTCP::process()
         if (value)
         {
             // Try to send it...
-            while (!connection->writeString(transmitionMode==0?toUnStyledString(*value) + "\n": value->toStyledString()  ).succeed)
+            while (!connection->writeString(transmitionMode==0?toUnStyledString(*value) + "\n": value->toStyledString()  ))
             {
                 // if not, try to reconnect.
                 while (!reconnect()) {}
@@ -125,7 +125,7 @@ bool Output_JSONTCP::reconnect()
         connection = nullptr;
     }
 
-    connection = new Mantids::Network::Sockets::Socket_TCP;
+    connection = new Mantids30::Network::Sockets::Socket_TCP;
 
 
     if (!connection->connectTo(server.c_str(),
@@ -134,14 +134,14 @@ bool Output_JSONTCP::reconnect()
     {
         std::string msg = connection->getLastError();
         boost::replace_all(msg,"\n",",");
-        LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_ERR, "JSONTCP connection error to %s:%" PRIu16 ": %s",  server.c_str(), port  ,msg.c_str());
+        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "JSONTCP connection error to %s:%" PRIu16 ": %s",  server.c_str(), port  ,msg.c_str());
         connected = false;
         sleep(config.get<uint32_t>("ReconnectSleepTimeInSecs",3));
         return false;
     }
     else
     {
-        LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_INFO, "JSONTCP connected to %s:%" PRIu16,  server.c_str(), port);
+        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::INFO, "JSONTCP connected to %s:%" PRIu16,  server.c_str(), port);
         connected = true;
         return true;
     }

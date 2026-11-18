@@ -1,7 +1,7 @@
 #ifndef RECEPTORTCPSERVER_H
 #define RECEPTORTCPSERVER_H
 
-#include <mdz_net_sockets/acceptor_multithreaded.h>
+#include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include "tcplineprocessor.h"
 #include <atomic>
 #include <set>
@@ -30,7 +30,7 @@ public:
     void incInvalidLines();
 
 private:
-    Mantids::Network::Sockets::Acceptors::MultiThreaded acceptor;
+    std::shared_ptr<Mantids30::Network::Sockets::Acceptors::MultiThreaded> acceptor = std::make_shared<Mantids30::Network::Sockets::Acceptors::MultiThreaded>();
 
     boost::property_tree::ptree config;
     std::string listenAddr, description;

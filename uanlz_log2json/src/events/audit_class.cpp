@@ -118,7 +118,7 @@ void Audit_ClassType::parseVar(const string &varName, const string &varValue)
 
     if (!contentVars[varName].parse( classTypeName, varName,  varValue ))
     {
-        LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_ERR, "Unable to parse variable '%s' with value '%s'", varName.c_str(), varValue.c_str());
+        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'", varName.c_str(), varValue.c_str());
     }
 
     if (classTypeName == "SOCKADDR" && varName=="saddr" && varValue.size()<250)
@@ -198,7 +198,7 @@ bool Audit_ClassType::mergeSpplitedVars()
     {
         if (ends_with(i.first,"]"))
         {
-            LOG_APP->log0(__func__,Mantids::Application::Logs::LEVEL_ERR, "Orphan variable '%s' can't be reconstructed", i.first.c_str());
+            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Orphan variable '%s' can't be reconstructed", i.first.c_str());
         }
     }
 
