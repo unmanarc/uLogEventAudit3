@@ -16,6 +16,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -204,7 +205,48 @@ WebService {{
                 launch(name, directory)
             eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
             eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
-            # Numeric GET arguments must survive encoded JSON and the JSONCpp boundary.
+            # Numeric GET arguments must survive encoded JSON and FastRPC1.
+            for path, member in [('alerts/rules', None), ('alerts/actions', None),
+                                 ('log2json/hosts', 'hosts'), ('log2json/inputs', 'inputs'),
+                                 ('log2json/outputs', 'outputs')]:
+                status, body = request('/api/v1/'+path, reader)
+                result = json.loads(body)
+                assert status == 200 and isinstance(result if member is None else result[member], list), (path, body)
+            # Input configuration writes preserve Unicode, escapes, numbers and booleans.
+            new_input = {'Description': 'test \u03bb "quoted"\ninput', 'ListenAddr': '127.0.0.1',
+                         'ListenPort': 12345, 'enabled': False}
+            status, body = request('/api/v1/alerts/inputs/config', admin, 'POST', new_input, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/inputs/config', reader)
+            added_input = json.loads(body)['inputs'][0]
+            assert all(added_input[key] == value for key, value in new_input.items()), body
+            status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
+                                   {'id': added_input['id']}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            assert len(json.loads((tmp/'uanlz_alert/inputs.json').read_text())) == 1
+            input_file = tmp/'uanlz_alert/inputs.json'
+            original_inputs = input_file.read_text()
+            status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
+                                   {'id': 'test-input'}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            assert json.loads(input_file.read_text()) == []
+            input_file.write_text('null')
+            status, body = request('/api/v1/alerts/inputs/config', reader)
+            assert status == 200 and json.loads(body)['inputs'] == [], (status, body)
+            for invalid_document in ['{', '{}', '[] trailing']:
+                input_file.write_text(invalid_document)
+                status, body = request('/api/v1/alerts/inputs/config', admin, 'POST', new_input, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is False, (status, body)
+                assert input_file.read_text() == invalid_document
+            input_file.write_text(original_inputs)
+            for resource in ['actions', 'rules']:
+                status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is True, (status, body)
+                config_file = tmp/'uanlz_alert'/(resource+'.json')
+                assert json.loads(config_file.read_text()) == []
+                status, body = request('/api/v1/alerts/'+resource+'/config', admin, 'PUT', {}, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is False, (status, body)
+                assert json.loads(config_file.read_text()) == []
             assert request('/api/v1/alerts/rules/item', admin, data={'id': 0})[0] == 200
             action = {'name': 'test-action', 'description': 'test', 'path': '/bin/true', 'args': ['/bin/true']}
             status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
@@ -213,17 +255,38 @@ WebService {{
             assert status == 200 and json.loads(body)['name'] == 'test-action', (status, body)
             assert request('/api/v1/alerts/actions', admin, 'DELETE', {'name': 'test-action'}, 'test-csrf-id')[0] == 200
             marker = tmp/'rule-executed'
-            action = {'name': 'pipeline-action', 'path': '/usr/bin/touch', 'args': ['/usr/bin/touch', str(marker)]}
+            capture = 'import json,sys; from pathlib import Path; Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))'
+            action = {'name': 'pipeline-action', 'path': sys.executable,
+                      'args': [sys.executable, '-c', capture, str(marker),
+                               '%-.INFO.id%', '%-.CWD[0].cwd%', '%+.CWD[0].cwd%',
+                               '%$.CWD[0]%', '%-.missing[0]%', '%#rule.name%', '%-.EXECVE[0].argv%']}
             status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             rule = {'name': 'pipeline-rule', 'action': 'EXEC', 'actionId': 'pipeline-action',
                     'filter': 'IS_EQUAL($.CWD[0].cwd,"/tmp")'}
             status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 0, 'rule': rule}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
+            # Invalid numeric positions must never wrap or truncate to rule zero.
+            for invalid_id in [-1, 0.5, 1 << 32, '0', None]:
+                status, body = request('/api/v1/alerts/rules/item', reader, data={'id': invalid_id})
+                assert status == 200 and json.loads(body) is None, (status, body)
+                status, body = request('/api/v1/alerts/rules', admin, 'DELETE',
+                                       {'pos': invalid_id}, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is False, (status, body)
             with socket.create_connection(('127.0.0.1', input_port), timeout=5) as incoming:
-                line = f'node=integration type=CWD msg=audit({int(time.time())}.123:42): cwd="/tmp"\n'
-                incoming.sendall(line.encode())
+                event_id = (1 << 64) - 1
+                stamp = f'{int(time.time())}.123:{event_id}'
+                lines = [f'node=integration type=CWD msg=audit({stamp}): cwd="/tmp"',
+                         f'node=integration type=EXECVE msg=audit({stamp}): argc=2 a0="echo" a1="hello"']
+                incoming.sendall(('\n'.join(lines)+'\n').encode())
             eventually(marker.exists, 'audit input -> reconstructed JSON -> TCP output -> expression -> action')
+            captured = json.loads(marker.read_text())
+            assert captured[0] == str(event_id), captured
+            assert json.loads(captured[1]) == '/tmp', captured
+            assert json.loads(captured[2]) == '/TMP', captured
+            assert json.loads(captured[3]) == {'cwd': '/tmp'} and captured[3].endswith('\n'), captured
+            assert captured[4:6] == ['null', 'pipeline-rule'], captured
+            assert json.loads(captured[6]) == ['echo', 'hello'], captured
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
