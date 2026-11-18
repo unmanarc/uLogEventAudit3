@@ -29,6 +29,32 @@ The web resources install into `/var/www/uauditweb`; configuration goes into
 Configure credentials, certificates, origins and login URLs before enabling
 services; see [MIGRATION.md](MIGRATION.md).
 
+## C++ regression tests
+
+CTest builds `audit_modernization_test` when `BUILD_TESTING` is enabled (the
+default). It checks queue ownership on rejection, pop and destruction; repeated
+parsing and copying of binary audit variables; fragmented EXECVE records;
+separate PATH records; and malformed socket addresses.
+
+```bash
+LD_LIBRARY_PATH="$HOME/Devel/ROOT/lib" ctest --test-dir build/mantids30 --output-on-failure
+```
+
+For memory and undefined-behavior checks on these paths:
+
+```bash
+PKG_CONFIG_PATH="$HOME/Devel/ROOT/share/pkgconfig:$PKG_CONFIG_PATH" \
+cmake -S . -B build/modernization-sanitizers -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake --build build/modernization-sanitizers --target audit_modernization_test -j
+LD_LIBRARY_PATH="$HOME/Devel/ROOT/lib" \
+  ctest --test-dir build/modernization-sanitizers --output-on-failure
+```
+
+These flags instrument the application test sources; installed libMantids30
+libraries retain their own build flags.
+
 ## Integration test
 
 ```bash

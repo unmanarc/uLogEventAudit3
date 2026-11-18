@@ -266,6 +266,22 @@ WebService {{
                     'filter': 'IS_EQUAL($.CWD[0].cwd,"/tmp")'}
             status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 0, 'rule': rule}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
+            # Replacements and reordering must retain ownership and the configured values.
+            action['description'] = 'updated pipeline action'
+            status, body = request('/api/v1/alerts/actions', admin, 'PUT', action, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/rules', admin, 'PUT', {'pos': 0, 'rule': rule}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            spare_rule = dict(rule, name='spare-rule')
+            status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 1, 'rule': spare_rule}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            for direction, position in [('up', 1), ('down', 0)]:
+                status, body = request('/api/v1/alerts/rules/' + direction, admin, 'POST', {'pos': position}, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/rules/item', reader, data={'id': 0})
+            assert status == 200 and json.loads(body)['name'] == rule['name'], (status, body)
+            status, body = request('/api/v1/alerts/rules', admin, 'DELETE', {'pos': 1}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
             # Invalid numeric positions must never wrap or truncate to rule zero.
             for invalid_id in [-1, 0.5, 1 << 32, '0', None]:
                 status, body = request('/api/v1/alerts/rules/item', reader, data={'id': invalid_id})
@@ -277,7 +293,8 @@ WebService {{
                 event_id = (1 << 64) - 1
                 stamp = f'{int(time.time())}.123:{event_id}'
                 lines = [f'node=integration type=CWD msg=audit({stamp}): cwd="/tmp"',
-                         f'node=integration type=EXECVE msg=audit({stamp}): argc=2 a0="echo" a1="hello"']
+                         f'node=integration type=EXECVE msg=audit({stamp}): argc=2 a0[0]=6563',
+                         f'node=integration type=EXECVE msg=audit({stamp}): a0[1]=686F a1="hello"']
                 incoming.sendall(('\n'.join(lines)+'\n').encode())
             eventually(marker.exists, 'audit input -> reconstructed JSON -> TCP output -> expression -> action')
             captured = json.loads(marker.read_text())
