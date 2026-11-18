@@ -1,10 +1,26 @@
+/**
+ * @file
+ * @brief Declarations and contracts for uanlz_web/src/rpcserverimpl.
+ */
 #pragma once
 #include <Mantids30/Network/Sockets/socket_stream.h>
-namespace UANLZ::WEB {
-class RPCServerImpl {
+namespace UANLZ::WEB
+{
+/** @brief Authenticate internal TLS clients and attach them to Mantids30 FastRPC1. */
+class RpcServerImpl
+{
 public:
-    static bool createRPCListener();
+    /**
+     * @brief Validate service API keys and start the internal Mantids30 TLS/RPC listener.
+     * @return True if the listener was created and started.
+     */
+    static bool createRpcListener();
+
 private:
-    static void callbackOnRPCConnect(void *, const std::shared_ptr<Mantids30::Network::Sockets::Socket_Stream> &sock);
+    /**
+     * @brief Authenticate the service API key and hand the accepted TLS connection to FastRPC1.
+     * @param socket Shared stream owned jointly with the Mantids30 connection machinery.
+     */
+    static void onRpcConnected(void *, const std::shared_ptr<Mantids30::Network::Sockets::Socket_Stream> &socket);
 };
-}
+} // namespace UANLZ::WEB

@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_web/src/main.
+ */
 #include "globals.h"
 #include "rpcserverimpl.h"
 #include "webserverimpl.h"
@@ -10,51 +14,80 @@
 using namespace Mantids30;
 using namespace Runtime::Service;
 using namespace UANLZ::WEB;
+/** @brief Connect the Mantids30 application lifecycle to this executable. */
 class Main : public Application
 {
 public:
-    void _initvars(int, char *[], Arguments::GlobalArguments *args) override
+    /**
+     * @brief Configure service identity, lifecycle options and command-line arguments.
+     * @param globalArguments Mantids30 service argument registry being initialized.
+     */
+    void _initvars(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
-        args->setInifiniteWaitAtEnd(true);
-        args->softwareLicense = "GPLv3";
-        args->softwareDescription = PROJECT_DESCRIPTION;
-        args->addAuthor({"Aarón Mizrachi", "aaron@unmanarc.com"});
-        args->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "stable");
-        args->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory", "/etc/uauditanalyzer/uanlz_web", Core::Memory::Abstract::Var::Type::STRING);
+        globalArguments->setInifiniteWaitAtEnd(true);
+        globalArguments->softwareLicense = "GPLv3";
+        globalArguments->softwareDescription = PROJECT_DESCRIPTION;
+        globalArguments->addAuthor({"Aarón Mizrachi", "aaron@unmanarc.com"});
+        globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH),
+                                    "stable");
+        globalArguments->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory",
+                                              "/etc/uauditanalyzer/uanlz_web",
+                                              Core::Memory::Abstract::Var::Type::STRING);
     }
-    bool _config(int, char *[], Arguments::GlobalArguments *args) override
+    /**
+     * @brief Load service configuration and initialize resources before worker startup.
+     * @param globalArguments Parsed Mantids30 arguments selecting the configuration directory.
+     * @return True when configuration and resource initialization succeed.
+     */
+    bool _config(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
         Network::Sockets::Socket_TLS::prepareTLS();
-        auto dir = std::filesystem::absolute(args->getCommandLineOptionValue("config-dir")->toString());
-        auto log = ConfigBuilder::Runtime_Logs::Builder::createInitLog();
-        auto config = Config::Loader::loadSecureApplicationConfig(log.get(), dir.c_str(), "webserver.conf");
+        auto configDirectory =
+            std::filesystem::absolute(globalArguments->getCommandLineOptionValue("config-dir")->toString());
+        auto initialLog = ConfigBuilder::Runtime_Logs::Builder::createInitLog();
+        auto config =
+            Config::Loader::loadSecureApplicationConfig(initialLog.get(), configDirectory.c_str(), "webserver.conf");
         if (!config)
             return false;
         Globals::config = *config;
         LOG_APP = ConfigBuilder::Runtime_Logs::Builder::createAppLog(*config);
         LOG_RPC = ConfigBuilder::Runtime_Logs::Builder::createRPCLog(*config);
-        std::filesystem::current_path(dir);
+        std::filesystem::current_path(configDirectory);
         return true;
     }
-    int _start(int, char *[], Arguments::GlobalArguments *args) override
+    /**
+     * @brief Start this executable's listeners and service-lifetime workers.
+     * @param globalArguments Mantids30 service settings and startup arguments.
+     * @return Service startup exit status.
+     */
+    int _start(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
-        if (!RPCServerImpl::createRPCListener() || !WebServerImpl::createWebServer())
+        if (!RpcServerImpl::createRpcListener() || !WebServerImpl::createWebServer())
         {
-            args->setInifiniteWaitAtEnd(false);
+            globalArguments->setInifiniteWaitAtEnd(false);
             return EXIT_FAILURE;
         }
         LOG_APP->log0(__func__, Runtime::Logs::INFO, "uAuditAnalyzer3 REST service ready");
         return EXIT_SUCCESS;
     }
+    /**
+     * @brief Handle the Mantids30 shutdown hook for this executable.
+     */
     void _shutdown() override
     {
         Globals::webServer.reset();
-        if (Globals::fastRPC)
-            Globals::fastRPC->stop();
+        if (Globals::fastRpc)
+            Globals::fastRpc->stop();
         if (Globals::rpcListener)
             Globals::rpcListener->stop();
     }
 };
+/**
+ * @brief Run this executable through the Mantids30 application lifecycle.
+ * @param argc Number of command-line arguments.
+ * @param argv Command-line argument vector owned by the runtime.
+ * @return Exit status returned by Mantids30.
+ */
 int main(int argc, char *argv[])
 {
     Main application;
