@@ -1,7 +1,7 @@
 # Building uAuditAnalyzer3
 
 Requires CMake 3.16+, C++17, libMantids30 3.0, Boost 1.75+ (JSON, regex,
-thread), JSONCpp, OpenSSL, and pkg-config. The three executables use the
+thread), OpenSSL, and pkg-config. The three executables use the
 `Mantids30_*` pkg-config modules; the old `mdz_*` libraries are no longer used.
 
 For a libMantids30 installation under `~/Devel/ROOT`:
@@ -38,7 +38,8 @@ node tests/web_client.test.js
 
 The test uses the three real executables, a temporary APISync HTTP fixture and
 new TLS certificates. It checks authentication, scopes, CSRF, rendering,
-service connections, JSON arguments and configuration writes. It opens only
+service connections, JSON arguments, configuration writes, 64-bit event IDs
+and action argument path substitutions. It opens only
 local ports and modifies temporary files. Python 3 and the OpenSSL CLI are
 required; the browser client check requires Node.js. The fixture does not replace testing the configured uFastAuthD3 login
 portal, callback and refresh flow in a deployment.

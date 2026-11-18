@@ -26,14 +26,14 @@ Group:          Applications/Internet
 %define debug_package %{nil}
 %endif
 BuildRequires: libMantids30-devel >= 3.0.0
-BuildRequires: %{cmake} systemd zlib-devel boost-devel gcc-c++ jsoncpp-devel sqlite-devel
+BuildRequires: %{cmake} systemd zlib-devel boost-devel gcc-c++ sqlite-devel
 %if 0%{?rhel} == 7
 BuildRequires:  openssl11-devel
 %else
 BuildRequires:  openssl-devel
 %endif
 Requires: libMantids30 >= 3.0.0
-Requires: zlib boost-regex boost-system jsoncpp sqlite
+Requires: zlib boost-regex boost-system boost-json sqlite
 %if 0%{?rhel} == 7
 Requires:       openssl11
 %else

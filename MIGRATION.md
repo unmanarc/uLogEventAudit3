@@ -4,8 +4,10 @@ All three applications now use libMantids30 and C++17. The browser uses REST;
 `uanlz_alert` and `uanlz_log2json` keep outbound TLS connections to the web
 service through libMantids30 FastRPC1. Migrate all three executables together.
 Event JSON, rule/action files and the converter's input/output configuration
-formats are preserved. JSONCpp remains the event/configuration representation;
-the Mantids30 transport and expression boundaries convert to Boost.JSON.
+formats are preserved. Events, configuration, expressions and RPC payloads use
+Boost.JSON throughout, with the libMantids30 JSON helpers. Empty collections
+are JSON arrays (`[]`); legacy `null` configuration files load as empty lists.
+Configuration files must contain a JSON array or legacy `null`.
 
 ## Authentication and configuration
 

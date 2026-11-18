@@ -33,7 +33,6 @@ This should be built on top of:
 
 - libMantids30 3.0 - https://github.com/unmanarc/libMantids30
 - uFastAuthD3 for web authentication
-- JSONCPP (AT LEAST v1.7.7, for RHEL7 you will have to build it by hand or install an external RPM)
 - Boost 1.75+ (JSON, regex, thread)
 - C++17
 
