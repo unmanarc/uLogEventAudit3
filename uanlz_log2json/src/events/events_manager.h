@@ -24,12 +24,14 @@ public:
     static void insertClassContents(const auditHostID & hostID,  // hostname/ip
                            const std::tuple<time_t,uint32_t,uint64_t> & eventId, // event time -> event msecs -> event id
                            const std::string & eventType,
-                           std::string *vardata);
+                           std::string vardata);
 
     static bool getFinished();
 
 private:
-    static std::map<auditHostID,Audit_Host> eventsByHostName;
+    using HostMap = std::map<auditHostID, std::shared_ptr<Audit_Host>>;
+    static HostMap snapshotHosts();
+    static HostMap eventsByHostName;
     static std::mutex mutex_insert;
 };
 

@@ -6,7 +6,7 @@
 
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-std::map<auditHostID,Audit_Host> Events_Manager::eventsByHostName;
+Events_Manager::HostMap Events_Manager::eventsByHostName;
 std::mutex Events_Manager::mutex_insert;
 
 void garbageCollector()
@@ -26,18 +26,16 @@ Events_Manager::Events_Manager()
 json Events_Manager::getJSONStats()
 {
     boost::json::array v;
-    mutex_insert.lock();
-    for ( auto & i : eventsByHostName )
+    for (const auto &[id, hostEvents] : snapshotHosts())
     {
         boost::json::object host{{"events", boost::json::object{}}};
-        host["host"] = i.first.hostname;
-        host["ip"] = i.first.ip;
-        host["events"].as_object()["pending"] = (uint64_t) i.second.getPendingEventsCount( );
-        host["events"].as_object()["processed"] = (uint64_t) i.second.getCountEventsProcessed();
-        host["events"].as_object()["dropped"] = (uint64_t) i.second.getCountEventsDropped() ;
+        host["host"] = id.hostname;
+        host["ip"] = id.ip;
+        host["events"].as_object()["pending"] = (uint64_t) hostEvents->getPendingEventsCount();
+        host["events"].as_object()["processed"] = (uint64_t) hostEvents->getCountEventsProcessed();
+        host["events"].as_object()["dropped"] = (uint64_t) hostEvents->getCountEventsDropped() ;
         v.emplace_back(std::move(host));
     }
-    mutex_insert.unlock();
     return v;
 }
 
@@ -48,13 +46,8 @@ void Events_Manager::gc()
         uint64_t maxAuditWaitTime = Globals::getConfig_main()->get<uint64_t>("GC.AuditMaxAgeInSecs",10);
         uint64_t auditGCPeriod = Globals::getConfig_main()->get<uint64_t>("GC.GCPeriodInSecs",5);
 
-        mutex_insert.lock();
-        for ( auto & i : eventsByHostName )
-        {
-            i.second.dropOldUncompletedEvents( maxAuditWaitTime );
-        }
-        mutex_insert.unlock();
-
+        for (const auto &entry : snapshotHosts())
+            entry.second->dropOldUncompletedEvents(maxAuditWaitTime);
         sleep(auditGCPeriod);
     }
 }
@@ -64,10 +57,25 @@ void Events_Manager::startGC()
     std::thread(garbageCollector).detach();
 }
 
-void Events_Manager::insertClassContents(const auditHostID & hostID, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string *vardata )
+void Events_Manager::insertClassContents(const auditHostID & hostID, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string vardata )
 {
-    mutex_insert.lock();
-    eventsByHostName[hostID].setHostID(hostID);
-    eventsByHostName[hostID].insertClassContents(eventId,eventType,vardata);
-    mutex_insert.unlock();
+    std::shared_ptr<Audit_Host> host;
+    {
+        std::lock_guard<std::mutex> lock(mutex_insert);
+        auto position = eventsByHostName.find(hostID);
+        if (position == eventsByHostName.end())
+        {
+            auto created = std::make_shared<Audit_Host>();
+            created->setHostID(hostID);
+            position = eventsByHostName.emplace(hostID, std::move(created)).first;
+        }
+        host = position->second;
+    }
+    host->insertClassContents(eventId, eventType, std::move(vardata));
+}
+
+Events_Manager::HostMap Events_Manager::snapshotHosts()
+{
+    std::lock_guard<std::mutex> lock(mutex_insert);
+    return eventsByHostName;
 }
