@@ -1,18 +1,16 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/output/output_base.
+ */
 #include "output_base.h"
 
 using namespace UANLZ::LOG2JSON::Output;
 
+OutputBase::OutputBase() {}
 
-Output_Base::Output_Base()
-{
-}
+OutputBase::~OutputBase() {}
 
-Output_Base::~Output_Base()
-{
-
-}
-
-std::string Output_Base::getDescription() const
+std::string OutputBase::getDescription() const
 {
     return description;
 }

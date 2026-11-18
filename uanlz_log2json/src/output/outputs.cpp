@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/output/outputs.
+ */
 #include "outputs.h"
 #include "../output/output_base.h"
 
@@ -5,50 +9,47 @@
 
 using namespace UANLZ::LOG2JSON::Output;
 
-std::list<std::unique_ptr<Output_Base>> Outputs::outputBases;
-std::mutex Outputs::mt;
+std::list<std::unique_ptr<OutputBase>> Outputs::outputs;
+std::mutex Outputs::registryMutex;
 
-Outputs::Outputs()
-{
-
-}
+Outputs::Outputs() {}
 
 json Outputs::getStats()
 {
-    boost::json::array v;
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &ob : outputBases)
+    boost::json::array outputStats;
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &output : outputs)
     {
-        v.emplace_back(ob->getStats());
+        outputStats.emplace_back(output->getStats());
     }
-    return v;
+    return outputStats;
 }
 
 void Outputs::loadConfig(const std::string &file)
 {
-    // fill output here.
-    auto out = std::make_unique<Output_JSONTCP>();
-    if (!out->loadConfig(file)) return;
 
-    std::lock_guard<std::mutex> lock(mt);
-    outputBases.push_back(std::move(out));
+    auto output = std::make_unique<JsonTcpOutput>();
+    if (!output->loadConfig(file))
+        return;
 
+    std::lock_guard<std::mutex> lock(registryMutex);
+    outputs.push_back(std::move(output));
 }
 
 void Outputs::startThreads()
 {
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &ob : outputBases)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &output : outputs)
     {
-        ob->startThread();
+        output->startThread();
     }
 }
 
-void Outputs::pushToOutputBases(const json &eventJSON, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
+void Outputs::dispatchEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &ob : outputBases)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &output : outputs)
     {
-        ob->logAuditEvent(eventJSON,eventId);
+        output->logAuditEvent(eventJson, eventId);
     }
 }

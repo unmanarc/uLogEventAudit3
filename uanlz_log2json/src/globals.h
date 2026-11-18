@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Declarations and contracts for uanlz_log2json/src/globals.
+ */
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
@@ -9,30 +13,49 @@
 
 #define LOG_APP Globals::getAppLog()
 
-namespace UANLZ { namespace LOG2JSON {
+namespace UANLZ
+{
+namespace LOG2JSON
+{
 
+/** @brief Hold the configuration, logs and shared resources used by this service. */
 class Globals
 {
 public:
+    /**
+     * @brief Provide access to process-wide configuration and logging.
+     */
     Globals();
 
+    /**
+     * @brief Return the process logger without transferring ownership.
+     * @return Borrowed logger pointer, which may be null before logging initialization.
+     */
     static Mantids30::Runtime::Logs::AppLog *getAppLog();
+    /**
+     * @brief Transfer ownership of the process logger into the global state.
+     * @param value Unique owner of the logger to install.
+     */
     static void setAppLog(std::unique_ptr<Mantids30::Runtime::Logs::AppLog> value);
 
-    static std::mutex * getDatabaseMutex();
+    /**
+     * @brief Return the shared database synchronization primitive.
+     */
+    static std::mutex *getDatabaseMutex();
 
-    static boost::property_tree::ptree * getConfig_main();
-
+    /**
+     * @brief Return the shared configuration loaded before worker startup.
+     * @return Borrowed configuration pointer; initialize it before starting workers.
+     */
+    static boost::property_tree::ptree *getMainConfig();
 
 private:
-    static std::mutex mDatabase,mDirs;
-    static boost::property_tree::ptree config_main;
-    static std::unique_ptr<Mantids30::Runtime::Logs::AppLog> applog;
-
+    static std::mutex databaseMutex, directoriesMutex;
+    static boost::property_tree::ptree mainConfig;
+    static std::unique_ptr<Mantids30::Runtime::Logs::AppLog> appLog;
 };
 
-
-}}
-
+} // namespace LOG2JSON
+} // namespace UANLZ
 
 #endif // GLOBALS_H

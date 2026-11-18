@@ -1,44 +1,45 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/input/inputs.
+ */
 #include "inputs.h"
 
 using namespace UANLZ::LOG2JSON::Input;
 
-std::list<std::unique_ptr<TCPServer>> Inputs::tcpServers;
-std::mutex Inputs::mt;
+std::list<std::unique_ptr<TcpServer>> Inputs::tcpServers;
+std::mutex Inputs::registryMutex;
 
-Inputs::Inputs()
-{
-
-}
+Inputs::Inputs() {}
 
 json Inputs::getStats()
 {
-    boost::json::array v;
+    boost::json::array inputStats;
 
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &i : tcpServers)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &inputServer : tcpServers)
     {
-        v.emplace_back(i->getStats());
+        inputStats.emplace_back(inputServer->getStats());
     }
 
-    return v;
+    return inputStats;
 }
 
 void Inputs::loadConfig(const std::string &file)
 {
-    auto in = std::make_unique<TCPServer>();
-    if (!in->loadConfig(file))
+    auto inputServer = std::make_unique<TcpServer>();
+    if (!inputServer->loadConfig(file))
     {
         return;
     }
-    std::lock_guard<std::mutex> lock(mt);
-    tcpServers.push_back(std::move(in));
+    std::lock_guard<std::mutex> lock(registryMutex);
+    tcpServers.push_back(std::move(inputServer));
 }
 
 void Inputs::startThreads()
 {
-    std::lock_guard<std::mutex> lock(mt);
-    for (const auto &i : tcpServers)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (const auto &inputServer : tcpServers)
     {
-        i->startThreaded();
+        inputServer->startListener();
     }
 }

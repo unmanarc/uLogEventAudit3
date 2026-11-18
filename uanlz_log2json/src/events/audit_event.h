@@ -1,62 +1,139 @@
+/**
+ * @file
+ * @brief Declarations and contracts for uanlz_log2json/src/events/audit_event.
+ */
 #ifndef EVENT_CONTAINER_H
 #define EVENT_CONTAINER_H
-
 
 #include <list>
 #include <chrono>
 #include "audit_class.h"
 
-namespace UANLZ { namespace LOG2JSON { namespace AuditdEvents {
+namespace UANLZ
+{
+namespace LOG2JSON
+{
+namespace AuditdEvents
+{
 
-struct auditHostID
+/** @brief Composite event-source identity used as the host registry key. */
+struct AuditHostId
 {
     std::string hostname;
-    std::string ip;
+    std::string ipAddress;
 
-    bool operator==(const auditHostID &o) const
+    /**
+     * @brief Compare the hostname and source address for host identity.
+     * @param other Host identity to compare with this one.
+     * @return True when both identity fields match.
+     */
+    bool operator==(const AuditHostId &other) const
     {
-        return hostname == o.hostname && ip == o.ip;
+        return hostname == other.hostname && ipAddress == other.ipAddress;
     }
 
-    bool operator<(const auditHostID &o)  const
+    /**
+     * @brief Order hosts by hostname and then by source address for map keys.
+     * @param other Host identity to compare with this one.
+     * @return True when this host sorts before the other host.
+     */
+    bool operator<(const AuditHostId &other) const
     {
-        return hostname < o.hostname || (hostname == o.hostname && ip < o.ip);
+        return hostname < other.hostname || (hostname == other.hostname && ipAddress < other.ipAddress);
     }
 };
 
-class Audit_Event
+/** @brief Own auditd records sharing one timestamp and serial number. */
+class AuditEvent
 {
 public:
-    Audit_Event();
-    ~Audit_Event() = default;
+    /**
+     * @brief Create an event and start its monotonic age timer.
+     */
+    AuditEvent();
+    /**
+     * @brief Release the resources owned by this AuditEvent instance.
+     */
+    ~AuditEvent() = default;
 
-    uint64_t timeSinceCreation();
+    /**
+     * @brief Return the elapsed whole seconds since event creation using a monotonic clock.
+     * @return Whole elapsed seconds unaffected by wall-clock adjustments.
+     */
+    uint64_t getAgeSeconds();
 
-    bool insertClassContents(const std::string & eventType, std::string varData);
+    /**
+     * @brief Add auditd record text to its event, merging repeated types except PATH.
+     * @param eventType Auditd record type controlling interpretation and event completion.
+     * @param recordData Owned record text to append or move into the event.
+     * @return For an event, true if the record type marks event completion.
+     */
+    bool insertClassContents(const std::string &eventType, std::string recordData);
 
+    /**
+     * @brief Return the audit timestamp, milliseconds and 64-bit serial number.
+     */
     std::tuple<time_t, uint32_t, uint64_t> getEventId() const;
+    /**
+     * @brief Set the timestamp and serial number identifying this event.
+     * @param value Timestamp and serial number to store.
+     */
     void setEventId(const std::tuple<time_t, uint32_t, uint64_t> &value);
 
-    auditHostID getHostId() const;
-    void setHostId(const auditHostID &value);
+    /**
+     * @brief Return the hostname and source address associated with this event.
+     */
+    AuditHostId getHostId() const;
+    /**
+     * @brief Associate the event or host buffer with its hostname and source address.
+     * @param value Hostname and source address to associate with the buffer or event.
+     */
+    void setHostId(const AuditHostId &value);
 
+    /**
+     * @brief Parse the variables in every buffered auditd record.
+     * @return True after all buffered records have been processed.
+     */
     bool process();
 
-    std::set<std::string> getClassesNames();
-    bool isMultiContainer(const std::string & groupName);
-    std::list<Audit_ClassType *> getMultiLineClassVars(const std::string & groupName);
-    Audit_ClassType * getClassVars(const std::string & groupName);
+    /**
+     * @brief Return the distinct auditd record types held by this event.
+     */
+    std::set<std::string> getClassNames();
+    /**
+     * @brief Report whether more than one record exists for the requested type.
+     * @param groupName Auditd record type to look up.
+     * @return True if at least two records have the requested type.
+     */
+    bool hasMultipleClassRecords(const std::string &groupName);
+    /**
+     * @brief Return borrowed pointers to all records of the requested type.
+     * @param groupName Auditd record type to look up.
+     * @return Pointers valid while the owning event and its records remain alive.
+     */
+    std::list<AuditClass *> getClassRecords(const std::string &groupName);
+    /**
+     * @brief Return a borrowed pointer to the first matching record, or nullptr.
+     * @param groupName Auditd record type to look up.
+     * @return Borrowed record pointer, or nullptr when the type is absent.
+     */
+    AuditClass *getFirstClassRecord(const std::string &groupName);
 
-    json getJSON();
+    /**
+     * @brief Serialize parsed auditd data using the existing event JSON schema.
+     */
+    json getJson();
 
 private:
     // eventType -> ClassEvent
-    std::multimap<std::string, Audit_ClassType> classVars;
+    std::multimap<std::string, AuditClass> classRecords;
     std::tuple<time_t, uint32_t, uint64_t> eventId;
-    auditHostID hostId;
+    AuditHostId hostId;
     std::chrono::steady_clock::time_point creationTime;
 };
 
-}}}
+} // namespace AuditdEvents
+} // namespace LOG2JSON
+} // namespace UANLZ
 
 #endif // EVENT_CONTAINER_H

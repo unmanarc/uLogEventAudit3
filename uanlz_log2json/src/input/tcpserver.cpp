@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/input/tcpserver.
+ */
 #include "tcpserver.h"
 
 #include "../globals.h"
@@ -17,126 +21,137 @@ using namespace Mantids30::Core::Memory::Streams;
 using namespace Mantids30::Network::Sockets;
 using namespace Mantids30::Runtime;
 
-void logServerThr(void * obj, const std::shared_ptr<Socket_Stream> &baseClientSocket)
+/**
+ * @brief Parse one accepted Mantids30 connection and publish its live statistics.
+ * @param context Borrowed TcpServer registered in the acceptor callback configuration.
+ * @param clientSocket Shared accepted socket, retained by the stack parser while receiving.
+ * @note The registration guard removes the parser before its stack storage is released.
+ */
+void processClientConnection(void *context, const std::shared_ptr<Socket_Stream> &clientSocket)
 {
-    auto *server = static_cast<TCPServer *>(obj);
-    TCPLineProcessor lineServer(baseClientSocket, *server);
+    auto *server = static_cast<TcpServer *>(context);
+    TcpLineProcessor lineProcessor(clientSocket, *server);
 
-    string sRemotePair = baseClientSocket->getRemotePairStr();
-    bool secure = baseClientSocket->isSecure();
-    lineServer.setRemoteIP(sRemotePair);
+    string remoteAddress = clientSocket->getRemotePairStr();
+    bool secure = clientSocket->isSecure();
+    lineProcessor.setRemoteIp(remoteAddress);
 
-    string threadName = "IN_" + sRemotePair;
+    string threadName = "IN_" + remoteAddress;
 #ifndef WIN32
     pthread_setname_np(pthread_self(), threadName.c_str());
 #endif
 
-    LOG_APP->log1(__func__,sRemotePair,Logs::INFO,"Receiving %srsyslog+auditd incoming connection...", secure? "secure ":"");
+    LOG_APP->log1(__func__, remoteAddress, Logs::INFO, "Receiving %srsyslog+auditd incoming connection...",
+                  secure ? "secure " : "");
 
-    server->addClient(&lineServer);
+    server->addClient(&lineProcessor);
     struct ClientRegistration
     {
-        TCPServer &server;
-        TCPLineProcessor &processor;
-        ~ClientRegistration() { server.remClient(&processor); }
-    } registration{*server, lineServer};
+        TcpServer &server;
+        TcpLineProcessor &processor;
+        /** @brief Remove the borrowed parser before its callback scope ends. */
+        ~ClientRegistration()
+        {
+            server.removeClient(&processor);
+        }
+    } registration{*server, lineProcessor};
 
-    Parser::ParseResult err;
-    lineServer.parseObject(&err);
-    LOG_APP->log1(__func__,sRemotePair, err == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING,
-                  "Incoming connection finished (parser status %d).", static_cast<int>(err));
-
-
+    Parser::ParseResult parseResult;
+    lineProcessor.parseObject(&parseResult);
+    LOG_APP->log1(__func__, remoteAddress, parseResult == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING,
+                  "Incoming connection finished (parser status %d).", static_cast<int>(parseResult));
 }
 
-TCPServer::TCPServer()
+TcpServer::TcpServer()
 {
     invalidLinesCount = 0;
     processedLinesCount = 0;
 }
 
-bool TCPServer::loadConfig(const string &file)
+bool TcpServer::loadConfig(const string &file)
 {
-    if (!access(file.c_str(),R_OK))
-        boost::property_tree::ini_parser::read_ini( file.c_str(),config);
+    if (!access(file.c_str(), R_OK))
+        boost::property_tree::ini_parser::read_ini(file.c_str(), config);
     else
     {
-        LOG_APP->log0(__func__,Logs::WARNING,"Failed to load receptor configuration file %s, insufficient permissions?", file.c_str());
+        LOG_APP->log0(__func__, Logs::WARNING,
+                      "Failed to load receptor configuration file %s, insufficient permissions?", file.c_str());
         return false;
     }
 
-    listenAddr = config.get<string>("ListenAddr","127.0.0.1");
-    listenPort = config.get<uint16_t>("ListenPort",10514);
-    description = config.get<string>("Description", "Log receiver @" + listenAddr + ":" + to_string(listenPort));
+    listenAddress = config.get<string>("ListenAddr", "127.0.0.1");
+    listenPort = config.get<uint16_t>("ListenPort", 10514);
+    description = config.get<string>("Description", "Log receiver @" + listenAddress + ":" + to_string(listenPort));
 
     return true;
 }
 
-void TCPServer::startThreaded()
+void TcpServer::startListener()
 {
-    auto tcpServer = std::make_shared<Socket_TCP>();
+    auto listenerSocket = std::make_shared<Socket_TCP>();
 
-    if (!tcpServer->listenOn(listenPort,listenAddr.c_str(),true))
+    if (!listenerSocket->listenOn(listenPort, listenAddress.c_str(), true))
     {
-        LOG_APP->log0(__func__,Logs::ERROR,"Error creating TCP LOG listener @%s:%" PRIu16,listenAddr.c_str(),listenPort);
+        LOG_APP->log0(__func__, Logs::ERROR, "Error creating TCP LOG listener @%s:%" PRIu16, listenAddress.c_str(),
+                      listenPort);
         return;
     }
 
-    LOG_APP->log0(__func__,Logs::WARNING,"LOG Listener running on TCP @%s:%" PRIu16 "...", listenAddr.c_str(),tcpServer->getLocalPort());
+    LOG_APP->log0(__func__, Logs::WARNING, "LOG Listener running on TCP @%s:%" PRIu16 "...", listenAddress.c_str(),
+                  listenerSocket->getLocalPort());
 
     // STREAM MANAGER:
-    acceptor->addAcceptorSocket(tcpServer);
-    acceptor->callbacks.onClientConnected = &logServerThr;
+    acceptor->addAcceptorSocket(listenerSocket);
+    acceptor->callbacks.onClientConnected = &processClientConnection;
     acceptor->callbacks.contextOnConnect = this;
     acceptor->startInBackground();
 }
 
-json TCPServer::getStats()
+json TcpServer::getStats()
 {
-    boost::json::object v{{"clients", boost::json::array{}}};
+    boost::json::object serverStats{{"clients", boost::json::array{}}};
 
-    v["description"] = description;
-    v["processedLinesCount"] = (uint64_t)processedLinesCount;
-    v["invalidLinesCount"] = (uint64_t)invalidLinesCount;
+    serverStats["description"] = description;
+    serverStats["processedLinesCount"] = (uint64_t)processedLinesCount;
+    serverStats["invalidLinesCount"] = (uint64_t)invalidLinesCount;
 
-    std::lock_guard<std::mutex> lock(mt);
-    for (auto i : clientProcessors)
+    std::lock_guard<std::mutex> lock(registryMutex);
+    for (auto client : clientProcessors)
     {
-        v["clients"].as_array().emplace_back(i->getStats());
+        serverStats["clients"].as_array().emplace_back(client->getStats());
     }
 
-    return v;
+    return serverStats;
 }
 
-void TCPServer::addClient(TCPLineProcessor *clientProcessor)
+void TcpServer::addClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(mt);
+    std::lock_guard<std::mutex> lock(registryMutex);
     clientProcessors.insert(clientProcessor);
 }
 
-void TCPServer::remClient(TCPLineProcessor *clientProcessor)
+void TcpServer::removeClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(mt);
+    std::lock_guard<std::mutex> lock(registryMutex);
     clientProcessors.erase(clientProcessor);
 }
 
-string TCPServer::getListenAddr() const
+string TcpServer::getListenAddress() const
 {
-    return listenAddr;
+    return listenAddress;
 }
 
-uint16_t TCPServer::getListenPort() const
+uint16_t TcpServer::getListenPort() const
 {
     return listenPort;
 }
 
-void TCPServer::incProcessedLines()
+void TcpServer::incrementProcessedLines()
 {
     processedLinesCount++;
 }
 
-void TCPServer::incInvalidLines()
+void TcpServer::incrementInvalidLines()
 {
     invalidLinesCount++;
 }
-

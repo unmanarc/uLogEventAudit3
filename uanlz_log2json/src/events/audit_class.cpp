@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/events/audit_class.
+ */
 #include "audit_class.h"
 
 #include "../globals.h"
@@ -15,218 +19,240 @@
 #include <boost/algorithm/string.hpp>
 using namespace boost::algorithm;
 
-static boost::regex exSyslogAuditdData1("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>\"[^\"]+\")");
-static boost::regex exSyslogAuditdData2("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>[^ ^\"]+)");
+static boost::regex quotedVariablePattern("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>\"[^\"]+\")");
+static boost::regex unquotedVariablePattern("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>[^ ^\"]+)");
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-string &Audit_ClassType::getRawInput()
+string &AuditClass::getRawInput()
 {
     return rawInput;
 }
 
-void Audit_ClassType::setRawInput(string value)
+void AuditClass::setRawInput(string value)
 {
     rawInput = std::move(value);
 }
 
-unsigned char fromHex16(const char *value);
+/**
+ * @brief Decode two consecutive hexadecimal characters into one byte.
+ * @param encodedValue Borrowed buffer containing at least two readable characters.
+ * @pre The caller has validated the field length and hexadecimal encoding.
+ * @return Decoded byte value.
+ */
+unsigned char decodeHexByte(const char *encodedValue);
 
-bool Audit_ClassType::processToVarContent()
+bool AuditClass::parseVariables()
 {
-    contentVars.clear();
-    boost::match_results<string::const_iterator> whatDataDecomposed;
+    variablesByName.clear();
+    boost::match_results<string::const_iterator> variableMatch;
     boost::match_flag_type flags = boost::match_default;
 
-    for (string::const_iterator start = rawInput.begin(), end =  rawInput.end();
-         boost::regex_search(start, end, whatDataDecomposed, exSyslogAuditdData1, flags);
-         start = whatDataDecomposed[0].second)
+    // Auditd quotes literal text and leaves encoded/numeric fields unquoted.
+    for (string::const_iterator start = rawInput.begin(), end = rawInput.end();
+         boost::regex_search(start, end, variableMatch, quotedVariablePattern, flags); start = variableMatch[0].second)
     {
-        parseVar(string(whatDataDecomposed[1].first, whatDataDecomposed[1].second),string(whatDataDecomposed[2].first, whatDataDecomposed[2].second));
+        parseVariable(string(variableMatch[1].first, variableMatch[1].second),
+                      string(variableMatch[2].first, variableMatch[2].second));
     }
 
-    for (string::const_iterator start = rawInput.begin(), end =  rawInput.end();
-         boost::regex_search(start, end, whatDataDecomposed, exSyslogAuditdData2, flags);
-         start = whatDataDecomposed[0].second)
+    for (string::const_iterator start = rawInput.begin(), end = rawInput.end();
+         boost::regex_search(start, end, variableMatch, unquotedVariablePattern, flags);
+         start = variableMatch[0].second)
     {
-        parseVar(string(whatDataDecomposed[1].first, whatDataDecomposed[1].second),string(whatDataDecomposed[2].first, whatDataDecomposed[2].second));
+        parseVariable(string(variableMatch[1].first, variableMatch[1].second),
+                      string(variableMatch[2].first, variableMatch[2].second));
     }
 
-    return mergeSpplitedVars();
+    return mergeSplitVariables();
 }
 
-string Audit_ClassType::getClassTypeName() const
+string AuditClass::getClassTypeName() const
 {
     return classTypeName;
 }
 
-void Audit_ClassType::setClassTypeName(const string &value)
+void AuditClass::setClassTypeName(const string &value)
 {
     classTypeName = value;
 }
 
-json Audit_ClassType::getJSON()
+json AuditClass::getJson()
 {
-    boost::json::object v{};
+    boost::json::object recordJson{};
 
-    bool normal = true;
+    bool useGenericFields = true;
     if (classTypeName == "EXECVE")
     {
-        if (contentVars.find("argc")!=contentVars.end())
+        if (variablesByName.find("argc") != variablesByName.end())
         {
-            normal = false;
-            v["argc"] = contentVars["argc"].getFancy();
-            v["argv"] = boost::json::array{};
-            std::string cmdline;
-            for (uint32_t i=0; i<contentVars["argc"].asUInt32() && i<65536; i++)
+            useGenericFields = false;
+            recordJson["argc"] = variablesByName["argc"].getDisplayValue();
+            recordJson["argv"] = boost::json::array{};
+            std::string commandLine;
+            for (uint32_t index = 0; index < variablesByName["argc"].asUint32() && index < 65536; index++)
             {
-                std::string curVar = "a" + to_string(i);
-                if (contentVars.find(curVar)!=contentVars.end())
+                std::string argumentName = "a" + to_string(index);
+                if (variablesByName.find(argumentName) != variablesByName.end())
                 {
-                    v["argv"].as_array().emplace_back(contentVars[curVar].getFancy());
-                    cmdline += contentVars[curVar].getFancy() + " ";
+                    recordJson["argv"].as_array().emplace_back(variablesByName[argumentName].getDisplayValue());
+                    commandLine += variablesByName[argumentName].getDisplayValue() + " ";
                 }
                 else
                 {
-                    v["argv"].as_array().emplace_back("__UAA_PARSER_NOT_FOUND__");
-                    cmdline += "__UAA_PARSER_NOT_FOUND__ ";
+                    recordJson["argv"].as_array().emplace_back("__UAA_PARSER_NOT_FOUND__");
+                    commandLine += "__UAA_PARSER_NOT_FOUND__ ";
                 }
             }
-            if (!cmdline.empty()) cmdline.pop_back();
-            v["cmdline"] = cmdline;
+            if (!commandLine.empty())
+                commandLine.pop_back();
+            recordJson["cmdline"] = commandLine;
         }
     }
 
-    if (normal)
+    if (useGenericFields)
     {
-        for ( auto & i : contentVars)
+        for (auto &variable : variablesByName)
         {
-            v[i.first] = i.second.getFancy();
+            recordJson[variable.first] = variable.second.getDisplayValue();
         }
     }
 
-    return v;
+    return recordJson;
 }
 
-void Audit_ClassType::parseVar(const string &varName, const string &varValue)
+void AuditClass::parseVariable(const string &variableName, const string &variableValue)
 {
 
-    if (!contentVars[varName].parse( classTypeName, varName,  varValue ))
+    if (!variablesByName[variableName].parse(classTypeName, variableName, variableValue))
     {
-        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'", varName.c_str(), varValue.c_str());
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'",
+                      variableName.c_str(), variableValue.c_str());
     }
 
-    if (classTypeName == "SOCKADDR" && varName == "saddr" &&
-        varValue.size() >= 2 * sizeof(sa_family_t) && varValue.size() < 250 &&
-        varValue.size() % 2 == 0 &&
-        varValue.find_first_not_of("0123456789abcdefABCDEF") == string::npos)
+    if (classTypeName == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) &&
+        variableValue.size() < 250 && variableValue.size() % 2 == 0 &&
+        variableValue.find_first_not_of("0123456789abcdefABCDEF") == string::npos)
     {
-        string family, laddr, path;
+        string family, ipAddress, path;
         unsigned short port = 0;
 
         std::array<char, 128> data{};
-        const auto dataSize = varValue.size() / 2;
-        for (size_t i = 0; i < dataSize; ++i)
-            data[i] = fromHex16(varValue.data() + 2 * i);
+        const auto addressSize = variableValue.size() / 2;
+        for (size_t index = 0; index < addressSize; ++index)
+            data[index] = decodeHexByte(variableValue.data() + 2 * index);
 
+        // Socket records are byte sequences; copy into aligned types before reading fields.
         sa_family_t socketFamily{};
         std::memcpy(&socketFamily, data.data(), sizeof(socketFamily));
         switch (socketFamily)
         {
         case AF_INET:
         {
-            if (dataSize < sizeof(sockaddr_in)) return;
+            if (addressSize < sizeof(sockaddr_in))
+                return;
             sockaddr_in address{};
             std::memcpy(&address, data.data(), sizeof(address));
-            char ipAddr[INET_ADDRSTRLEN]{};
-            if (!inet_ntop(AF_INET, &address.sin_addr, ipAddr, sizeof(ipAddr))) return;
+            char addressText[INET_ADDRSTRLEN]{};
+            if (!inet_ntop(AF_INET, &address.sin_addr, addressText, sizeof(addressText)))
+                return;
             family = "AF_INET";
             port = ntohs(address.sin_port);
-            laddr = ipAddr;
-        } break;
+            ipAddress = addressText;
+        }
+        break;
         case AF_INET6:
         {
-            if (dataSize < sizeof(sockaddr_in6)) return;
+            if (addressSize < sizeof(sockaddr_in6))
+                return;
             sockaddr_in6 address{};
             std::memcpy(&address, data.data(), sizeof(address));
-            char ipAddr[INET6_ADDRSTRLEN]{};
-            if (!inet_ntop(AF_INET6, &address.sin6_addr, ipAddr, sizeof(ipAddr))) return;
+            char addressText[INET6_ADDRSTRLEN]{};
+            if (!inet_ntop(AF_INET6, &address.sin6_addr, addressText, sizeof(addressText)))
+                return;
             family = "AF_INET6";
             port = ntohs(address.sin6_port);
-            laddr = ipAddr;
-        } break;
+            ipAddress = addressText;
+        }
+        break;
         case AF_UNIX:
         {
             constexpr auto offset = offsetof(sockaddr_un, sun_path);
-            if (dataSize < offset) return;
+            if (addressSize < offset)
+                return;
             sockaddr_un address{};
-            std::memcpy(&address, data.data(), std::min(dataSize, sizeof(address)));
-            const auto length = std::min(dataSize - offset, sizeof(address.sun_path));
+            std::memcpy(&address, data.data(), std::min(addressSize, sizeof(address)));
+            const auto length = std::min(addressSize - offset, sizeof(address.sun_path));
             path.assign(address.sun_path, strnlen(address.sun_path, length));
             family = "AF_UNIX";
-            laddr = "127.0.0.1";
-        } break;
+            ipAddress = "127.0.0.1";
+        }
+        break;
         default:
             break;
         }
 
-
-        contentVars["family"].parse( classTypeName, "family",  family );
-        contentVars["ipaddr"].parse( classTypeName, "ipaddr",  laddr );
-        if (path.size()) contentVars["unix_path"].parse( classTypeName, "unix_path",  path );
-        contentVars["port"].parse( classTypeName, "port",  to_string(port) );
+        variablesByName["family"].parse(classTypeName, "family", family);
+        variablesByName["ipaddr"].parse(classTypeName, "ipaddr", ipAddress);
+        if (path.size())
+            variablesByName["unix_path"].parse(classTypeName, "unix_path", path);
+        variablesByName["port"].parse(classTypeName, "port", to_string(port));
     }
 }
 
-bool Audit_ClassType::mergeSpplitedVars()
+bool AuditClass::mergeSplitVariables()
 {
-    set<string> spplitedVars = getSpplitedVarNames();
-    for (const auto & varName : spplitedVars)
+    // Merge only contiguous chunks: missing indexes leave later chunks visible as orphans.
+    set<string> splitVariableNames = getSplitVariableNames();
+    for (const auto &variableName : splitVariableNames)
     {
-        // Take the next vars, append to the first one and remove the extra...
-        string varNameWithZeroPos = getVarNameByPos(varName,0);
-        contentVars[varName].append(contentVars[varNameWithZeroPos]);
-        contentVars.erase(varNameWithZeroPos);
 
-        size_t i=1;
-        for (std::string varNameWithPos = getVarNameByPos(varName,i++); contentVars.find(varNameWithPos) != contentVars.end();  varNameWithPos = getVarNameByPos(varName,i++))
+        string firstChunkName = getChunkVariableName(variableName, 0);
+        variablesByName[variableName].append(variablesByName[firstChunkName]);
+        variablesByName.erase(firstChunkName);
+
+        size_t chunkIndex = 1;
+        for (std::string chunkName = getChunkVariableName(variableName, chunkIndex++);
+             variablesByName.find(chunkName) != variablesByName.end();
+             chunkName = getChunkVariableName(variableName, chunkIndex++))
         {
-            // Append each variable, and then destroy it.
-            contentVars[varName].append(contentVars[varNameWithPos]);
-            contentVars.erase(varNameWithPos);
+
+            variablesByName[variableName].append(variablesByName[chunkName]);
+            variablesByName.erase(chunkName);
         }
     }
 
-
-    // Find any variable ending with ]
-    for (const auto & i : contentVars)
+    for (const auto &variable : variablesByName)
     {
-        if (ends_with(i.first,"]"))
+        if (ends_with(variable.first, "]"))
         {
-            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Orphan variable '%s' can't be reconstructed", i.first.c_str());
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Orphan variable '%s' can't be reconstructed",
+                          variable.first.c_str());
         }
     }
 
     return true;
 }
 
-set<string> Audit_ClassType::getSpplitedVarNames()
+set<string> AuditClass::getSplitVariableNames()
 {
-    set<string> spplitedVars;
-    for ( const auto & i :  contentVars)
+    set<string> splitVariableNames;
+    for (const auto &variable : variablesByName)
     {
-        if (ends_with(i.first,"[0]"))
+        if (ends_with(variable.first, "[0]"))
         {
-            string varName = i.first;
-            varName.pop_back();varName.pop_back();varName.pop_back();
-            spplitedVars.insert(varName);
+            string variableName = variable.first;
+            variableName.pop_back();
+            variableName.pop_back();
+            variableName.pop_back();
+            splitVariableNames.insert(variableName);
         }
     }
-    return spplitedVars;
+    return splitVariableNames;
 }
 
-string Audit_ClassType::getVarNameByPos(const string &varName, const size_t & pos)
+string AuditClass::getChunkVariableName(const string &variableName, const size_t &position)
 {
-    return varName + "[" + to_string(pos) + "]";
+    return variableName + "[" + to_string(position) + "]";
 }

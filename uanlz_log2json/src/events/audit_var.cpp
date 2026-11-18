@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/events/audit_var.
+ */
 #include "audit_var.h"
 #include "../vars/namedefs.h"
 #include <boost/algorithm/string.hpp>
@@ -6,120 +10,150 @@ using namespace boost::algorithm;
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-
-bool Audit_Var::append(const Audit_Var &v)
+bool AuditVariable::append(const AuditVariable &other)
 {
-    if (!v.getValid()) return setValid(false);
-    rawPure += v.rawPure;
-    fancy += v.fancy;
+    if (!other.isValid())
+        return setValid(false);
+    rawValue += other.rawValue;
+    displayValue += other.displayValue;
     return setValid(true);
 }
 
-inline bool isHexUpperString(const char *value)
+/**
+ * @brief Check that a NUL-terminated field contains only auditd uppercase hex digits.
+ * @param encodedValue Borrowed input text to inspect.
+ * @return True for an empty string or a string containing only 0-9 and A-F.
+ */
+inline bool isUppercaseHexString(const char *encodedValue)
 {
-    for ( ;value && *value;value++ )
+    for (; encodedValue && *encodedValue; encodedValue++)
     {
-        if (!(*value>='A' && *value<='F') && !(*value>='0' && *value<='9'))
+        if (!(*encodedValue >= 'A' && *encodedValue <= 'F') && !(*encodedValue >= '0' && *encodedValue <= '9'))
             return false;
     }
     return true;
 }
 
-inline bool isNumeric(const char value)
+/**
+ * @brief Test an ASCII character without locale-dependent classification.
+ * @param encodedValue Character to inspect.
+ * @return True for characters between 0 and 9.
+ */
+inline bool isDecimalDigit(const char encodedValue)
 {
-    return (value>='0' && value<='9');
+    return (encodedValue >= '0' && encodedValue <= '9');
 }
 
-
-inline unsigned char fromHex8(const char value)
+/**
+ * @brief Convert one ASCII hexadecimal digit to its numeric nibble.
+ * @param encodedValue Hexadecimal character to decode.
+ * @return Nibble value, or zero for an unrecognized character.
+ */
+inline unsigned char decodeHexDigit(const char encodedValue)
 {
-    if (value>='A' && value<='F') return (value-'A')+10;
-    else if (value>='0' && value<='9') return (value-'0');
-    else if (value>='a' && value<='f') return (value-'a')+10;
+    if (encodedValue >= 'A' && encodedValue <= 'F')
+        return (encodedValue - 'A') + 10;
+    else if (encodedValue >= '0' && encodedValue <= '9')
+        return (encodedValue - '0');
+    else if (encodedValue >= 'a' && encodedValue <= 'f')
+        return (encodedValue - 'a') + 10;
     return 0;
 }
 
-
-inline bool isATextVar( const string &auditdEventType, const string &varName )
+/**
+ * @brief Identify EXECVE argument fields, including indexed fragments.
+ * @param eventType Auditd record type containing the field.
+ * @param variableName Field name to classify.
+ * @return True for an EXECVE argument name rather than its length metadata.
+ */
+inline bool isExecveArgument(const string &eventType, const string &variableName)
 {
-    return (auditdEventType == "EXECVE" && varName.size()>=2 && varName.at(0)=='a' && isNumeric(varName.at(1)) && !ends_with(varName,"n"));
+    return (eventType == "EXECVE" && variableName.size() >= 2 && variableName.at(0) == 'a' &&
+            isDecimalDigit(variableName.at(1)) && !ends_with(variableName, "n"));
 }
 
-unsigned char fromHex16(const char *value)
+/**
+ * @brief Decode two consecutive hexadecimal characters into one byte.
+ * @param encodedValue Borrowed buffer containing at least two readable characters.
+ * @pre The caller has validated the field length and hexadecimal encoding.
+ * @return Decoded byte value.
+ */
+unsigned char decodeHexByte(const char *encodedValue)
 {
-    return fromHex8(value[0])*0x10 + fromHex8(value[1]);
+    return decodeHexDigit(encodedValue[0]) * 0x10 + decodeHexDigit(encodedValue[1]);
 }
 
-void Audit_Var::createFancyString()
+void AuditVariable::updateDisplayValue()
 {
-    fancy = rawPure;
-    for (char &byte : fancy)
+    displayValue = rawValue;
+    for (char &byte : displayValue)
     {
-        if (byte == '\0' || byte == '!') byte = ' ';
+        if (byte == '\0' || byte == '!')
+            byte = ' ';
     }
 }
 
-size_t Audit_Var::getRawPureSize() const
+size_t AuditVariable::getRawValueSize() const
 {
-    return rawPure.size();
+    return rawValue.size();
 }
 
-uint32_t Audit_Var::asUInt32() const
+uint32_t AuditVariable::asUint32() const
 {
-    return strtoul(fancy.c_str(),0,10);
+    return strtoul(displayValue.c_str(), 0, 10);
 }
 
-const string &Audit_Var::getFancy() const
+const string &AuditVariable::getDisplayValue() const
 {
-    return fancy;
+    return displayValue;
 }
 
-
-const char *Audit_Var::getRawPure() const
+const char *AuditVariable::getRawValue() const
 {
-    return rawPure.c_str();
+    return rawValue.c_str();
 }
 
-
-bool Audit_Var::getValid() const
+bool AuditVariable::isValid() const
 {
     return valid;
 }
 
-bool Audit_Var::setValid(bool value)
+bool AuditVariable::setValid(bool isValid)
 {
-    valid = value;
+    valid = isValid;
     return valid;
 }
 
-bool Audit_Var::parse(const string &auditdEventType, const string &varName, const string &varValue)
+bool AuditVariable::parse(const string &eventType, const string &variableName, const string &variableValue)
 {
-    rawPure.clear();
-    fancy.clear();
-    if (varValue.empty()) return setValid(false);
+    rawValue.clear();
+    displayValue.clear();
+    if (variableValue.empty())
+        return setValid(false);
 
-    if (    (varValue.at(0) == '\'' && varValue.size()>2 && varValue.at(varValue.size()-1)=='\'')
-            || (varValue.at(0) == '\"' && varValue.size()>2 && varValue.at(varValue.size()-1)=='\"')
-            || (varValue.at(0) == '(' && varValue.size()>2 && varValue.at(varValue.size()-1)==')')
-            || (varValue.at(0) == '{' && varValue.size()>2 && varValue.at(varValue.size()-1)=='}'
-                )
-            )
+    if ((variableValue.at(0) == '\'' && variableValue.size() > 2 &&
+         variableValue.at(variableValue.size() - 1) == '\'') ||
+        (variableValue.at(0) == '\"' && variableValue.size() > 2 &&
+         variableValue.at(variableValue.size() - 1) == '\"') ||
+        (variableValue.at(0) == '(' && variableValue.size() > 2 && variableValue.at(variableValue.size() - 1) == ')') ||
+        (variableValue.at(0) == '{' && variableValue.size() > 2 && variableValue.at(variableValue.size() - 1) == '}'))
     {
-        rawPure = varValue.substr(1, varValue.size() - 2);
+        rawValue = variableValue.substr(1, variableValue.size() - 2);
 
-        createFancyString();
+        updateDisplayValue();
 
         return setValid(true);
     }
-    else if ( NameDefs::isTextVar(varName) || isATextVar( auditdEventType, varName ) ) // at this point, if this is text var, then should be HEX (previous if statement check any using "'{ ).
+    else if (NameDefs::isTextVar(variableName) || isExecveArgument(eventType, variableName))
     {
-        if (isHexUpperString(varValue.c_str()) && varValue.size()%2==0)
+        // Unquoted auditd text is hexadecimal; numeric and other literal fields use the final branch.
+        if (isUppercaseHexString(variableValue.c_str()) && variableValue.size() % 2 == 0)
         {
-            rawPure.resize(varValue.size() / 2);
-            for (size_t i = 0; i < rawPure.size(); ++i)
-                rawPure[i] = fromHex16(varValue.data() + 2 * i);
+            rawValue.resize(variableValue.size() / 2);
+            for (size_t byteIndex = 0; byteIndex < rawValue.size(); ++byteIndex)
+                rawValue[byteIndex] = decodeHexByte(variableValue.data() + 2 * byteIndex);
 
-            createFancyString();
+            updateDisplayValue();
             return setValid(true);
         }
         else
@@ -129,8 +163,8 @@ bool Audit_Var::parse(const string &auditdEventType, const string &varName, cons
     }
     else // Take the value as is.
     {
-        rawPure = varValue;
-        createFancyString();
+        rawValue = variableValue;
+        updateDisplayValue();
         return setValid(true);
     }
 

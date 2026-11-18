@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/events/events_distributionthreads.
+ */
 #include "events_distributionthreads.h"
 
 #include <thread>
@@ -10,66 +14,55 @@ using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 using namespace UANLZ::LOG2JSON;
 
+Mantids30::Core::Threads::Safe::Queue<AuditEvent> EventDistribution::eventsQueue;
+uint32_t EventDistribution::pushTimeoutMs = 0;
 
-Mantids30::Core::Threads::Safe::Queue<Audit_Event> Events_DistributionThreads::eventsQueue;
-uint32_t Events_DistributionThreads::pushTimeoutInMS = 0;
+std::atomic<uint64_t> EventDistribution::eventsProcessed;
+std::atomic<uint64_t> EventDistribution::eventsProcessedLastTenSeconds;
+std::atomic<uint64_t> EventDistribution::eventsProcessedThisPeriod;
+std::atomic<uint64_t> EventDistribution::eventsDropped;
 
-//std::atomic<double> ProcessorThreads_Output::lastRulesEvaluationTime;
-std::atomic<uint64_t> Events_DistributionThreads::eventsProcessed;
-std::atomic<uint64_t> Events_DistributionThreads::eventsProcessedInLast10Second;
-std::atomic<uint64_t> Events_DistributionThreads::eventsProcessedInThisPeriod;
-std::atomic<uint64_t> Events_DistributionThreads::eventsDropped;
-
-// TOOD: remover rules de aqui.
-
-void outputDistributionThread(int threadid)
+/**
+ * @brief Parse queued audit events and dispatch their JSON to every output.
+ * @param workerId Worker number used to identify timeout diagnostics.
+ * @note A queue timeout emits the existing noEventsAlert heartbeat payload.
+ */
+void runEventDistribution(int workerId)
 {
     std::string threadName = "EVENTS_DEQUEUE";
 #ifndef WIN32
     pthread_setname_np(pthread_self(), threadName.c_str());
 #endif
 
-//    auto start = chrono::high_resolution_clock::now();
-//    auto finish = chrono::high_resolution_clock::now();
-//    chrono::duration<double, milli> elapsed = finish - start;
-
     for (;;)
     {
-        auto event = Events_DistributionThreads::popAuditEvent( Globals::getConfig_main()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs",10000) );
+        auto event = EventDistribution::popAuditEvent(
+            Globals::getMainConfig()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs", 10000));
 
-        // processing event
         if (event)
         {
             event->process();
-            json eventJSON = event->getJSON();
+            json eventJson = event->getJson();
 
-            // push to outputs...
-            Output::Outputs::pushToOutputBases(eventJSON, event->getEventId());
+            Output::Outputs::dispatchEvent(eventJson, event->getEventId());
 
-
-            // Account it.
-            Events_DistributionThreads::addEventsProcessed();
-/*
-            start = chrono::high_resolution_clock::now();
-            // Evaluate Rules...
-            Rules::evaluate(eventJSON);
-            finish = chrono::high_resolution_clock::now();
-            elapsed = finish - start;
-
-            ProcessorThreads_Output::setLastRulesEvaluationTime(elapsed.count());
-*/
+            EventDistribution::incrementProcessedEvents();
         }
         else
         {
-            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::DEBUG, "No events so far for output thread #%d, triggering no event alert JSON...", threadid);
-            boost::json::object noEventsAlertJSON;
-            noEventsAlertJSON["noEventsAlert"] = true;
-            Output::Outputs::pushToOutputBases(noEventsAlertJSON, std::make_tuple<time_t, uint32_t, uint64_t>(0,0,0));
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::DEBUG,
+                          "No events so far for output thread #%d, triggering no event alert JSON...", workerId);
+            boost::json::object idleEventJson;
+            idleEventJson["noEventsAlert"] = true;
+            Output::Outputs::dispatchEvent(idleEventJson, std::make_tuple<time_t, uint32_t, uint64_t>(0, 0, 0));
         }
     }
 }
 
-void refreshEventsParsedPerSecond()
+/**
+ * @brief Publish the processed-event count every ten seconds for the service lifetime.
+ */
+void runDistributionCounters()
 {
     std::string threadName = "EVENTS_COUNTER";
 #ifndef WIN32
@@ -78,83 +71,71 @@ void refreshEventsParsedPerSecond()
 
     for (;;)
     {
-        Events_DistributionThreads::lRefreshEventsParsedPer10Second();
+        EventDistribution::publishIntervalCounters();
         sleep(10);
     }
 }
 
-Events_DistributionThreads::Events_DistributionThreads()
+EventDistribution::EventDistribution() {}
+
+json EventDistribution::getStats()
 {
+    boost::json::object distributionStats{{"eventsQueue", boost::json::object{}},
+                                          {"eventsProcessed", boost::json::object{}}};
+    distributionStats["eventsQueue"].as_object()["maxItems"] = (uint64_t)eventsQueue.getMaxItems();
+    distributionStats["eventsQueue"].as_object()["curSize"] = (uint64_t)eventsQueue.size();
+    distributionStats["eventsQueue"].as_object()["dropped"] = (uint64_t)eventsDropped;
+
+    distributionStats["eventsProcessed"].as_object()["last10s"] = (uint64_t)eventsProcessedLastTenSeconds;
+    distributionStats["eventsProcessed"].as_object()["total"] = (uint64_t)eventsProcessed;
+
+    return distributionStats;
 }
 
-json Events_DistributionThreads::stats()
+void EventDistribution::setQueueSize(const size_t &queueCapacity)
 {
-    boost::json::object v{{"eventsQueue", boost::json::object{}}, {"eventsProcessed", boost::json::object{}}};
-    v["eventsQueue"].as_object()["maxItems"] = (uint64_t) eventsQueue.getMaxItems();
-    v["eventsQueue"].as_object()["curSize"] = (uint64_t) eventsQueue.size();
-    v["eventsQueue"].as_object()["dropped"] = (uint64_t) eventsDropped;
-
-    v["eventsProcessed"].as_object()["last10s"] = (uint64_t) eventsProcessedInLast10Second;
-    v["eventsProcessed"].as_object()["total"] = (uint64_t) eventsProcessed;
-
-    return v;
-}
-/*
-    myfile.open (outputDir + "/processor.last_rule_evaluation_time");
-    myfile << "# Processor Rule Last Evaluation Time in milliseconds" << endl;
-    myfile << lastRulesEvaluationTime << endl;
-    myfile.close();
-*/
-
-void Events_DistributionThreads::setQueueSize(const size_t &qSize)
-{
-    eventsQueue.setMaxItems(qSize);
+    eventsQueue.setMaxItems(queueCapacity);
 }
 
-void Events_DistributionThreads::startDistributionThreads(const size_t &threads)
+void EventDistribution::startDistributionThreads(const size_t &threads)
 {
-    pushTimeoutInMS = Globals::getConfig_main()->get<uint32_t>("Processor.QueuePushTimeoutInMS",0);
+    pushTimeoutMs = Globals::getMainConfig()->get<uint32_t>("Processor.QueuePushTimeoutInMS", 0);
     eventsProcessed = 0;
     eventsDropped = 0;
-    eventsProcessedInLast10Second=0;
-    eventsProcessedInThisPeriod=0;
-  //  lastRulesEvaluationTime = 0;
+    eventsProcessedLastTenSeconds = 0;
+    eventsProcessedThisPeriod = 0;
 
-    std::thread(refreshEventsParsedPerSecond).detach();
+    std::thread(runDistributionCounters).detach();
 
-    for (size_t i=1;i<=threads;i++)
+    for (size_t workerIndex = 1; workerIndex <= threads; workerIndex++)
     {
-        std::thread tx(outputDistributionThread,i);
-        tx.detach();
+        std::thread workerThread(runEventDistribution, workerIndex);
+        workerThread.detach();
     }
 }
 
-bool Events_DistributionThreads::pushAuditEvent(std::unique_ptr<Audit_Event> aevent)
+bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditEvent> event)
 {
-    bool r = eventsQueue.push(aevent.get(), pushTimeoutInMS);
-    if (r) aevent.release(); // Ownership transfers to Mantids30 only on success.
-    else eventsDropped++;
-    return r;
+    bool queued = eventsQueue.push(event.get(), pushTimeoutMs);
+    if (queued)
+        event.release(); // Ownership transfers to Mantids30 only on success.
+    else
+        eventsDropped++;
+    return queued;
 }
 
-std::unique_ptr<Audit_Event> Events_DistributionThreads::popAuditEvent(const uint32_t & tmout_msecs)
+std::unique_ptr<AuditEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
 {
-    return std::unique_ptr<Audit_Event>(eventsQueue.pop(tmout_msecs));
+    return std::unique_ptr<AuditEvent>(eventsQueue.pop(popTimeoutMs));
 }
 
-void Events_DistributionThreads::addEventsProcessed()
+void EventDistribution::incrementProcessedEvents()
 {
     eventsProcessed++;
-    eventsProcessedInThisPeriod++;
+    eventsProcessedThisPeriod++;
 }
 
-void Events_DistributionThreads::lRefreshEventsParsedPer10Second()
+void EventDistribution::publishIntervalCounters()
 {
-    eventsProcessedInLast10Second = eventsProcessedInThisPeriod.exchange(0);
+    eventsProcessedLastTenSeconds = eventsProcessedThisPeriod.exchange(0);
 }
-/*
-void ProcessorThreads_Output::setLastRulesEvaluationTime(double _lastRulesEvaluationTime)
-{
-    lastRulesEvaluationTime = _lastRulesEvaluationTime;
-}
-*/

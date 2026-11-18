@@ -1,74 +1,71 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/vars/namedefs.
+ */
 #include "namedefs.h"
 
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-std::set<std::string> NameDefs::textVars;
-std::set<std::string> NameDefs::endEventType;
+std::set<std::string> NameDefs::textVariableNames;
+std::set<std::string> NameDefs::terminalEventTypes;
 
-NameDefs::NameDefs()
-{
-
-}
-// TODO: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/security_guide/sec-audit_record_types
+NameDefs::NameDefs() {}
 
 void NameDefs::init()
 {
-    textVars.insert("acct");
-    textVars.insert("cmd");
-    textVars.insert("comm");
-    textVars.insert("cwd");
-   // textVars.insert("dev");
-    textVars.insert("exe");
-    textVars.insert("grp");
-    textVars.insert("key");
-    textVars.insert("name");
-    textVars.insert("path");
-    textVars.insert("proctitle");
-    textVars.insert("reason");
+    textVariableNames.insert("acct");
+    textVariableNames.insert("cmd");
+    textVariableNames.insert("comm");
+    textVariableNames.insert("cwd");
 
-    // TODO: use EOE if available...
-    endEventType.insert("SYSTEM_BOOT");
-    endEventType.insert("ADD_USER");
-    endEventType.insert("ANOM_ABEND");
-    //endEventType.insert("ANOM_PROMISCUOUS"); << multi?
-    // AVC->ENDS WITH PROCTITLE.
-    // BPRM_FCAPS->ENDS WITH PROCTITLE.
-    endEventType.insert("CONFIG_CHANGE");
-    endEventType.insert("CRED_ACQ");
-    endEventType.insert("CRED_DISP");
-    endEventType.insert("CRED_REFR");
-    endEventType.insert("CRYPTO_KEY_USER");
-    endEventType.insert("CRYPTO_SESSION");
-    endEventType.insert("DAEMON_START");
-    //CWD ->ENDS WITH PROCTITLE.
-    //EXECVE ->ENDS WITH PROCTITLE.
-    endEventType.insert("LOGIN");
-    //NETFILTER_CFG ->ENDS WITH PROCTITLE.
-    //PATH ->ENDS WITH PROCTITLE.
-    endEventType.insert("PROCTITLE");
-    endEventType.insert("SERVICE_START");
-    endEventType.insert("SERVICE_STOP");
-    //SOCKADDR->ENDS WITH PROCTITLE
-    //SYSCALL->ENDS WITH PROCTITLE
-    endEventType.insert("USER_ACCT");
-    endEventType.insert("USER_AUTH");
-    endEventType.insert("USER_CHAUTHTOK");
-    endEventType.insert("USER_CMD");
-    endEventType.insert("USER_END");
-    endEventType.insert("USER_ERR");
-    endEventType.insert("USER_LOGIN");
-    endEventType.insert("USER_LOGOUT");
-    endEventType.insert("USER_MGMT");
-    endEventType.insert("USER_ROLE_CHANGE");
-    endEventType.insert("USER_START");
+    textVariableNames.insert("exe");
+    textVariableNames.insert("grp");
+    textVariableNames.insert("key");
+    textVariableNames.insert("name");
+    textVariableNames.insert("path");
+    textVariableNames.insert("proctitle");
+    textVariableNames.insert("reason");
+
+    // Keep the legacy completion table: multi-record events commonly end with PROCTITLE.
+    terminalEventTypes.insert("SYSTEM_BOOT");
+    terminalEventTypes.insert("ADD_USER");
+    terminalEventTypes.insert("ANOM_ABEND");
+
+    //  AVC->ENDS WITH PROCTITLE.
+    //  BPRM_FCAPS->ENDS WITH PROCTITLE.
+    terminalEventTypes.insert("CONFIG_CHANGE");
+    terminalEventTypes.insert("CRED_ACQ");
+    terminalEventTypes.insert("CRED_DISP");
+    terminalEventTypes.insert("CRED_REFR");
+    terminalEventTypes.insert("CRYPTO_KEY_USER");
+    terminalEventTypes.insert("CRYPTO_SESSION");
+    terminalEventTypes.insert("DAEMON_START");
+
+    terminalEventTypes.insert("LOGIN");
+
+    terminalEventTypes.insert("PROCTITLE");
+    terminalEventTypes.insert("SERVICE_START");
+    terminalEventTypes.insert("SERVICE_STOP");
+
+    terminalEventTypes.insert("USER_ACCT");
+    terminalEventTypes.insert("USER_AUTH");
+    terminalEventTypes.insert("USER_CHAUTHTOK");
+    terminalEventTypes.insert("USER_CMD");
+    terminalEventTypes.insert("USER_END");
+    terminalEventTypes.insert("USER_ERR");
+    terminalEventTypes.insert("USER_LOGIN");
+    terminalEventTypes.insert("USER_LOGOUT");
+    terminalEventTypes.insert("USER_MGMT");
+    terminalEventTypes.insert("USER_ROLE_CHANGE");
+    terminalEventTypes.insert("USER_START");
 }
 
-bool NameDefs::isTextVar(const std::string &varName)
+bool NameDefs::isTextVar(const std::string &variableName)
 {
-    return textVars.find(varName)!=textVars.end();
+    return textVariableNames.find(variableName) != textVariableNames.end();
 }
 
 bool NameDefs::isEndEventType(const std::string &eventType)
 {
-    return endEventType.find(eventType)!=endEventType.end();
+    return terminalEventTypes.find(eventType) != terminalEventTypes.end();
 }

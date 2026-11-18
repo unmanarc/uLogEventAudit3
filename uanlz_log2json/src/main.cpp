@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/main.
+ */
 #include <Mantids30/Runtime/Service/application.h>
 
 #include <Mantids30/Network/Sockets/socket_tcp.h>
@@ -30,29 +34,36 @@ using namespace UANLZ::LOG2JSON;
 using namespace Mantids30::Runtime;
 using namespace Mantids30::Runtime::Service;
 
-
-
-
+/** @brief Connect the Mantids30 application lifecycle to this executable. */
 class Main : public Application
 {
 public:
-    void _shutdown() override
-    {
-    }
+    /**
+     * @brief Handle the Mantids30 shutdown hook for this executable.
+     */
+    void _shutdown() override {}
 
-    int _start(int , char *[], Arguments::GlobalArguments *globalArguments) override
+    /**
+     * @brief Start this executable's listeners and service-lifetime workers.
+     * @param globalArguments Mantids30 service settings and startup arguments.
+     * @return Service startup exit status.
+     */
+    int _start(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
-        std::string configDir = globalArguments->getCommandLineOptionValue("config-dir")->toString();
+        std::string configDirectory = globalArguments->getCommandLineOptionValue("config-dir")->toString();
 
         // start program.
-        LOG_APP->log(__func__, "","", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32,__DATE__, __TIME__, getpid());
-        LOG_APP->log0(__func__,Logs::INFO, "Using config dir: %s", configDir.c_str());
+        LOG_APP->log(__func__, "", "", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32, __DATE__,
+                     __TIME__, getpid());
+        LOG_APP->log0(__func__, Logs::INFO, "Using config dir: %s", configDirectory.c_str());
 
         // Start modules here...
-        AuditdEvents::Events_Manager::startGC();
+        AuditdEvents::EventsManager::startGarbageCollector();
 
-        AuditdEvents::Events_DistributionThreads::startDistributionThreads( Globals::getConfig_main()->get<size_t>("Processor.Threads",8) );
-        AuditdEvents::Events_DistributionThreads::setQueueSize(Globals::getConfig_main()->get<size_t>("Processor.QueueSize",1000));
+        AuditdEvents::EventDistribution::startDistributionThreads(
+            Globals::getMainConfig()->get<size_t>("Processor.Threads", 8));
+        AuditdEvents::EventDistribution::setQueueSize(
+            Globals::getMainConfig()->get<size_t>("Processor.QueueSize", 1000));
 
         // Start output threads...
         Output::Outputs::startThreads();
@@ -60,27 +71,39 @@ public:
         // Start input threads...
         Input::Inputs::startThreads();
 
-        std::thread(RPCImpl::runRPClient).detach();
+        std::thread(RpcImpl::runRpcClient).detach();
 
-        LOG_APP->log0(__func__,Logs::INFO,  (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(), getpid());
+        LOG_APP->log0(__func__, Logs::INFO, (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(),
+                      getpid());
         return 0;
     }
 
-    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments) override
+    /**
+     * @brief Configure service identity, lifecycle options and command-line arguments.
+     * @param globalArguments Mantids30 service argument registry being initialized.
+     */
+    void _initvars(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
         // init variables (pre-config):
         globalArguments->setInifiniteWaitAtEnd(true);
 
         globalArguments->softwareLicense = "GPLv3 (https://www.gnu.org/licenses/gpl-3.0.en.html)";
-        globalArguments->addAuthor({"Aarón Mizrachi","aaron@unmanarc.com"});
+        globalArguments->addAuthor({"Aarón Mizrachi", "aaron@unmanarc.com"});
 
         globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "a");
         globalArguments->softwareDescription = PROJECT_DESCRIPTION;
 
-        globalArguments->addCommandLineOption("Service Options", 'c', "config-dir" , "Configuration directory"  , "/etc/uauditanalyzer/" + globalArguments->getDaemonName(), Mantids30::Core::Memory::Abstract::Var::Type::STRING );
+        globalArguments->addCommandLineOption("Service Options", 'c', "config-dir", "Configuration directory",
+                                              "/etc/uauditanalyzer/" + globalArguments->getDaemonName(),
+                                              Mantids30::Core::Memory::Abstract::Var::Type::STRING);
     }
 
-    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments) override
+    /**
+     * @brief Load service configuration and initialize resources before worker startup.
+     * @param globalArguments Parsed Mantids30 arguments selecting the configuration directory.
+     * @return True when configuration and resource initialization succeed.
+     */
+    bool _config(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
         Mantids30::Network::Sockets::Socket_TLS::prepareTLS();
 
@@ -94,73 +117,79 @@ public:
         initLog.enableAttributeNameLogging = false;
         initLog.userFieldMinWidth = 1;
 
-        std::string configDir = globalArguments->getCommandLineOptionValue("config-dir")->toString();
+        std::string configDirectory = globalArguments->getCommandLineOptionValue("config-dir")->toString();
 
-        initLog.log0(__func__,Logs::INFO, "Loading configuration: %s", (configDir + "/config.ini").c_str());
+        initLog.log0(__func__, Logs::INFO, "Loading configuration: %s", (configDirectory + "/config.ini").c_str());
 
-        boost::property_tree::ptree config_main;
+        boost::property_tree::ptree mainConfig;
 
-        if (access(configDir.c_str(),R_OK))
+        if (access(configDirectory.c_str(), R_OK))
         {
-            initLog.log0(__func__,Logs::CRITICAL, "Missing configuration dir: %s", configDir.c_str());
+            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration dir: %s", configDirectory.c_str());
             return false;
         }
 
-        chdir(configDir.c_str());
+        chdir(configDirectory.c_str());
 
-        if (!access((configDir + "/config.ini").c_str(),R_OK))
+        if (!access((configDirectory + "/config.ini").c_str(), R_OK))
         {
-            struct stat stats;
+            struct stat fileStatus;
             // Check file properties...
-            stat((configDir + "/config.ini").c_str(), &stats);
+            stat((configDirectory + "/config.ini").c_str(), &fileStatus);
 
-            int smode = stats.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+            int filePermissions = fileStatus.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
 
-            if ( smode != 0600 )
+            if (filePermissions != 0600)
             {
-                initLog.log0(__func__,Logs::WARNING, "config.ini file permissions are not 0600 and API key may be exposed, changing...");
+                initLog.log0(__func__, Logs::WARNING,
+                             "config.ini file permissions are not 0600 and API key may be exposed, changing...");
 
-                if (chmod((configDir + "/config.ini").c_str(),0600))
+                if (chmod((configDirectory + "/config.ini").c_str(), 0600))
                 {
-                    initLog.log0(__func__,Logs::CRITICAL, "Configuration file permissions can't be changed to 0600");
+                    initLog.log0(__func__, Logs::CRITICAL, "Configuration file permissions can't be changed to 0600");
                     return false;
                 }
-                initLog.log0(__func__,Logs::INFO, "config.ini file permissions changed to 0600");
+                initLog.log0(__func__, Logs::INFO, "config.ini file permissions changed to 0600");
             }
 
-            boost::property_tree::ini_parser::read_ini( (configDir + "/config.ini").c_str(),config_main);
+            boost::property_tree::ini_parser::read_ini((configDirectory + "/config.ini").c_str(), mainConfig);
         }
         else
         {
-            initLog.log0(__func__,Logs::CRITICAL, "Missing configuration: %s", (configDir + "/config.ini").c_str());
+            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration: %s",
+                         (configDirectory + "/config.ini").c_str());
             return false;
         }
 
-        *(Globals::getConfig_main()) = config_main;
+        *(Globals::getMainConfig()) = mainConfig;
 
-        if ( config_main.get<bool>("Logs.ToSyslog",true) ) logMode|=Logs::Mode::SYSLOG;
+        if (mainConfig.get<bool>("Logs.ToSyslog", true))
+            logMode |= Logs::Mode::SYSLOG;
         Globals::setAppLog(std::make_unique<Logs::AppLog>(logMode));
         LOG_APP->enableEmptyFieldLogging = true;
-        LOG_APP->enableColorLogging = config_main.get<bool>("Logs.ShowColors",true);
-        LOG_APP->enableDateLogging = config_main.get<bool>("Logs.ShowDate",true);
+        LOG_APP->enableColorLogging = mainConfig.get<bool>("Logs.ShowColors", true);
+        LOG_APP->enableDateLogging = mainConfig.get<bool>("Logs.ShowDate", true);
         LOG_APP->userFieldMinWidth = 1;
         LOG_APP->enableAttributeNameLogging = false;
-        LOG_APP->setDebug(Globals::getConfig_main()->get<bool>("Logs.Debug",false));
+        LOG_APP->setDebug(Globals::getMainConfig()->get<bool>("Logs.Debug", false));
 
-        const auto loadDirectory = [&](const std::string &name, auto loadConfig) {
-            const auto directory = std::filesystem::path(configDir) / name;
+        const auto loadDirectory = [&](const std::string &name, auto loadConfig)
+        {
+            const auto directory = std::filesystem::path(configDirectory) / name;
             std::error_code error;
             std::filesystem::directory_iterator iterator(directory, error), end;
             std::set<std::filesystem::path> files;
             while (!error && iterator != end)
             {
-                if (iterator->is_regular_file(error)) files.insert(iterator->path());
-                if (!error) iterator.increment(error);
+                if (iterator->is_regular_file(error))
+                    files.insert(iterator->path());
+                if (!error)
+                    iterator.increment(error);
             }
             if (error)
             {
-                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s",
-                              directory.c_str(), error.message().c_str());
+                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(),
+                              error.message().c_str());
                 return false;
             }
             for (const auto &file : files)
@@ -171,14 +200,21 @@ public:
             return true;
         };
 
-        if (!loadDirectory("receptors.d", Input::Inputs::loadConfig)) return false;
-        if (!loadDirectory("dispatchers.d", Output::Outputs::loadConfig)) return false;
+        if (!loadDirectory("receptors.d", Input::Inputs::loadConfig))
+            return false;
+        if (!loadDirectory("dispatchers.d", Output::Outputs::loadConfig))
+            return false;
 
         return true;
     }
-
 };
 
+/**
+ * @brief Run this executable through the Mantids30 application lifecycle.
+ * @param argc Number of command-line arguments.
+ * @param argv Command-line argument vector owned by the runtime.
+ * @return Exit status returned by Mantids30.
+ */
 int main(int argc, char *argv[])
 {
     Main application;

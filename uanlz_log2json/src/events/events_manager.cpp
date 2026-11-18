@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Implementation for uanlz_log2json/src/events/events_manager.
+ */
 #include "events_manager.h"
 #include "../globals.h"
 
@@ -6,76 +10,82 @@
 
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-Events_Manager::HostMap Events_Manager::eventsByHostName;
-std::mutex Events_Manager::mutex_insert;
+EventsManager::HostMap EventsManager::hostsById;
+std::mutex EventsManager::hostsMutex;
 
-void garbageCollector()
+/**
+ * @brief Name the garbage collector thread and enter the host expiration loop.
+ * @note Runs for the lifetime of the service.
+ */
+void runGarbageCollector()
 {
     std::string threadName = "EVENTS_GC";
 #ifndef WIN32
     pthread_setname_np(pthread_self(), threadName.c_str());
 #endif
-    Events_Manager::gc();
+    EventsManager::collectExpiredEvents();
 }
 
-Events_Manager::Events_Manager()
-{
+EventsManager::EventsManager() {}
 
-}
-
-json Events_Manager::getJSONStats()
+json EventsManager::getStats()
 {
-    boost::json::array v;
-    for (const auto &[id, hostEvents] : snapshotHosts())
+    boost::json::array hostStats;
+    for (const auto &[hostId, hostState] : snapshotHosts())
     {
-        boost::json::object host{{"events", boost::json::object{}}};
-        host["host"] = id.hostname;
-        host["ip"] = id.ip;
-        host["events"].as_object()["pending"] = (uint64_t) hostEvents->getPendingEventsCount();
-        host["events"].as_object()["processed"] = (uint64_t) hostEvents->getCountEventsProcessed();
-        host["events"].as_object()["dropped"] = (uint64_t) hostEvents->getCountEventsDropped() ;
-        v.emplace_back(std::move(host));
+        boost::json::object hostJson{{"events", boost::json::object{}}};
+        hostJson["host"] = hostId.hostname;
+        hostJson["ip"] = hostId.ipAddress;
+        hostJson["events"].as_object()["pending"] = (uint64_t)hostState->getPendingEventsCount();
+        hostJson["events"].as_object()["processed"] = (uint64_t)hostState->getProcessedEventsCount();
+        hostJson["events"].as_object()["dropped"] = (uint64_t)hostState->getDroppedEventsCount();
+        hostStats.emplace_back(std::move(hostJson));
     }
-    return v;
+    return hostStats;
 }
 
-void Events_Manager::gc()
+void EventsManager::collectExpiredEvents()
 {
     for (;;)
     {
-        uint64_t maxAuditWaitTime = Globals::getConfig_main()->get<uint64_t>("GC.AuditMaxAgeInSecs",10);
-        uint64_t auditGCPeriod = Globals::getConfig_main()->get<uint64_t>("GC.GCPeriodInSecs",5);
+        uint64_t maxEventAgeSeconds = Globals::getMainConfig()->get<uint64_t>("GC.AuditMaxAgeInSecs", 10);
+        uint64_t collectionIntervalSeconds = Globals::getMainConfig()->get<uint64_t>("GC.GCPeriodInSecs", 5);
 
         for (const auto &entry : snapshotHosts())
-            entry.second->dropOldUncompletedEvents(maxAuditWaitTime);
-        sleep(auditGCPeriod);
+            entry.second->flushExpiredEvents(maxEventAgeSeconds);
+        sleep(collectionIntervalSeconds);
     }
 }
 
-void Events_Manager::startGC()
+void EventsManager::startGarbageCollector()
 {
-    std::thread(garbageCollector).detach();
+    std::thread(runGarbageCollector).detach();
 }
 
-void Events_Manager::insertClassContents(const auditHostID & hostID, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string vardata )
+void EventsManager::insertClassContents(const AuditHostId &hostId,
+                                        const std::tuple<time_t, uint32_t, uint64_t> &eventId,
+                                        const std::string &eventType, std::string recordData)
 {
-    std::shared_ptr<Audit_Host> host;
+    std::shared_ptr<AuditHost> hostState;
     {
-        std::lock_guard<std::mutex> lock(mutex_insert);
-        auto position = eventsByHostName.find(hostID);
-        if (position == eventsByHostName.end())
+        std::lock_guard<std::mutex> lock(hostsMutex);
+        auto position = hostsById.find(hostId);
+        if (position == hostsById.end())
         {
-            auto created = std::make_shared<Audit_Host>();
-            created->setHostID(hostID);
-            position = eventsByHostName.emplace(hostID, std::move(created)).first;
+            auto newHost = std::make_shared<AuditHost>();
+            newHost->setHostId(hostId);
+            position = hostsById.emplace(hostId, std::move(newHost)).first;
         }
-        host = position->second;
+        hostState = position->second;
     }
-    host->insertClassContents(eventId, eventType, std::move(vardata));
+    // A shared owner keeps the host alive after releasing the registry lock.
+    // Per-host queue waits must not block reception or statistics for other hosts.
+    hostState->insertClassContents(eventId, eventType, std::move(recordData));
 }
 
-Events_Manager::HostMap Events_Manager::snapshotHosts()
+EventsManager::HostMap EventsManager::snapshotHosts()
 {
-    std::lock_guard<std::mutex> lock(mutex_insert);
-    return eventsByHostName;
+    std::lock_guard<std::mutex> lock(hostsMutex);
+    // Copy owners, not event buffers; callers inspect each host under its own lock.
+    return hostsById;
 }
