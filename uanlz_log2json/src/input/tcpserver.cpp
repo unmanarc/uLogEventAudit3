@@ -91,18 +91,16 @@ void TCPServer::startThreaded()
 
 json TCPServer::getStats()
 {
-    json v;
+    boost::json::object v{{"clients", boost::json::array{}}};
 
     v["description"] = description;
-    v["processedLinesCount"] = (Json::UInt64)processedLinesCount;
-    v["invalidLinesCount"] = (Json::UInt64)invalidLinesCount;
+    v["processedLinesCount"] = (uint64_t)processedLinesCount;
+    v["invalidLinesCount"] = (uint64_t)invalidLinesCount;
 
-    int x=0;
     mt.lock();
     for (auto i : clientProcessors)
     {
-        v["clients"][x] = i->getStats();
-        x++;
+        v["clients"].as_array().emplace_back(i->getStats());
     }
     mt.unlock();
 

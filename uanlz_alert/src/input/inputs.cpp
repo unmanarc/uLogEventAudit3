@@ -20,13 +20,12 @@ Inputs::Inputs()
 
 json Inputs::getStats()
 {
-    json v;
+    boost::json::array v;
 
-    int x=0;
     mt.lock();
     for (auto i : tcpServers)
     {
-        v[x++]=i->getStats();
+        v.emplace_back(i->getStats());
     }
     mt.unlock();
 
@@ -36,11 +35,12 @@ json Inputs::getStats()
 json Inputs::readInputs(bool * readOK)
 {
     json root;
+    if (readOK) *readOK = false;
 
     if (access(sConfigFilePath.c_str(),R_OK))
     {
         // Create empty JSON for unexistent file:
-        json r;
+        boost::json::array r;
 
         LOG_APP->log0(__func__,Logs::INFO,"Inputs file '%s' not found, creating an empty file.", sConfigFilePath.c_str());
 
@@ -59,7 +59,7 @@ json Inputs::readInputs(bool * readOK)
         return root;
     }
 
-    config_doc >> root;
+    if (!UANLZ::JSON::readConfigArray(config_doc, root)) return {};
 
     if ( readOK) *readOK = true;
 
@@ -68,6 +68,7 @@ json Inputs::readInputs(bool * readOK)
 
 bool Inputs::writeInputs(const json &jConfig)
 {
+    if (!jConfig.is_array()) return false;
     if (readInputs() == jConfig)
         return true;
 
@@ -82,26 +83,28 @@ bool Inputs::writeInputs(const json &jConfig)
 bool Inputs::addInput(json jConfig)
 {
     bool readOK;
-    json root = readInputs(&readOK), rt;
+    json root = readInputs(&readOK);
+    boost::json::array rt;
     if (!readOK)
         return false;
 
-    jConfig["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
+    if (!jConfig.is_object()) return false;
+    jConfig.as_object()["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
 
     std::string listenAddr, description;
     uint16_t listenPort;
 
-    listenAddr = JSON_ASSTRING(jConfig,"ListenAddr","");
-    listenPort = JSON_ASUINT(jConfig,"ListenPort",0);
-    description = JSON_ASSTRING(jConfig,"Description","");
+    listenAddr = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"ListenAddr",""));
+    listenPort = UANLZ::JSON::asUInt32(jConfig,"ListenPort",0);
+    description = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"Description",""));
 
-    LOG_APP->log0(__func__,Logs::INFO,"Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(jConfig,"id",""),description.c_str(),listenAddr.c_str(),listenPort );
+    LOG_APP->log0(__func__,Logs::INFO,"Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, Mantids30::DataFormat::JSON::ASCSTRING(jConfig,"id",""),description.c_str(),listenAddr.c_str(),listenPort );
 
-    rt[0]=jConfig;
+    rt.emplace_back(jConfig);
     // Read array:
-    for ( u_int32_t i=0 ; i< root.size(); i++ )
+    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
     {
-        rt[i+1] = root[i];
+        rt.emplace_back(root.as_array()[i]);
     }
 
     return writeInputs(rt);
@@ -110,25 +113,25 @@ bool Inputs::addInput(json jConfig)
 bool Inputs::remInput(const std::string &inputId)
 {
     bool readOK;
-    json root = readInputs(&readOK), rt;
+    json root = readInputs(&readOK);
+    boost::json::array rt;
     if (!readOK)
         return false;
     // Read array:
-    u_int32_t j=0;
-    for ( u_int32_t i=0 ; i< root.size(); i++ )
+    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
     {
-        if ( JSON_ASSTRING(root[i],"id","") != inputId )
-            rt[j++] = root[i];
+        if ( std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"id","")) != inputId )
+            rt.emplace_back(root.as_array()[i]);
         else
         {
             std::string listenAddr, description;
             uint16_t listenPort;
 
-            listenAddr = JSON_ASSTRING(root[i],"ListenAddr","");
-            listenPort = JSON_ASUINT(root[i],"ListenPort",0);
-            description = JSON_ASSTRING(root[i],"Description","");
+            listenAddr = std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"ListenAddr",""));
+            listenPort = UANLZ::JSON::asUInt32(root.as_array()[i],"ListenPort",0);
+            description = std::string(Mantids30::DataFormat::JSON::ASSTRING(root.as_array()[i],"Description",""));
 
-            LOG_APP->log0(__func__,Logs::INFO,"Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(root[i],"id",""),description.c_str(),listenAddr.c_str(),listenPort );
+            LOG_APP->log0(__func__,Logs::INFO,"Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16, Mantids30::DataFormat::JSON::ASCSTRING(root.as_array()[i],"id",""),description.c_str(),listenAddr.c_str(),listenPort );
 
         }
     }
@@ -149,10 +152,10 @@ bool Inputs::loadConfig()
     }
 
     // Read array:
-    for ( u_int32_t i=0 ; i< root.size(); i++ )
+    for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
     {
         TCPServer * in = new TCPServer();
-        if (!in->loadConfig(root[i]))
+        if (!in->loadConfig(root.as_array()[i]))
         {
             delete in;
         }

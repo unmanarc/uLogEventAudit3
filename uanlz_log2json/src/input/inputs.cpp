@@ -12,13 +12,12 @@ Inputs::Inputs()
 
 json Inputs::getStats()
 {
-    json v;
+    boost::json::array v;
 
-    int x=0;
     mt.lock();
     for (auto i : tcpServers)
     {
-        v[x++]=i->getStats();
+        v.emplace_back(i->getStats());
     }
     mt.unlock();
 

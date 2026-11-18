@@ -64,7 +64,7 @@ void RPCImpl::runRPClient()
 
 json RPCImpl::statEventsPerHost(void *,const std::string &, const json &, void*, const std::string &)
 {
-    json j;
+    boost::json::object j;
     j["hosts"] = AuditdEvents::Events_Manager::getJSONStats();
     j["ok"] = true;
     return j;
@@ -72,7 +72,7 @@ json RPCImpl::statEventsPerHost(void *,const std::string &, const json &, void*,
 
 json RPCImpl::statOutputsDistributionThreads(void *,const std::string &, const json &, void*, const std::string &)
 {
-    json j;
+    boost::json::object j;
     j["events"] = AuditdEvents::Events_DistributionThreads::stats();
     j["ok"] = true;
     return j;
@@ -80,7 +80,7 @@ json RPCImpl::statOutputsDistributionThreads(void *,const std::string &, const j
 
 json RPCImpl::statOutputs(void *,const std::string &, const json &, void*, const std::string &)
 {
-    json j;
+    boost::json::object j;
     j["outputs"] = Output::Outputs::getStats();
     j["ok"] = true;
     return j;
@@ -88,7 +88,7 @@ json RPCImpl::statOutputs(void *,const std::string &, const json &, void*, const
 
 json RPCImpl::statInputs(void *,const std::string &, const json &, void*, const std::string &)
 {
-    json j;
+    boost::json::object j;
     j["ok"] = true;
     j["inputs"] = Input::Inputs::getStats();
     return j;
@@ -96,7 +96,7 @@ json RPCImpl::statInputs(void *,const std::string &, const json &, void*, const 
 /*
 json RPCImpl::helloWorld(void *, const json &)
 {
-    json hw;
+    boost::json::object hw;
     hw["MSG"] = "Hello World!";
     return hw;
 }

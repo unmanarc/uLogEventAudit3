@@ -50,9 +50,9 @@ TCPServer::TCPServer()
 
 bool TCPServer::loadConfig(const json & jConfig)
 {
-    listenAddr = JSON_ASSTRING(jConfig,"ListenAddr","");
-    listenPort = JSON_ASUINT(jConfig,"ListenPort",0);
-    description = JSON_ASSTRING(jConfig,"Description","");
+    listenAddr = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"ListenAddr",""));
+    listenPort = UANLZ::JSON::asUInt32(jConfig,"ListenPort",0);
+    description = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"Description",""));
 
     LOG_APP->log0(__func__,Logs::INFO,"Configuring JSON input '%s' @%s:%" PRIu16,description.c_str(),listenAddr.c_str(),listenPort );
 
@@ -80,16 +80,14 @@ void TCPServer::startThreaded()
 
 json TCPServer::getStats()
 {
-    json v;
+    boost::json::object v{{"clients", boost::json::array{}}};
 
     v["description"] = description;
 
-    int x=0;
     mt.lock();
     for (auto i : clientProcessors)
     {
-        v["clients"][x] = i->getStats();
-        x++;
+        v["clients"].as_array().emplace_back(i->getStats());
     }
     mt.unlock();
 

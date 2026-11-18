@@ -73,7 +73,7 @@ void Audit_ClassType::setClassTypeName(const string &value)
 
 json Audit_ClassType::getJSON()
 {
-    json v;
+    boost::json::object v{};
 
     bool normal = true;
     if (classTypeName == "EXECVE")
@@ -82,18 +82,19 @@ json Audit_ClassType::getJSON()
         {
             normal = false;
             v["argc"] = contentVars["argc"].getFancy();
+            v["argv"] = boost::json::array{};
             std::string cmdline;
             for (uint32_t i=0; i<contentVars["argc"].asUInt32() && i<65536; i++)
             {
                 std::string curVar = "a" + to_string(i);
                 if (contentVars.find(curVar)!=contentVars.end())
                 {
-                    v["argv"][i] = contentVars[curVar].getFancy();
+                    v["argv"].as_array().emplace_back(contentVars[curVar].getFancy());
                     cmdline += contentVars[curVar].getFancy() + " ";
                 }
                 else
                 {
-                    v["argv"][i] = "__UAA_PARSER_NOT_FOUND__";
+                    v["argv"].as_array().emplace_back("__UAA_PARSER_NOT_FOUND__");
                     cmdline += "__UAA_PARSER_NOT_FOUND__ ";
                 }
             }

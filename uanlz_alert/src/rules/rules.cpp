@@ -92,13 +92,6 @@ void forkExec(const std::string & ruleName, const char *file, std::vector<string
     free(argv);
 }
 
-std::string toUnStyledString(const json& value)
-{
-    Json::FastWriter writer;
-    std::string str = writer.write( value );
-    str.erase(std::remove(str.begin(), str.end(), '\n'), str.end());
-    return str;
-}
 
 Rules::Rules()
 {
@@ -116,17 +109,17 @@ Rules::~Rules()
 
 json Rules::getStats()
 {
-    json j;
-    j["queue"]["count"] = (Json::UInt64)evaluationQueue.size();
-    j["queue"]["max"] = (Json::UInt64)evaluationQueue.getMaxItems();
+    boost::json::object j{{"queue", boost::json::object{}}};
+    j["queue"].as_object()["count"] = (uint64_t)evaluationQueue.size();
+    j["queue"].as_object()["max"] = (uint64_t)evaluationQueue.getMaxItems();
 
-    j["queuedLinesCount"]   = (Json::UInt64)queuedLinesCount;
-    j["droppedInQueue"]     = (Json::UInt64)droppedInQueue;
-    j["badFormatLines"]     = (Json::UInt64)badFormatLines;
-    j["processedLines"]     = (Json::UInt64)processedLines;
-    j["rulesActivated"]     = (Json::UInt64)rulesActivated;
-    j["queueInLastSec"]     = (Json::UInt64)queueInLastSec;
-    j["queueOutLastSec"]    = (Json::UInt64)queueOutLastSec;
+    j["queuedLinesCount"]   = (uint64_t)queuedLinesCount;
+    j["droppedInQueue"]     = (uint64_t)droppedInQueue;
+    j["badFormatLines"]     = (uint64_t)badFormatLines;
+    j["processedLines"]     = (uint64_t)processedLines;
+    j["rulesActivated"]     = (uint64_t)rulesActivated;
+    j["queueInLastSec"]     = (uint64_t)queueInLastSec;
+    j["queueOutLastSec"]    = (uint64_t)queueOutLastSec;
     j["lastEvaluationTimeInMS"] = (double)evaluationTimeInMS;
 
     return j;
@@ -185,9 +178,9 @@ bool Rules::reloadRules()
     json root = readRulesFileConfig();
     LOG_APP->log0(__func__,Logs::INFO,"Loading filters from file: %s", sRulesFilePath.c_str());
 
-    for (uint32_t i=0;i<root.size();i++)
+    for (uint32_t i=0;i<Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size();i++)
     {
-        _addRule(i,root[i]);
+        _addRule(i,root.as_array()[i]);
     }
 
     bRulesModified = false;
@@ -202,9 +195,9 @@ bool Rules::reloadActions()
     json root = readActionsFileConfig();
 
     LOG_APP->log0(__func__,Logs::INFO,"Loading actions from file: %s", sActionsFilePath.c_str());
-    for (uint32_t i=0;i<root.size();i++)
+    for (uint32_t i=0;i<Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size();i++)
     {
-        _addAction(root[i]);
+        _addAction(root.as_array()[i]);
     }
 
     bActionsModified = false;
@@ -215,13 +208,12 @@ bool Rules::reloadActions()
 
 bool Rules::evaluate(const json &values)
 {
-    const auto evaluationValues = UANLZ::JSON::toMantids(values);
     std::shared_lock<std::shared_mutex> lock(mtRules);
 
     bool activated = false;
     for (sRule * rule: rules)
     {
-        if (rule->expr->evaluate(evaluationValues))
+        if (rule->expr->evaluate(values))
         {
             // Activate
             activated = true;
@@ -334,7 +326,7 @@ void Rules::threadEvaluation(const uint32_t &threadId)
             auto finish = chrono::high_resolution_clock::now();
             chrono::duration<double, milli> elapsed = finish - start;
 
-            Json::Reader reader;
+            Mantids30::DataFormat::JSON::Reader reader;
             if (reader.parse(*s, v))
             {
                 if (evaluate(v))
@@ -434,23 +426,26 @@ string Rules::getValueForVar(const string &var, const string &ruleName, const js
     else if (var.at(0) == '$')
     {
         // JSONPATH MULTI-LINE STYLED
-        Json::Path path(var.substr(1));
-        json result = path.resolve(values);
-        return result.toStyledString();
+        Mantids30::DataFormat::JSON::Path path(var.substr(1));
+        const auto *resolved = path.resolve(values);
+        const json result = resolved ? *resolved : json{};
+        return UANLZ::JSON::toStyledString(result);
     }
     else if (var.at(0) == '-')
     {
         // JSONPATH ONE-LINE UNSTYLED
-        Json::Path path(var.substr(1));
-        json result = path.resolve(values);
-        return toUnStyledString(result);
+        Mantids30::DataFormat::JSON::Path path(var.substr(1));
+        const auto *resolved = path.resolve(values);
+        const json result = resolved ? *resolved : json{};
+        return Mantids30::DataFormat::JSON::toString(result);
     }
     else if (var.at(0) == '+')
     {
         // JSONPATH ONE-LINE UNSTYLED MAYUS
-        Json::Path path(var.substr(1));
-        json result = path.resolve(values);
-        return boost::to_upper_copy(toUnStyledString(result));
+        Mantids30::DataFormat::JSON::Path path(var.substr(1));
+        const auto *resolved = path.resolve(values);
+        const json result = resolved ? *resolved : json{};
+        return boost::to_upper_copy(Mantids30::DataFormat::JSON::toString(result));
     }
     else if (var.at(0) == '#')
     {
@@ -471,8 +466,8 @@ string Rules::getValueForVar(const string &var, const string &ruleName, const js
 
 bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
 {
-    std::string name =  JSON_ASSTRING(jConfig,"name","");
-    std::string action = JSON_ASSTRING(jConfig,"action","");
+    std::string name =  std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name",""));
+    std::string action = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"action",""));
 
     if (replace)
     {
@@ -486,7 +481,7 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
 
     LOG_APP->log0(__func__,Logs::INFO,"Creating Rule '%s'",name.c_str());
 
-    std::string filter = JSON_ASSTRING(jConfig,"filter","");
+    std::string filter = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"filter",""));
 
     boost::replace_all(filter,"\n", " ");
 
@@ -505,7 +500,7 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
     if (action == "EXEC" || action == "EXECANDABORT")
     {
         rule->ruleAction =  action == "EXEC"? RULE_ACTION_EXEC : RULE_ACTION_EXECANDABORT;
-        rule->actionId = JSON_ASSTRING(jConfig,"actionId","");
+        rule->actionId = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"actionId",""));
         // TODO: Check if actionId exist...
 
         if (actions.find(rule->actionId) == actions.end())
@@ -544,8 +539,8 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
 
 bool Rules::_addAction(const json &jConfig, bool replace)
 {
-    std::string actionName = JSON_ASSTRING(jConfig,"name","");
-    std::string actionDescription = JSON_ASSTRING(jConfig,"description","");
+    std::string actionName = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name",""));
+    std::string actionDescription = std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"description",""));
 
     if (!replace)
     {
@@ -568,14 +563,13 @@ bool Rules::_addAction(const json &jConfig, bool replace)
 
     sAction * action = new sAction;
     action->jOriginalVal = jConfig;
-    action->setFileName(JSON_ASSTRING(jConfig,"path",""));
+    action->setFileName(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"path","")));
     vector<string> arguments;
-    for (uint32_t i =0; i<jConfig["args"].size();i++ )
+    for (const auto &arg : Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(jConfig, "args"))
     {
-        json arg = jConfig["args"][i];
         //AppendNewLineToEarchArgument
-        std::string argument = JSON_ASSTRING_D(arg,"");
-        if (JSON_ASBOOL(jConfig,"appendNewLineToEachArgv",false)) argument+="%N%";
+        std::string argument = std::string(Mantids30::DataFormat::JSON::ASSTRING_D(arg,""));
+        if (Mantids30::DataFormat::JSON::ASBOOL(jConfig,"appendNewLineToEachArgv",false)) argument+="%N%";
         arguments.push_back(argument);
     }
     action->setArguments(arguments);
@@ -639,11 +633,10 @@ string Rules::getRandomTag(const string &str, uint64_t t)
 json Rules::getCurrentRunningActions()
 {
     std::shared_lock<std::shared_mutex> lock(mtRules);
-    json r;
+    boost::json::array r;
 
-    uint32_t i=0;
     for (const auto &action: actions)
-        r[i++] = action.second->jOriginalVal;
+        r.emplace_back(action.second->jOriginalVal);
 
     return r;
 }
@@ -674,10 +667,9 @@ json Rules::getCurrentRunningRules()
 {
     std::shared_lock<std::shared_mutex> lock(mtRules);
 
-    json r;
+    boost::json::array r;
 
-    uint32_t i=0;
-    for (auto rule: rules) r[i++] = rule->jOriginalVal;
+    for (auto rule: rules) r.emplace_back(rule->jOriginalVal);
 
     return r;
 }
@@ -714,6 +706,7 @@ void Rules::setMaxQueuePopTimeInMilliseconds(const uint64_t &value)
 
 bool Rules::writeRulesFileConfig(const json &jConfig)
 {
+    if (!jConfig.is_array()) return false;
     if (readRulesFileConfig() == jConfig)
     {
         bRulesModified = false;
@@ -733,6 +726,7 @@ bool Rules::writeRulesFileConfig(const json &jConfig)
 
 bool Rules::writeActionsFileConfig(const json &jConfig)
 {
+    if (!jConfig.is_array()) return false;
     if (readActionsFileConfig() == jConfig)
     {
         bActionsModified = false;
@@ -756,7 +750,7 @@ json Rules::readRulesFileConfig()
     std::ifstream config_doc(sRulesFilePath, std::ifstream::binary);
     if (!config_doc.is_open())
         return root;
-    config_doc >> root;
+    if (!UANLZ::JSON::readConfigArray(config_doc, root)) return {};
     return root;
 }
 
@@ -767,7 +761,7 @@ json Rules::readActionsFileConfig()
     std::ifstream config_doc(sActionsFilePath, std::ifstream::binary);
     if (!config_doc.is_open())
         return root;
-    config_doc >> root;
+    if (!UANLZ::JSON::readConfigArray(config_doc, root)) return {};
     return root;
 }
 

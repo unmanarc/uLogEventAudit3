@@ -15,12 +15,11 @@ Outputs::Outputs()
 
 json Outputs::getStats()
 {
-    json v;
+    boost::json::array v;
     mt.lock();
-    int x=0;
     for (Output_Base * ob : outputBases)
     {
-        v[x++] = ob->getStats();
+        v.emplace_back(ob->getStats());
     }
     mt.unlock();
     return v;

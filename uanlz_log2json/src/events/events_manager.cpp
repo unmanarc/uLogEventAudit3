@@ -25,17 +25,17 @@ Events_Manager::Events_Manager()
 
 json Events_Manager::getJSONStats()
 {
-    json v;
+    boost::json::array v;
     mutex_insert.lock();
-    int x=0;
     for ( auto & i : eventsByHostName )
     {
-        v[x]["host"] = i.first.hostname;
-        v[x]["ip"] = i.first.ip;
-        v[x]["events"]["pending"] = (Json::UInt64) i.second.getPendingEventsCount( );
-        v[x]["events"]["processed"] = (Json::UInt64) i.second.getCountEventsProcessed();
-        v[x]["events"]["dropped"] = (Json::UInt64) i.second.getCountEventsDropped() ;
-        x++;
+        boost::json::object host{{"events", boost::json::object{}}};
+        host["host"] = i.first.hostname;
+        host["ip"] = i.first.ip;
+        host["events"].as_object()["pending"] = (uint64_t) i.second.getPendingEventsCount( );
+        host["events"].as_object()["processed"] = (uint64_t) i.second.getCountEventsProcessed();
+        host["events"].as_object()["dropped"] = (uint64_t) i.second.getCountEventsDropped() ;
+        v.emplace_back(std::move(host));
     }
     mutex_insert.unlock();
     return v;

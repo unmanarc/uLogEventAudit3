@@ -64,7 +64,7 @@ void outputDistributionThread(int threadid)
         else
         {
             LOG_APP->log0(__func__,Mantids30::Runtime::Logs::DEBUG, "No events so far for output thread #%d, triggering no event alert JSON...", threadid);
-            json noEventsAlertJSON;
+            boost::json::object noEventsAlertJSON;
             noEventsAlertJSON["noEventsAlert"] = true;
             Output::Outputs::pushToOutputBases(noEventsAlertJSON, std::make_tuple<time_t, uint32_t, uint64_t>(0,0,0));
         }
@@ -91,13 +91,13 @@ Events_DistributionThreads::Events_DistributionThreads()
 
 json Events_DistributionThreads::stats()
 {
-    json v;
-    v["eventsQueue"]["maxItems"] = (Json::UInt64) eventsQueue.getMaxItems();
-    v["eventsQueue"]["curSize"] = (Json::UInt64) eventsQueue.size();
-    v["eventsQueue"]["dropped"] = (Json::UInt64) eventsDropped;
+    boost::json::object v{{"eventsQueue", boost::json::object{}}, {"eventsProcessed", boost::json::object{}}};
+    v["eventsQueue"].as_object()["maxItems"] = (uint64_t) eventsQueue.getMaxItems();
+    v["eventsQueue"].as_object()["curSize"] = (uint64_t) eventsQueue.size();
+    v["eventsQueue"].as_object()["dropped"] = (uint64_t) eventsDropped;
 
-    v["eventsProcessed"]["last10s"] = (Json::UInt64) eventsProcessedInLast10Second;
-    v["eventsProcessed"]["total"] = (Json::UInt64) eventsProcessed;
+    v["eventsProcessed"].as_object()["last10s"] = (uint64_t) eventsProcessedInLast10Second;
+    v["eventsProcessed"].as_object()["total"] = (uint64_t) eventsProcessed;
 
     return v;
 }

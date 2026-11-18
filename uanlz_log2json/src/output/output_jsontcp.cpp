@@ -45,13 +45,6 @@ bool Output_JSONTCP::loadConfig(const std::string &file)
     return true;
 }
 
-std::string toUnStyledString(const json& value)
-{
-    Json::FastWriter writer;
-    std::string str = writer.write( value );
-    str.erase(std::remove(str.begin(), str.end(), '\n'), str.end());
-    return str;
-}
 
 void Output_JSONTCP::logAuditEvent(const json & eventJSON, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
@@ -89,7 +82,7 @@ void Output_JSONTCP::process()
         if (value)
         {
             // Try to send it...
-            while (!connection->writeString(transmitionMode==0?toUnStyledString(*value) + "\n": value->toStyledString()  ))
+            while (!connection->writeString(transmitionMode==0?Mantids30::DataFormat::JSON::toString(*value) + "\n": UANLZ::JSON::toStyledString(*value)  ))
             {
                 // if not, try to reconnect.
                 while (!reconnect()) {}
@@ -102,16 +95,16 @@ void Output_JSONTCP::process()
 
 json Output_JSONTCP::getStats()
 {
-    json v;
+    boost::json::object v{{"queue", boost::json::object{}}};
 
     std::string server = config.get<std::string>("Host","127.0.0.1");
     uint16_t port = config.get<uint16_t>("Port",18200);
 
     v["id"] = server + ":" + to_string(port);
-    v["queue"]["size"] = (Json::UInt64)queueValues.size();
-    v["queue"]["maxItems"] = (Json::UInt64)queueValues.getMaxItems();
-    v["queue"]["dropped"] = (Json::UInt64)dropped;
-    v["queue"]["processed"] = (Json::UInt64)processed;
+    v["queue"].as_object()["size"] = (uint64_t)queueValues.size();
+    v["queue"].as_object()["maxItems"] = (uint64_t)queueValues.getMaxItems();
+    v["queue"].as_object()["dropped"] = (uint64_t)dropped;
+    v["queue"].as_object()["processed"] = (uint64_t)processed;
     v["connected"] = (bool)connected;
 
     return v;

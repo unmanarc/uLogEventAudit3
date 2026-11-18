@@ -109,7 +109,7 @@ json RPCImpl::statReadRunningRules(void *, const std::string &, const json &, vo
 
 json RPCImpl::statReadRunningRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningRule(JSON_ASUINT(jConfig,"id",0xFFFFFFFF));
+    return Filters::Rules::getCurrentRunningRule(UANLZ::JSON::asUInt32(jConfig,"id",0xFFFFFFFF));
 }
 
 json RPCImpl::statAreRulesModified(void *, const std::string &, const json &, void*, const std::string &)
@@ -119,12 +119,12 @@ json RPCImpl::statAreRulesModified(void *, const std::string &, const json &, vo
 
 json RPCImpl::controlRemoveRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::removeRule(JSON_ASUINT(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::removeRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
 }
 
 json RPCImpl::controlRemoveAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::removeAction(JSON_ASSTRING(jConfig,"name",""));
+    return Filters::Rules::removeAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name","")));
 }
 
 json RPCImpl::controlSaveRunningRules(void *, const std::string &, const json &, void*, const std::string &)
@@ -149,22 +149,22 @@ json RPCImpl::controlEditAction(void *, const std::string &, const json &jConfig
 
 json RPCImpl::controlEditRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::editRule(JSON_ASUINT(jConfig,"pos",0xFFFFFFFF),jConfig["rule"]);
+    return Filters::Rules::editRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF),Mantids30::DataFormat::JSON::MEMBER_OR_NULL(jConfig, "rule"));
 }
 
 json RPCImpl::controlAddRule(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::addRule(JSON_ASUINT(jConfig,"pos",0xFFFFFFFF),jConfig["rule"]);
+    return Filters::Rules::addRule(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF),Mantids30::DataFormat::JSON::MEMBER_OR_NULL(jConfig, "rule"));
 }
 
 json RPCImpl::controlRuleUp(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::ruleUp(JSON_ASUINT(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::ruleUp(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
 }
 
 json RPCImpl::controlRuleDown(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::ruleDown(JSON_ASUINT(jConfig,"pos",0xFFFFFFFF));
+    return Filters::Rules::ruleDown(UANLZ::JSON::asUInt32(jConfig,"pos",0xFFFFFFFF));
 }
 
 json RPCImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
@@ -189,12 +189,12 @@ json RPCImpl::statReadRunningActions(void *, const std::string &, const json &, 
 
 json RPCImpl::statReadRunningAction(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningAction(JSON_ASSTRING(jConfig,"name",""));
+    return Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"name","")));
 }
 
 json RPCImpl::RemInputFromFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
 {
-    return Input::Inputs::remInput(JSON_ASSTRING(jConfig,"id",""));
+    return Input::Inputs::remInput(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"id","")));
 }
 
 json RPCImpl::AddInputToFileConfig(void *, const std::string &, const json &jConfig, void*, const std::string &)
@@ -204,7 +204,7 @@ json RPCImpl::AddInputToFileConfig(void *, const std::string &, const json &jCon
 
 json RPCImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void*, const std::string &)
 {
-    json j;
+    boost::json::object j{};
     j["modified"] = Input::Inputs::getModified();
     j["inputs"] = Input::Inputs::readInputs();
     return j;
@@ -250,7 +250,7 @@ json RPCImpl::controlActionsReload(void *,const std::string &, const json &, voi
 /*
 json RPCImpl::helloWorld(void *, const json &)
 {
-    json hw;
+    boost::json::object hw;
     hw["MSG"] = "Hello World!";
     return hw;
 }

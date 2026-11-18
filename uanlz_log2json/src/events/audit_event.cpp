@@ -120,7 +120,7 @@ Audit_ClassType *Audit_Event::getClassVars(const string &groupName)
 
 json Audit_Event::getJSON()
 {
-    json x;
+    boost::json::object x{{"AUDITD", boost::json::object{}}, {"INFO", boost::json::object{}}};
 
     time_t unixTime = std::get<0>(eventId);
     std::string  sTime = std::asctime(std::localtime(&unixTime));
@@ -128,38 +128,38 @@ json Audit_Event::getJSON()
 
     std::string auditdID =  to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
 
-    x["AUDITD"]["id"]  = auditdID;
+    x["AUDITD"].as_object()["id"]  = auditdID;
 
-    x["INFO"]["source"] = "auditd";
-    x["INFO"]["parserVersion"]  = 1;
+    x["INFO"].as_object()["source"] = "auditd";
+    x["INFO"].as_object()["parserVersion"]  = 1;
 
-    x["INFO"]["unixTime"]  = (json::Int64)unixTime;
-    x["INFO"]["msecs"]     = std::get<1>(eventId);
-    x["INFO"]["id"]        = (json::UInt64)std::get<2>(eventId);
+    x["INFO"].as_object()["unixTime"]  = (int64_t)unixTime;
+    x["INFO"].as_object()["msecs"]     = std::get<1>(eventId);
+    x["INFO"].as_object()["id"]        = (uint64_t)std::get<2>(eventId);
 
-    x["INFO"]["host"]      = hostId.hostname;
-    x["INFO"]["ip"]        = hostId.ip;
-    x["INFO"]["time"]      = sTime;
+    x["INFO"].as_object()["host"]      = hostId.hostname;
+    x["INFO"].as_object()["ip"]        = hostId.ip;
+    x["INFO"].as_object()["time"]      = sTime;
 
     std::set<string> classes = getClassesNames();
     for (const string & className : classes)
     {
-        int i=0;
+        boost::json::array entries;
         typedef std::multimap<std::string, Audit_ClassType *>::iterator MMAPIterator;
         std::pair<MMAPIterator, MMAPIterator> result = classVars.equal_range(className);
         for (MMAPIterator it = result.first; it != result.second; it++)
         {
             if (className != "INFO")
             {
-                x[className][i] = it->second->getJSON();
-                i++;
+                entries.emplace_back(it->second->getJSON());
             }
             // TODO: limit max classes
         }
-        if (i && x[className][0].isMember("key"))
+        if (!entries.empty() && Mantids30::DataFormat::JSON::HAS_MEMBER(entries.front(), "key"))
         {
-            x["INFO"]["key"] = x[className][0]["key"];
+            x["INFO"].as_object()["key"] = entries.front().as_object().at("key");
         }
+        if (!entries.empty()) x[className] = std::move(entries);
     }
     return x;
 }
