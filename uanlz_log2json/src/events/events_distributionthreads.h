@@ -2,6 +2,7 @@
 #define OUTPUT_DISTRIBUTIONTHREADS_H
 
 #include <Mantids30/Core/Threads/safe_queue.h>
+#include <memory>
 
 #include "../events/audit_event.h"
 
@@ -16,8 +17,8 @@ public:
     static void setQueueSize(const size_t & qSize);
     static void startDistributionThreads(const size_t & threads);
 
-    static bool pushAuditEvent(Audit_Event *aevent);
-    static Audit_Event * popAuditEvent(const uint32_t &tmout_msecs);
+    static bool pushAuditEvent(std::unique_ptr<Audit_Event> aevent);
+    static std::unique_ptr<Audit_Event> popAuditEvent(const uint32_t &tmout_msecs);
 
     static void addEventsProcessed();
     static void lRefreshEventsParsedPer10Second();

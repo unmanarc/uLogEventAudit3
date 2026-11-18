@@ -35,8 +35,7 @@ void outputDistributionThread(int threadid)
 
     for (;;)
     {
-        map<string, Audit_Var> contentVars;
-        Audit_Event * event = Events_DistributionThreads::popAuditEvent( Globals::getConfig_main()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs",10000) );
+        auto event = Events_DistributionThreads::popAuditEvent( Globals::getConfig_main()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs",10000) );
 
         // processing event
         if (event)
@@ -47,7 +46,6 @@ void outputDistributionThread(int threadid)
             // push to outputs...
             Output::Outputs::pushToOutputBases(eventJSON, event->getEventId());
 
-            delete event;
 
             // Account it.
             Events_DistributionThreads::addEventsProcessed();
@@ -131,16 +129,17 @@ void Events_DistributionThreads::startDistributionThreads(const size_t &threads)
     }
 }
 
-bool Events_DistributionThreads::pushAuditEvent(Audit_Event *aevent)
+bool Events_DistributionThreads::pushAuditEvent(std::unique_ptr<Audit_Event> aevent)
 {
-    bool r = eventsQueue.push(aevent, pushTimeoutInMS);
-    if (!r) eventsDropped++;
+    bool r = eventsQueue.push(aevent.get(), pushTimeoutInMS);
+    if (r) aevent.release(); // Ownership transfers to Mantids30 only on success.
+    else eventsDropped++;
     return r;
 }
 
-Audit_Event *Events_DistributionThreads::popAuditEvent(const uint32_t & tmout_msecs)
+std::unique_ptr<Audit_Event> Events_DistributionThreads::popAuditEvent(const uint32_t & tmout_msecs)
 {
-    return eventsQueue.pop(tmout_msecs);
+    return std::unique_ptr<Audit_Event>(eventsQueue.pop(tmout_msecs));
 }
 
 void Events_DistributionThreads::addEventsProcessed()
@@ -151,8 +150,7 @@ void Events_DistributionThreads::addEventsProcessed()
 
 void Events_DistributionThreads::lRefreshEventsParsedPer10Second()
 {
-    eventsProcessedInLast10Second = (uint64_t)eventsProcessedInThisPeriod;
-    eventsProcessedInThisPeriod = 0;
+    eventsProcessedInLast10Second = eventsProcessedInThisPeriod.exchange(0);
 }
 /*
 void ProcessorThreads_Output::setLastRulesEvaluationTime(double _lastRulesEvaluationTime)

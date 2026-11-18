@@ -1,145 +1,107 @@
 #include "audit_host.h"
 #include "../globals.h"
-
-#include "../events/events_distributionthreads.h"
-
-#include <set>
-#include <inttypes.h>
+#include "events_distributionthreads.h"
+#include <vector>
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-
-Audit_Host::Audit_Host()
+namespace {
+string eventIDString(const Audit_Event &event)
 {
-    countEventsDropped=0;
-    countEventsProcessed=0;
-    enforceMaxAge = Globals::getConfig_main()->get<uint64_t>("GC.EnforceMaxAge",true);
+    const auto [seconds, milliseconds, id] = event.getEventId();
+    return to_string(seconds) + "." + to_string(milliseconds) + ":" + to_string(id);
+}
 }
 
-Audit_Host::~Audit_Host()
+Audit_Host::Audit_Host() : countEventsDropped(0), countEventsProcessed(0)
 {
-    for (auto & i : auditEvents)
-    {
-        delete i.second;
-    }
+    enforceMaxAge = Globals::getConfig_main()->get<bool>("GC.EnforceMaxAge", true);
 }
 
-void Audit_Host::insertClassContents(const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string * varData)
+void Audit_Host::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eventId,
+                                    const string &eventType, string varData)
 {
-    mEvents.lock();
-    Audit_Event * aevent = nullptr;
-
-    if ( auditEvents.find(eventId) != auditEvents.end() )
-        aevent = auditEvents[eventId];
-    else
+    unique_lock<mutex> lock(mEvents);
+    auto position = auditEvents.find(eventId);
+    if (position == auditEvents.end())
     {
-        aevent = new Audit_Event;
-        auditEvents[eventId] = aevent;
-        aevent->setEventId(eventId);
-        aevent->setHostId(hostid);
+        auto event = make_unique<Audit_Event>();
+        event->setEventId(eventId);
+        event->setHostId(hostid);
+        position = auditEvents.emplace(eventId, std::move(event)).first;
     }
 
-    if (aevent->insertClassContents(eventType,varData) && !enforceMaxAge)
+    if (position->second->insertClassContents(eventType, std::move(varData)) && !enforceMaxAge)
     {
-        // Event reception ready/completed for analysis, take it out from here and put it in the queue!.
-        auditEvents.erase(eventId);
-        mEvents.unlock();
-
-        if (!Events_DistributionThreads::pushAuditEvent(aevent))
+        auto event = std::move(position->second);
+        auditEvents.erase(position);
+        lock.unlock();
+        const auto id = eventIDString(*event);
+        if (!Events_DistributionThreads::pushAuditEvent(std::move(event)))
         {
-            std::tuple<time_t, uint32_t, uint64_t> eventId = aevent->getEventId();
-            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Queue full, Event %" PRIu16 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId),get<1>(eventId),get<2>(eventId) );
-            delete aevent;
-            countEventsDropped++;
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR,
+                          "Queue full, Event %s Dropped...", id.c_str());
+            ++countEventsDropped;
         }
-        else
-        {
-            countEventsProcessed++;
-        }
-    }
-    else
-    {
-        mEvents.unlock();
+        else ++countEventsProcessed;
     }
 }
 
 void Audit_Host::setHostID(const auditHostID &value)
 {
+    lock_guard<mutex> lock(mEvents);
     if (hostid.hostname.empty()) hostid = value;
 }
 
 void Audit_Host::dropOldUncompletedEvents(const uint64_t &maxEventTimeInSeconds)
 {
-    mEvents.lock();
-
-    set<tuple<time_t,uint32_t,uint64_t>> uncompleted_phase1;
-    set<Audit_Event *> uncompleted_phase2;
-
-    for (auto & i : auditEvents)
+    vector<unique_ptr<Audit_Event>> expired;
+    string hostname;
     {
-        if (i.second->timeSinceCreation()>maxEventTimeInSeconds)
+        lock_guard<mutex> lock(mEvents);
+        hostname = hostid.hostname;
+        for (auto it = auditEvents.begin(); it != auditEvents.end();)
         {
-            uncompleted_phase1.insert(i.first);
-            uncompleted_phase2.insert(i.second);
+            if (it->second->timeSinceCreation() > maxEventTimeInSeconds)
+            {
+                expired.push_back(std::move(it->second));
+                it = auditEvents.erase(it);
+            }
+            else ++it;
         }
     }
 
-    for (auto & eventId : uncompleted_phase1)
+    if (!enforceMaxAge && !expired.empty())
     {
-        auditEvents.erase(eventId);
-    }
-
-    mEvents.unlock();
-
-    string uncompletedEventIDs = "";
-    for (Audit_Event * aevent : uncompleted_phase2)
-    {
-        char cEventID[512];
-        std::tuple<time_t, uint32_t, uint64_t> eventId = aevent->getEventId();
-        snprintf(cEventID,500,"%" PRIu64 ".%" PRIu32 ":%" PRIu64 ",", get<0>(eventId),get<1>(eventId),get<2>(eventId));
-        if (!enforceMaxAge) uncompletedEventIDs+=cEventID;
-    }
-
-    if (!uncompletedEventIDs.empty())
-    {
-        uncompletedEventIDs.pop_back();
-        LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Queueing uncompleted events for host='%s' (%s)...", this->hostid.hostname.c_str(), uncompletedEventIDs.c_str() );
-    }
-
-    for (Audit_Event * aevent : uncompleted_phase2)
-    {
-        if (!Events_DistributionThreads::pushAuditEvent(aevent))
+        string ids;
+        for (const auto &event : expired)
         {
-            char cEventID[512];
-            std::tuple<time_t, uint32_t, uint64_t> eventId = aevent->getEventId();
-            snprintf(cEventID,500,"%" PRIu64 ".%" PRIu32 ":%" PRIu64, get<0>(eventId),get<1>(eventId),get<2>(eventId));
-            LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...", cEventID );
-            delete aevent;
-            countEventsDropped++;
+            if (!ids.empty()) ids += ",";
+            ids += eventIDString(*event);
         }
-        else
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR,
+                      "Queueing uncompleted events for host='%s' (%s)...", hostname.c_str(), ids.c_str());
+    }
+
+    for (auto &event : expired)
+    {
+        const auto id = eventIDString(*event);
+        if (!Events_DistributionThreads::pushAuditEvent(std::move(event)))
         {
-            countEventsProcessed++;
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR,
+                          "Queue full, Event %s Dropped...", id.c_str());
+            ++countEventsDropped;
         }
+        else ++countEventsProcessed;
     }
 }
 
 size_t Audit_Host::getPendingEventsCount()
 {
-    size_t r;
-    mEvents.lock();
-    r = auditEvents.size();
-    mEvents.unlock();
-    return r;
+    lock_guard<mutex> lock(mEvents);
+    return auditEvents.size();
 }
 
-uint64_t Audit_Host::getCountEventsDropped() const
-{
-    return countEventsDropped;
-}
-
-uint64_t Audit_Host::getCountEventsProcessed() const
-{
-    return countEventsProcessed;
-}
+uint64_t Audit_Host::getCountEventsDropped() const { return countEventsDropped.load(); }
+uint64_t Audit_Host::getCountEventsProcessed() const { return countEventsProcessed.load(); }
