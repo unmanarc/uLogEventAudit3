@@ -93,3 +93,36 @@ returns 503; a failed internal RPC returns 502. libMantids30 currently returns
 403 for missing JWT authentication and 401 for missing scopes.
 
 See [BUILD.md](BUILD.md) for building and the temporary integration test.
+
+## C++17 ownership and concurrency
+
+The build uses ISO C++17 with compiler extensions disabled. libMantids30 remains
+responsible for sockets, acceptors, line parsing, FastRPC1, JSON helpers, expression
+evaluation and the underlying thread-safe queues.
+
+Audit text and decoded bytes are `std::string` values, including embedded NULs;
+class records are stored directly in their event. Single-owner objects such as
+pending events, rules, actions, loggers and configured inputs/outputs use
+`std::unique_ptr`. Host processing and statistics/GC snapshots share hosts through
+`std::shared_ptr`, so queue waits and per-host locks do not hold the host registry
+mutex. Sockets keep the shared ownership required by libMantids30. Borrowed
+class/client pointers and library callback contexts remain non-owning; wrapping
+these in unrelated shared owners would introduce double deletion or cycles.
+
+Queues use `Mantids30::Core::Threads::Safe::Queue` directly. Producers retain a
+`unique_ptr` while pushing and release it only after a successful push transfers
+ownership to Mantids30. Rejected items are destroyed by their producer's smart
+pointer. Consumers immediately adopt popped pointers into `unique_ptr`. Scoped locks release on exceptions.
+Connection parsers live on the callback stack and unregister on scope exit.
+Counters use atomic exchange when publishing interval totals; event ages use a
+monotonic clock and formatted event timestamps use thread-safe time conversion.
+Socket address decoding uses bounded copies into aligned structures.
+
+Actions preserve the configured executable, argv[0], PATH lookup and inherited
+standard streams. Their argument storage uses string/vector values; process
+waiting handles interruptions and reports launch/wait errors. AppSpawn's direct
+path and argv[0] conventions differ, so this path retains execvp semantics.
+
+The existing service-lifetime detached workers remain. A future graceful shutdown
+needs coordinated input cancellation, queue draining, RPC stop and worker joins;
+smart pointers alone do not provide that lifecycle.
