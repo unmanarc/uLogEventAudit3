@@ -1,163 +1,102 @@
 #include "webserverimpl.h"
 #include "globals.h"
-#include "config.h"
-
-#include <inttypes.h>
-
-#include <mdz_net_sockets/socket_tls.h>
-#include <boost/algorithm/string/predicate.hpp>
-
-#include <memory>
-#include <sstream>
-#include <ostream>
-#include <fstream>
-
-using namespace Mantids::Application;
-using namespace Mantids::Authentication;
-using namespace Mantids::RPC::Web;
-using namespace Mantids::RPC;
-using namespace Mantids;
+#include <Mantids30/Client/APISync/apisync.h>
+#include <Mantids30/ConfigBuilder/Server_WebRESTFul/config_builder.h>
+#include <config.h>
+#include <cstdlib>
+using namespace Mantids30;
 using namespace UANLZ::WEB;
-
-WebServerImpl::WebServerImpl()
+using namespace Server::WebRESTFul;
+using namespace Protocol::HTTP;
+namespace {
+struct Route
 {
+    Method verb;
+    const char *path;
+    const char *target;
+    const char *method;
+};
+Route routes[] = {
+#include "rest_routes.inc"
+};
+APIReturn sessionInfo(void *, const RESTful::RequestContext &request, Sessions::ClientDetails &)
+{
+    APIReturn result(boost::json::object{{"user", request.jwtToken->getSubject()},
+                                         {"csrfToken", request.jwtToken->getJwtId()},
+                                         {"maxAge", request.jwtToken->getExpirationTime() - time(nullptr)},
+                                         {"version", PROJECT_VER}});
+    result.httpExtraHeaders["Cache-Control"] = "no-store";
+    return result;
 }
-
-json WebServerImpl::rmtCaller(const std::string &caller, Authentication::Manager * auth, Authentication::Session * sess, const json &jInput)
+APIReturn forward(void *context, const RESTful::RequestContext &request, Sessions::ClientDetails &client)
 {
-    std::string remoteMethod = JSON_ASSTRING(jInput,"remoteMethod","");
-    json j,error;
-    if (!boost::starts_with(remoteMethod, caller)) return j;
-    j = Globals::getFastRPC()->runRemoteRPCMethod(JSON_ASSTRING(jInput,"target",""), remoteMethod,jInput["payload"],&error);
-
-    if (JSON_ASBOOL(error,"succeed",false) == false)
+    const auto &route = *static_cast<Route *>(context);
+    if (route.verb != Method::GET && (request.jwtToken->getJwtId().empty() || request.clientRequest->headers.getOptionValueStringByName("X-CSRF-Token") != request.jwtToken->getJwtId()))
+        return APIReturn(Status::Code::S_403_FORBIDDEN, "invalid_csrf_token", "Refresh the audit session and try again");
+    if (!request.inputJSON->is_null() && !request.inputJSON->is_object() && !request.inputJSON->is_array())
+        return APIReturn(Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected a JSON object or array");
+    if (!Globals::fastRPC->checkConnectionKey(route.target))
+        return APIReturn(Status::Code::S_503_SERVICE_UNAVAILABLE, "service_unavailable", "Audit service is disconnected");
+    boost::json::value error;
+    auto result = Globals::fastRPC->runRemoteRPCMethod(route.target, route.method, *request.inputJSON, &error, false);
+    if (!DataFormat::JSON::ASBOOL(error, "succeed", false))
     {
-        LOG_APP->log2(__func__, sess->getUserID(),"", Logs::LEVEL_ERR, "Error (%d) Executing Method '%s' at '%s': '%s'",
-                                   JSON_ASINT(error,"errorId",-1),
-                                   remoteMethod.c_str(),
-                                   JSON_ASCSTRING(jInput,"target",""),
-                                   JSON_ASCSTRING(error,"errorMessage","")
-                                   );
+        LOG_APP->log2(__func__, request.jwtToken->getSubject(), client.ipAddress, Runtime::Logs::ERROR, "Backend call failed: %s", route.method);
+        return APIReturn(Status::Code::S_502_BAD_GATEWAY, "backend_error", "Audit service could not complete the request");
     }
-    else
-    {
-        LOG_APP->log2(__func__, sess->getUserID(),"", Logs::LEVEL_INFO, "Method '%s' Executed at '%s'.",
-                                   remoteMethod.c_str(),
-                                   JSON_ASCSTRING(jInput,"target","")
-                                   );
-    }
-    return j;
+    APIReturn response(result);
+    response.httpExtraHeaders["Cache-Control"] = "no-store";
+    return response;
 }
-
-json WebServerImpl::controlMethods(void *, Authentication::Manager *auth, Authentication::Session * sess, const json & jInput)
-{
-    return rmtCaller( "control.", auth,sess,jInput );
-}
-
-json WebServerImpl::statMethods(void *, Authentication::Manager * auth, Authentication::Session * sess, const json &jInput)
-{
-  return rmtCaller( "stats.", auth,sess,jInput );
-}
-
+} // namespace
 bool WebServerImpl::createWebServer()
 {
-    std::string sAppName = Globals::getConfig_main()->get<std::string>("LoginRPCClient.AppName","UAUDITANLZ");
-    Mantids::Network::Sockets::Socket_TLS * sockWebListen = new Mantids::Network::Sockets::Socket_TLS();
-
-    uint16_t listenPort = Globals::getConfig_main()->get<uint16_t>("WebServer.ListenPort",33000);
-    std::string listenAddr = Globals::getConfig_main()->get<std::string>("WebServer.ListenAddr","0.0.0.0");
-
-    // Set the SO default security level:
-    sockWebListen->keys.setSecurityLevel(-1);
-
-    if (!sockWebListen->keys.loadPublicKeyFromPEMFile(  Globals::getConfig_main()->get<std::string>("WebServer.CertFile","snakeoil.crt").c_str()  ))
+    const auto section = Globals::config.get_child_optional("WebService");
+    if (!section || !section->get_child_optional("APISync"))
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting Web Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, "Bad TLS WEB Server Public Key");
+        LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Missing WebService or APISync configuration");
         return false;
     }
-    if (!sockWebListen->keys.loadPrivateKeyFromPEMFile( Globals::getConfig_main()->get<std::string>("WebServer.KeyFile","snakeoil.key").c_str()  ))
+    const char *envKey = std::getenv("UAUDIT_API_KEY");
+    const char *envApp = std::getenv("UAUDIT_APP");
+    const std::string key = envKey ? envKey : Globals::config.get<std::string>("Authentication.APIKey", "");
+    const std::string app = envApp ? envApp : Globals::config.get<std::string>("Authentication.AppName", "UAUDITANALYZER");
+    if (key.empty() || key.find("REPLACEME") == 0 || app.empty())
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting Web Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, "Bad TLS WEB Server Private Key");
+        LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Configure UAUDIT_API_KEY for uFastAuthD3 APISync");
         return false;
     }
-
-    if (sockWebListen->listenOn(listenPort ,listenAddr.c_str(), !Globals::getConfig_main()->get<bool>("WebServer.ipv6",false) ))
+    std::map<std::string, std::string> vars{{"APIKEY", key}, {"APP", app}};
+    Globals::webServer.reset(
+        ConfigBuilder::Server_WebRESTFul::Builder::createRESTfulEngine(*section, LOG_APP, LOG_RPC, app, "/var/www/uauditweb", ConfigBuilder::Server_WebRESTFul::REST_ENGINE_MANDATORY_SSL, vars));
+    if (!Globals::webServer)
+        return false;
+    Client::APISync::APISyncParameters sync;
+    sync.loadFromInfoTree(section->get_child("APISync"));
+    auto syncResult = Client::APISync::updateAccessControlContext(
+        LOG_APP.get(),
+        &sync,
+        app,
+        key,
+        boost::json::parse(R"([{"id":"stats","description":"Read audit statistics and configuration"},{"id":"control","description":"Modify audit rules, actions and inputs"}])"),
+        boost::json::parse(R"([{"id":"AUDIT_READER","description":"Audit reader","scopes":["stats"]},{"id":"AUDIT_ADMIN","description":"Audit administrator","scopes":["stats","control"]}])"),
+        boost::json::parse(R"([{"id":"LOGIN","description":"Audit console login","parentActivity":null}])"));
+    if (!syncResult.is_object())
     {
-        Authentication::Domains * authDomains = new Authentication::Domains;
-
-        ////////////////////////////////////////////////////////////////
-        /// Authentication DB
-        ///
-        auto * authManager = Globals::getLoginRPCClient()->getRemoteAuthManager();
-        Secret passDataStats, passDataControl;
-
-        // Create attribute to applications:]
-        if (!authManager->attribExist({sAppName,"control"}))
-        {
-            if (!authManager->attribAdd({sAppName,"control"},"Control Access"))
-            {
-                LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Failed to create attribute in the authentication server.");
-                return false;
-            }
-            else
-                LOG_APP->log0(__func__,Logs::LEVEL_INFO, "Attrib 'control' initialized.");
-
-        }
-        if (!authManager->attribExist({sAppName,"stats"}))
-        {
-            if (!authManager->attribAdd({sAppName,"stats"},"Stats Access"))
-            {
-                LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Failed to create attribute in the authentication server.");
-                return false;
-            }
-            else
-                LOG_APP->log0(__func__,Logs::LEVEL_INFO, "Attrib 'stats' initialized.");
-        }
-        // Add the default domain / auth:
-        authDomains->addDomain("",authManager);
-        ////////////////////////////////////////////////////////////////
-
-        MethodsManager *methodsManagers = new MethodsManager(sAppName);
-        // Add functions
-        methodsManagers->addRPCMethod( "remote.stats",     {"stats"},   {&WebServerImpl::statMethods,nullptr} );
-        methodsManagers->addRPCMethod( "remote.control",   {"control"}, {&WebServerImpl::controlMethods,nullptr} );
-
-        WebServer * webServer = new WebServer;
-        Globals::setWebServer(webServer);
-        webServer->setRPCLog(LOG_RPC);
-
-        std::string resourcesPath = Globals::getConfig_main()->get<std::string>("WebServer.ResourcesPath","/var/www/uauditweb");
-        if (!webServer->setDocumentRootPath( resourcesPath ))
-        {
-            LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error locating web server resources at %s",resourcesPath.c_str() );
-            return false;
-        }
-        webServer->setAuthenticator(authDomains);
-        webServer->setMethodManagers(methodsManagers);
-        webServer->setSoftwareVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "a");
-        webServer->setExtCallBackOnInitFailed(WebServerImpl::protoInitFail);
-
-        webServer->acceptPoolThreaded(sockWebListen);
-
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Status Web Server Listening @%s:%" PRIu16, listenAddr.c_str(), listenPort);
-        return true;
-    }
-    else
-    {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting Status Web Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, sockWebListen->getLastError().c_str());
-        delete sockWebListen;
+        LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "uFastAuthD3 access control synchronization failed");
         return false;
     }
-}
-
-bool WebServerImpl::protoInitFail(void * , Network::Sockets::Socket_StreamBase * sock, const char * remoteIP, bool )
-{
-    Mantids::Network::Sockets::Socket_TLS * secSocket = (Mantids::Network::Sockets::Socket_TLS *)sock;
-
-    for (const auto & i :secSocket->getTLSErrorsAndClear())
+    auto endpoints = std::make_shared<RESTful::Endpoints>();
+    endpoints->addEndpoint(Method::GET, "session", Security::JWT_COOKIE_AUTH, {}, nullptr, &sessionInfo);
+    for (auto &route : routes)
     {
-        if (!strstr(i.c_str(),"certificate unknown"))
-            LOG_APP->log1(__func__, remoteIP,Logs::LEVEL_ERR, "TLS Protocol Initialization: %s", i.c_str());
+        const std::string scope = route.verb == Method::GET ? "stats" : "control";
+        endpoints->addEndpoint(route.verb, route.path, Security::JWT_COOKIE_AUTH, {scope}, &route, &forward);
     }
+    auto &engine = Globals::webServer;
+    engine->config.appName = app;
+    engine->config.setSoftwareVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "stable");
+    engine->endpointsHandler[1] = endpoints;
+    engine->startInBackground();
     return true;
 }

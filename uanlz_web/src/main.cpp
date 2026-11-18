@@ -1,187 +1,61 @@
-#include <mdz_prg_service/application.h>
-#include <mdz_net_sockets/socket_tls.h>
-
+#include "globals.h"
 #include "rpcserverimpl.h"
 #include "webserverimpl.h"
-
-#include "globals.h"
-#include "config.h"
-
-#include <sys/types.h>
-
-#include <pwd.h>
-#include <signal.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <inttypes.h>
-#include <sys/stat.h>
-
+#include <Mantids30/ConfigBuilder/Runtime_Logs/config_builder.h>
+#include <Mantids30/Network/Sockets/socket_tls.h>
+#include <Mantids30/Runtime/Service/application.h>
+#include <Mantids30/Runtime/Service/program_config.h>
+#include <config.h>
+#include <filesystem>
+using namespace Mantids30;
+using namespace Runtime::Service;
 using namespace UANLZ::WEB;
-
-using namespace Mantids::Application;
-
 class Main : public Application
 {
 public:
-
-    void _shutdown()
+    void _initvars(int, char *[], Arguments::GlobalArguments *args) override
     {
+        args->setInifiniteWaitAtEnd(true);
+        args->softwareLicense = "GPLv3";
+        args->softwareDescription = PROJECT_DESCRIPTION;
+        args->addAuthor({"Aarón Mizrachi", "aaron@unmanarc.com"});
+        args->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "stable");
+        args->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory", "/etc/uauditanalyzer/uanlz_web", Core::Memory::Abstract::Var::Type::STRING);
     }
-
-    int _start(int , char *[], Arguments::GlobalArguments *globalArguments)
+    bool _config(int, char *[], Arguments::GlobalArguments *args) override
     {
-        std::string configDir = globalArguments->getCommandLineOptionValue("config-dir")->toString();
-
-        // start program.
-        LOG_APP->log(__func__, "","", Logs::LEVEL_INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32,__DATE__, __TIME__, getpid());
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO, "Using config dir: %s", configDir.c_str());
-
-        Globals::getLoginRPCClient()->start();
-
-        if (!UANLZ::WEB::RPCServerImpl::createRPCListener())
-        {
-            _exit(-2);
-        }
-
-        if (!UANLZ::WEB::WebServerImpl::createWebServer())
-        {
-            _exit(-1);
-        }
-
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Looking for static login resources...");
-
-        auto staticContent = Globals::getLoginRPCClient()->getRemoteAuthManager()->getStaticContent2();
-
-        for ( unsigned int i=0; i<staticContent.size(); i++ )
-        {
-            auto jContent =  staticContent[i];
-
-            if (jContent.isMember("path") && jContent.isMember("content"))
-            {
-                std::string path = JSON_ASSTRING(jContent,"path","");
-                std::string content = JSON_ASSTRING(jContent,"content","");
-                Globals::getWebServer()->addInternalContentElement(path,content);
-                LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Adding web login static resource '%s'", path.c_str());
-            }
-            else {
-                LOG_APP->log0(__func__,Logs::LEVEL_WARN,  "Warning: bad static resource (%d)", i);
-            }
-        }
-
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO,  (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(), getpid());
-
-        return 0;
-    }
-
-    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments)
-    {
-        // init variables (pre-config):
-        globalArguments->setInifiniteWaitAtEnd(true);
-
-        globalArguments->setLicense("GPLv3 (https://www.gnu.org/licenses/gpl-3.0.en.html)");
-        globalArguments->setAuthor("Aarón Mizrachi");
-        globalArguments->setEmail("aaron@unmanarc.com");
-
-        globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "a");
-        globalArguments->setDescription(PROJECT_DESCRIPTION);
-
-        globalArguments->addCommandLineOption("Service Options", 'c', "config-dir" , "Configuration directory"  , "/etc/uauditanalyzer/" + globalArguments->getDaemonName(), Mantids::Memory::Abstract::Var::TYPE_STRING );
-    }
-
-    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments)
-    {
-        Mantids::Network::Sockets::Socket_TLS::prepareTLS();
-
-        // process config:
-        unsigned int logMode = Logs::MODE_STANDARD;
-
-        Mantids::Network::Sockets::Socket_TLS::prepareTLS();
-
-        Logs::AppLog initLog( Logs::MODE_STANDARD);
-        initLog.setPrintEmptyFields(true);
-        initLog.setUsingAttributeName(false);
-        initLog.setUserAlignSize(1);
-
-        std::string configDir = globalArguments->getCommandLineOptionValue("config-dir")->toString();
-
-        initLog.log0(__func__,Logs::LEVEL_INFO, "Loading configuration: %s", (configDir + "/config.ini").c_str());
-
-        boost::property_tree::ptree config_main;
-
-        if (access(configDir.c_str(),R_OK))
-        {
-            initLog.log0(__func__,Logs::LEVEL_CRITICAL, "Missing configuration dir: %s", configDir.c_str());
+        Network::Sockets::Socket_TLS::prepareTLS();
+        auto dir = std::filesystem::absolute(args->getCommandLineOptionValue("config-dir")->toString());
+        auto log = ConfigBuilder::Runtime_Logs::Builder::createInitLog();
+        auto config = Config::Loader::loadSecureApplicationConfig(log.get(), dir.c_str(), "webserver.conf");
+        if (!config)
             return false;
-        }
-
-        chdir(configDir.c_str());
-
-        if (!access("config.ini",R_OK))
-        {
-            struct stat stats;
-            // Check file properties...
-            stat("config.ini", &stats);
-
-            int smode = stats.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
-
-            if ( smode != 0600 )
-            {
-                initLog.log0(__func__,Logs::LEVEL_WARN, "config.ini file permissions are not 0600 and API key may be exposed, changing...");
-
-                if (chmod("config.ini",0600))
-                {
-                    initLog.log0(__func__,Logs::LEVEL_CRITICAL, "Configuration file permissions can't be changed to 0600");
-                    return false;
-                }
-                initLog.log0(__func__,Logs::LEVEL_INFO, "config.ini file permissions changed to 0600");
-            }
-
-            boost::property_tree::ini_parser::read_ini("config.ini",config_main);
-        }
-        else
-        {
-            initLog.log0(__func__,Logs::LEVEL_CRITICAL, "Missing configuration: %s", "/config.ini");
-            return false;
-        }
-
-        *(Globals::getConfig_main()) = config_main;
-
-        if ( config_main.get<bool>("Logs.ToSyslog",false) ) logMode|=Logs::MODE_SYSLOG;
-        Globals::setAppLog(new Logs::AppLog( logMode));
-        LOG_APP->setPrintEmptyFields(true);
-        LOG_APP->setUsingColors(config_main.get<bool>("Logs.ShowColors",true));
-        LOG_APP->setUsingPrintDate(config_main.get<bool>("Logs.ShowDate",true));
-        LOG_APP->setModuleAlignSize(26);
-        LOG_APP->setUsingAttributeName(false);
-        LOG_APP->setDebug(Globals::getConfig_main()->get<bool>("Logs.Debug",false));
-
-        Globals::setRPCLog(new Logs::RPCLog(logMode));
-        LOG_RPC->setPrintEmptyFields(true);
-        LOG_RPC->setUsingColors(config_main.get<bool>("Logs.ShowColors",true));
-        LOG_RPC->setUsingPrintDate(config_main.get<bool>("Logs.ShowDate",true));
-        LOG_RPC->setDisableDomain(true);
-        LOG_RPC->setDisableModule(true);
-        LOG_RPC->setModuleAlignSize(26);
-        LOG_RPC->setUsingAttributeName(false);
-        LOG_RPC->setStandardLogSeparator(",");
-        LOG_RPC->setDebug(config_main.get<bool>("Logs.Debug",false));
-
-        // Initialize app vars here:
-        Globals::getLoginRPCClient()->setApiKey(Globals::getConfig_main()->get<std::string>("LoginRPCClient.LoginApiKey","REPLACEME_XABCXAPIX_LOGIN"));
-        Globals::getLoginRPCClient()->setAppName(Globals::getConfig_main()->get<std::string>("LoginRPCClient.AppName","UAUDITANLZ"));
-        Globals::getLoginRPCClient()->setCaFile(Globals::getConfig_main()->get<std::string>("LoginRPCClient.CAFile","ca.crt"));
-        Globals::getLoginRPCClient()->setRemoteHost(Globals::getConfig_main()->get<std::string>("LoginRPCClient.RemoteHost","127.0.0.1"));
-        Globals::getLoginRPCClient()->setRemotePort(Globals::getConfig_main()->get<uint16_t>("LoginRPCClient.RemotePort",30302));
-        Globals::getLoginRPCClient()->setUsingTLSPSK(Globals::getConfig_main()->get<bool>("LoginRPCClient.UsePSK",true));
-        Globals::getLoginRPCClient()->setUseIPv6(Globals::getConfig_main()->get<bool>("LoginRPCClient.ipv6",false));
-
+        Globals::config = *config;
+        LOG_APP = ConfigBuilder::Runtime_Logs::Builder::createAppLog(*config);
+        LOG_RPC = ConfigBuilder::Runtime_Logs::Builder::createRPCLog(*config);
+        std::filesystem::current_path(dir);
         return true;
     }
+    int _start(int, char *[], Arguments::GlobalArguments *args) override
+    {
+        if (!RPCServerImpl::createRPCListener() || !WebServerImpl::createWebServer())
+        {
+            args->setInifiniteWaitAtEnd(false);
+            return EXIT_FAILURE;
+        }
+        LOG_APP->log0(__func__, Runtime::Logs::INFO, "uAuditAnalyzer3 REST service ready");
+        return EXIT_SUCCESS;
+    }
+    void _shutdown() override
+    {
+        Globals::webServer.reset();
+        if (Globals::fastRPC)
+            Globals::fastRPC->stop();
+        if (Globals::rpcListener)
+            Globals::rpcListener->stop();
+    }
 };
-
 int main(int argc, char *argv[])
 {
-    Main * main = new Main;
-    return StartApplication(argc,argv,main);
+    return StartApplication(argc, argv, new Main);
 }
-

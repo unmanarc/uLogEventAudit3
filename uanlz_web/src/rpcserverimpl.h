@@ -1,20 +1,10 @@
-#ifndef RPC_H
-#define RPC_H
-
-#include <mdz_net_sockets/socket_streambase.h>
-
-namespace UANLZ { namespace WEB {
-
-class RPCServerImpl
-{
+#pragma once
+#include <Mantids30/Network/Sockets/socket_stream.h>
+namespace UANLZ::WEB {
+class RPCServerImpl {
 public:
-    RPCServerImpl();
     static bool createRPCListener();
-
 private:
-    static bool callbackOnRPCConnect(void *, Mantids::Network::Sockets::Socket_StreamBase *sock, const char *remoteAddr, bool secure);
+    static void callbackOnRPCConnect(void *, const std::shared_ptr<Mantids30::Network::Sockets::Socket_Stream> &sock);
 };
-
-}}
-
-#endif // RPC_H
+}

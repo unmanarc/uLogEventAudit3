@@ -1,87 +1,51 @@
 #include "rpcserverimpl.h"
 #include "globals.h"
-
-#include <mdz_net_sockets/socket_tls.h>
-#include <mdz_net_sockets/acceptor_multithreaded.h>
-#include <mdz_xrpc_fast/fastrpc.h>
-#include <mdz_prg_logs/applog.h>
-#include <memory>
-#include <string>
-#include <inttypes.h>
-
+#include <Mantids30/Network/Sockets/socket_tls.h>
+using namespace Mantids30;
 using namespace UANLZ::WEB;
-
-using namespace Mantids::Application;
-using namespace Mantids::RPC;
-using namespace Mantids;
-
-RPCServerImpl::RPCServerImpl()
+void RPCServerImpl::callbackOnRPCConnect(void *, const std::shared_ptr<Network::Sockets::Socket_Stream> &sock)
 {
-}
-
-bool RPCServerImpl::callbackOnRPCConnect(void *, Mantids::Network::Sockets::Socket_StreamBase *sock, const char * remoteAddr, bool secure)
-{
-    std::string rpcApiKey = sock->readStringEx<uint16_t>();
-
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO, "Incoming %sRPC connection from %s", secure?"secure ":"", remoteAddr);
-
-    if (rpcApiKey == Globals::getConfig_main()->get<std::string>("RPCServer.AlertsApiKey","REPLACEME_XABCXAPIX_ALERTS"))
-    {
-        if (Globals::getFastRPC()->processConnection(sock,"ALERTS")==-2)
-        {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "ALERTS RPC Already Connected, giving up from %s.", remoteAddr);
-        }
-    }
-    else if (rpcApiKey == Globals::getConfig_main()->get<std::string>("RPCServer.Log2JSONApiKey","REPLACEME_XABCXAPIX_LOG2JSON"))
-    {
-        if (Globals::getFastRPC()->processConnection(sock,"LOG2JSON")==-2)
-        {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "LOG2JSON RPC Already Connected, giving up from %s.", remoteAddr);
-        }
-    }
-
-    return true;
-}
-
-bool RPCServerImpl::createRPCListener()
-{
-    Mantids::Network::Sockets::Socket_TLS * sockRPCListen = new Mantids::Network::Sockets::Socket_TLS();
-
-    uint16_t listenPort = Globals::getConfig_main()->get<uint16_t>("RPCServer.ListenPort",33001);
-    std::string listenAddr = Globals::getConfig_main()->get<std::string>("RPCServer.ListenAddr","0.0.0.0");
-
-    if (!sockRPCListen->keys.loadPublicKeyFromPEMFile( Globals::getConfig_main()->get<std::string>("RPCServer.CertFile","snakeoil.crt").c_str() ))
-    {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting RPC Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, "Bad TLS RPC Server Public Key");
-        return false;
-    }
-    if (!sockRPCListen->keys.loadPrivateKeyFromPEMFile( Globals::getConfig_main()->get<std::string>("RPCServer.KeyFile","snakeoil.key").c_str() ))
-    {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting RPC Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, "Bad TLS RPC Server Private Key");
-        return false;
-    }
-
-    Globals::setFastRPC(new Mantids::RPC::Fast::FastRPC);
-
-    Network::Sockets::Acceptors::MultiThreaded * multiThreadedAcceptor = new Network::Sockets::Acceptors::MultiThreaded();
-    multiThreadedAcceptor->setMaxConcurrentClients( Globals::getConfig_main()->get<uint16_t>("RPCServer.MaxClients",512) );
-    multiThreadedAcceptor->setCallbackOnConnect(callbackOnRPCConnect,nullptr);
-
-    if (sockRPCListen->listenOn(listenPort ,listenAddr.c_str(), !Globals::getConfig_main()->get<bool>("RPCServer.ipv6",false) ))
-    {
-        multiThreadedAcceptor->setAcceptorSocket(sockRPCListen);
-        multiThreadedAcceptor->startThreaded();
-
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Accepting RPC clients @%s:%" PRIu16 " via TLS", listenAddr.c_str(), listenPort);
-        return true;
-    }
+    bool ok = false;
+    const auto key = sock->readStringEx<uint16_t>(&ok, 4096);
+    if (!ok || key.empty())
+        return;
+    const auto &config = Globals::config;
+    std::string service;
+    if (key == config.get<std::string>("RPCServer.AlertsApiKey"))
+        service = "ALERTS";
+    else if (key == config.get<std::string>("RPCServer.Log2JSONApiKey"))
+        service = "LOG2JSON";
     else
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_CRITICAL, "Error starting RPC Server @%s:%" PRIu16 ": %s", listenAddr.c_str(), listenPort, sockRPCListen->getLastError().c_str());
-        delete multiThreadedAcceptor;
+        LOG_APP->log1(__func__, sock->getRemotePairStr(), Runtime::Logs::WARNING, "Rejected service API key");
+        return;
+    }
+    Globals::fastRPC->processConnection(sock, service);
+}
+bool RPCServerImpl::createRPCListener()
+{
+    const auto &config = Globals::config;
+    const auto alertsKey = config.get<std::string>("RPCServer.AlertsApiKey", "");
+    const auto logKey = config.get<std::string>("RPCServer.Log2JSONApiKey", "");
+    if (alertsKey.empty() || logKey.empty() || alertsKey == logKey || alertsKey.find("REPLACEME") == 0 || logKey.find("REPLACEME") == 0)
+    {
+        LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Configure distinct RPC service API keys");
         return false;
     }
+    auto socket = std::make_shared<Network::Sockets::Socket_TLS>();
+    if (!socket->tlsKeys.loadPublicKeyFromPEMFile(config.get<std::string>("RPCServer.CertFile", "snakeoil.crt").c_str())
+        || !socket->tlsKeys.loadPrivateKeyFromPEMFile(config.get<std::string>("RPCServer.KeyFile", "snakeoil.key").c_str())
+        || !socket->listenOn(config.get<uint16_t>("RPCServer.ListenPort", 33001), config.get<std::string>("RPCServer.ListenAddr", "127.0.0.1").c_str(), !config.get<bool>("RPCServer.UseIPv6", false)))
+    {
+        LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Cannot start internal TLS listener: %s", socket->getLastError().c_str());
+        return false;
+    }
+    Globals::fastRPC = std::make_shared<Protocol::FastRPC1>();
+    Globals::fastRPC->setRemoteExecutionDisconnectedTries(0);
+    Globals::rpcListener = std::make_shared<Network::Sockets::Acceptors::MultiThreaded>();
+    Globals::rpcListener->parameters.setMaxConcurrentClients(config.get<uint32_t>("RPCServer.MaxClients", 16));
+    Globals::rpcListener->callbacks.onClientConnected = callbackOnRPCConnect;
+    Globals::rpcListener->addAcceptorSocket(socket);
+    Globals::rpcListener->startInBackground();
+    return true;
 }
-
-
-
