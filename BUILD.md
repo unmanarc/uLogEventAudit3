@@ -69,3 +69,16 @@ and action argument path substitutions. It opens only
 local ports and modifies temporary files. Python 3 and the OpenSSL CLI are
 required; the browser client check requires Node.js. The fixture does not replace testing the configured uFastAuthD3 login
 portal, callback and refresh flow in a deployment.
+
+## Source documentation
+
+Function contracts use Doxygen in headers; source-only helpers and Mantids30
+lifecycle overrides are documented beside their implementation. With Doxygen
+installed, generate the HTML reference with:
+
+```bash
+doxygen Doxyfile
+```
+
+The entry point is `build/doxygen/html/index.html`. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for naming, formatting, ownership and documentation conventions.
