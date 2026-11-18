@@ -12,19 +12,31 @@
 using namespace UANLZ::LOG2JSON;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-namespace {
+namespace
+{
+/** @brief Fail the regression test with a diagnostic when an invariant is false. */
 void require(bool condition, const char *message)
 {
-    if (!condition) throw std::runtime_error(message);
+    if (!condition)
+        throw std::runtime_error(message);
 }
 
 struct Tracked
 {
-    explicit Tracked(int &alive) : alive(alive) { ++alive; }
-    ~Tracked() { --alive; }
+    /** @brief Count one live object for queue ownership assertions. */
+    explicit Tracked(int &alive) : alive(alive)
+    {
+        ++alive;
+    }
+    /** @brief Count destruction when ownership leaves the queue or consumer. */
+    ~Tracked()
+    {
+        --alive;
+    }
     int &alive;
 };
 
+/** @brief Check the Mantids30 queue ownership contract on rejection, pop and destruction. */
 void queueOwnership()
 {
     int alive = 0;
@@ -51,27 +63,29 @@ void queueOwnership()
     require(alive == 0, "Mantids30 queue destroys pending items");
 }
 
+/** @brief Check binary decoding, repeated parsing and safe fragment concatenation. */
 void auditVariables()
 {
-    Audit_Var head, tail;
+    AuditVariable head, tail;
     require(head.parse("EXECVE", "a0", "41420021"), "hex decoding");
-    require(head.getRawPureSize() == 4 && head.getFancy() == "AB  ", "binary and display values");
-    require(head.getRawPure()[2] == '\0', "raw embedded NUL preserved");
+    require(head.getRawValueSize() == 4 && head.getDisplayValue() == "AB  ", "binary and display values");
+    require(head.getRawValue()[2] == '\0', "raw embedded NUL preserved");
     auto copy = head;
     require(tail.parse("EXECVE", "a0", "4344"), "second chunk");
     require(head.append(tail) && head.append(tail), "multiple appends");
-    require(head.getRawPureSize() == 8 && head.getFancy() == "AB  CDCD", "append updates length");
-    require(head.getRawPure()[8] == '\0', "appended raw value terminated");
-    require(copy.getRawPureSize() == 4 && copy.getFancy() == "AB  ", "independent value copy");
+    require(head.getRawValueSize() == 8 && head.getDisplayValue() == "AB  CDCD", "append updates length");
+    require(head.getRawValue()[8] == '\0', "appended raw value terminated");
+    require(copy.getRawValueSize() == 4 && copy.getDisplayValue() == "AB  ", "independent value copy");
     require(head.parse("CWD", "cwd", "\"/tmp\""), "repeated parse");
-    require(head.getFancy() == "/tmp", "repeated parse replaces data");
+    require(head.getDisplayValue() == "/tmp", "repeated parse replaces data");
     require(!head.parse("EXECVE", "a0", "ABC"), "odd hex rejected");
-    require(head.getRawPureSize() == 0 && head.getFancy().empty(), "invalid parse clears old data");
+    require(head.getRawValueSize() == 0 && head.getDisplayValue().empty(), "invalid parse clears old data");
 }
 
+/** @brief Check multi-record reconstruction and preservation of 64-bit event identities. */
 void eventReconstruction()
 {
-    Audit_Event event;
+    AuditEvent event;
     event.setEventId({1700000000, 123, 9007199254740993ULL});
     event.setHostId({"test", "127.0.0.1"});
     event.insertClassContents("EXECVE", "argc=2 a0[0]=6563 a0[1]=686F");
@@ -79,47 +93,49 @@ void eventReconstruction()
     event.insertClassContents("PATH", "item=0 name=\"/bin/echo\"");
     event.insertClassContents("PATH", "item=1 name=\"/tmp\"");
     require(event.process(), "process event");
-    auto value = event.getJSON();
+    auto value = event.getJson();
     const auto &object = value.as_object();
     const auto &args = object.at("EXECVE").as_array().at(0).as_object().at("argv").as_array();
     require(args.size() == 2 && args[0].as_string() == "echo" && args[1].as_string() == "hello",
             "split arguments and merged records reconstructed");
     require(object.at("PATH").as_array().size() == 2, "PATH records remain separate");
-    require(object.at("INFO").as_object().at("id").as_uint64() == 9007199254740993ULL,
-            "64-bit event ID preserved");
-    require(event.getClassVars("EXECVE") != nullptr && event.getClassVars("missing") == nullptr,
+    require(object.at("INFO").as_object().at("id").as_uint64() == 9007199254740993ULL, "64-bit event ID preserved");
+    require(event.getFirstClassRecord("EXECVE") != nullptr && event.getFirstClassRecord("missing") == nullptr,
             "borrowed class lookup");
-    require(event.getMultiLineClassVars("PATH").size() == 2, "borrowed multi-class lookup");
-    require(event.process() && event.getJSON() == value, "reprocessing does not append old chunks");
+    require(event.getClassRecords("PATH").size() == 2, "borrowed multi-class lookup");
+    require(event.process() && event.getJson() == value, "reprocessing does not append old chunks");
 }
 
+/** @brief Check valid and truncated socket-address records without unaligned accesses. */
 void socketAddresses()
 {
-    Audit_ClassType record;
+    AuditClass record;
     record.setClassTypeName("SOCKADDR");
     record.setRawInput("saddr=020000507F0000010000000000000000");
-    require(record.processToVarContent(), "IPv4 address record");
-    auto value = record.getJSON();
+    require(record.parseVariables(), "IPv4 address record");
+    auto value = record.getJson();
     require(value.as_object().at("ipaddr").as_string() == "127.0.0.1" &&
-            value.as_object().at("port").as_string() == "80", "IPv4 decoding");
+                value.as_object().at("port").as_string() == "80",
+            "IPv4 decoding");
     for (const auto *input : {"saddr=0", "saddr=0200", "saddr=0200005", "saddr=GGGG"})
     {
         record.setRawInput(input);
-        require(record.processToVarContent(), "malformed address record");
-        require(!record.getJSON().as_object().contains("ipaddr"), "invalid address not decoded");
+        require(record.parseVariables(), "malformed address record");
+        require(!record.getJson().as_object().contains("ipaddr"), "invalid address not decoded");
     }
     record.setRawInput("saddr=01002F746D702F736F636B00");
-    record.processToVarContent();
-    require(record.getJSON().as_object().at("unix_path").as_string() == "/tmp/sock", "UNIX path decoding");
+    record.parseVariables();
+    require(record.getJson().as_object().at("unix_path").as_string() == "/tmp/sock", "UNIX path decoding");
 }
-}
+} // namespace
 
+/** @brief Run the ownership and parser regression scenarios. */
 int main()
 {
     try
     {
-        Globals::setAppLog(std::make_unique<Mantids30::Runtime::Logs::AppLog>(
-            Mantids30::Runtime::Logs::Mode::STANDARD));
+        Globals::setAppLog(
+            std::make_unique<Mantids30::Runtime::Logs::AppLog>(Mantids30::Runtime::Logs::Mode::STANDARD));
         NameDefs::init();
         queueOwnership();
         auditVariables();
