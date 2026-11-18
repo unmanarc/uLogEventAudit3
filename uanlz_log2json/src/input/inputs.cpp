@@ -2,7 +2,7 @@
 
 using namespace UANLZ::LOG2JSON::Input;
 
-std::list<TCPServer *> Inputs::tcpServers;
+std::list<std::unique_ptr<TCPServer>> Inputs::tcpServers;
 std::mutex Inputs::mt;
 
 Inputs::Inputs()
@@ -14,35 +14,31 @@ json Inputs::getStats()
 {
     boost::json::array v;
 
-    mt.lock();
-    for (auto i : tcpServers)
+    std::lock_guard<std::mutex> lock(mt);
+    for (const auto &i : tcpServers)
     {
         v.emplace_back(i->getStats());
     }
-    mt.unlock();
 
     return v;
 }
 
 void Inputs::loadConfig(const std::string &file)
 {
-    TCPServer * in = new TCPServer();
+    auto in = std::make_unique<TCPServer>();
     if (!in->loadConfig(file))
     {
-        delete in;
         return;
     }
-    mt.lock();
-    tcpServers.push_back(in);
-    mt.unlock();
+    std::lock_guard<std::mutex> lock(mt);
+    tcpServers.push_back(std::move(in));
 }
 
 void Inputs::startThreads()
 {
-    mt.lock();
-    for (auto i : tcpServers)
+    std::lock_guard<std::mutex> lock(mt);
+    for (const auto &i : tcpServers)
     {
         i->startThreaded();
     }
-    mt.unlock();
 }

@@ -7,18 +7,20 @@
 
 namespace UANLZ { namespace LOG2JSON { namespace Input {
 
+class TCPServer;
+
 class TCPLineProcessor : public Mantids30::Protocol::LineRecv::LineRecv
 {
 public:
-    TCPLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, void * server);
-    virtual ~TCPLineProcessor();
+    TCPLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, TCPServer &server);
+    ~TCPLineProcessor() override;
 
     void setRemoteIP(const std::string &value);
 
     json getStats();
 
 protected:
-    bool processParsedLine(const std::string & line);
+    bool processParsedLine(const std::string & line) override;
 private:
 
     struct SyslogData
@@ -51,7 +53,7 @@ private:
     std::atomic<uint64_t> processedLinesCount, invalidLinesCount;
 
 
-    void * server;
+    TCPServer &server;
     std::string remoteIP;
 };
 

@@ -2,6 +2,8 @@
 #define INPUTS_H
 
 #include <mutex>
+#include <memory>
+#include <list>
 #include "../input/tcpserver.h"
 
 namespace UANLZ { namespace LOG2JSON { namespace Input {
@@ -15,7 +17,7 @@ public:
     static void startThreads();
 
 private:
-    static std::list<TCPServer *> tcpServers;
+    static std::list<std::unique_ptr<TCPServer>> tcpServers;
     static std::mutex mt;
 };
 

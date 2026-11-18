@@ -20,10 +20,9 @@ Mar 19 03:28:34 asd audispd: node=asd.com type=PATH msg=audit(1552987714.396:292
 */
 
 TCPLineProcessor::TCPLineProcessor(
-    const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, void *server)
-    : LineRecv(sock)
+    const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, TCPServer &server)
+    : LineRecv(sock), server(server)
 {
-    this->server = server;
 
     processedLinesCount = 0;
     invalidLinesCount = 0;
@@ -94,13 +93,13 @@ bool TCPLineProcessor::processParsedLine(
         }
 
         // Proccess auditd...
-        ((TCPServer *)server)->incProcessedLines();
+        server.incProcessedLines();
         processedLinesCount++;
         AuditdEvents::Events_Manager::insertClassContents( { auditdHeader.node.empty()? syslogData.hostName :auditdHeader.node,
                                                             ip.empty()?remoteIP:ip},
                                                             auditdHeader.getEventID(),
                                                             auditdHeader.type,
-                                                            new string(line.substr(readPosition))
+                                                            line.substr(readPosition)
                                                           );
     }
 
@@ -110,7 +109,7 @@ bool TCPLineProcessor::processParsedLine(
 void TCPLineProcessor::addInvalidLine(
     const std::string &line)
 {
-    ((TCPServer *) server)->incInvalidLines();
+    server.incInvalidLines();
     invalidLinesCount++;
     LOG_APP->log1(__func__, remoteIP, Mantids30::Runtime::Logs::WARNING, "Incoming invalid line: %s", line.c_str());
 }
