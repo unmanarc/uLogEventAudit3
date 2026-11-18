@@ -57,5 +57,6 @@ public:
 };
 int main(int argc, char *argv[])
 {
-    return StartApplication(argc, argv, new Main);
+    Main application;
+    return StartApplication(argc, argv, &application);
 }
