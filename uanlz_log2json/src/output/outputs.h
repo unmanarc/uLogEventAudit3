@@ -4,6 +4,7 @@
 #include <string>
 #include <list>
 #include <mutex>
+#include <memory>
 
 #include "../output/output_base.h"
 
@@ -20,7 +21,7 @@ public:
     static void pushToOutputBases(const json & eventJSON, const std::tuple<time_t, uint32_t, uint64_t> &eventId);
 
 private:
-    static std::list<Output_Base *> outputBases;
+    static std::list<std::unique_ptr<Output_Base>> outputBases;
     static std::mutex mt;
 
 };

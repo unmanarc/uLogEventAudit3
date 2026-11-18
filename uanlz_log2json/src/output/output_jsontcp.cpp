@@ -18,7 +18,7 @@ void tcpOutputProcessorThread( Output_JSONTCP * output )
 
 Output_JSONTCP::Output_JSONTCP() : Output_Base()
 {
-    connection = new Mantids30::Network::Sockets::Socket_TCP;
+    connection = std::make_unique<Mantids30::Network::Sockets::Socket_TCP>();
 }
 
 Output_JSONTCP::~Output_JSONTCP()
@@ -48,16 +48,14 @@ bool Output_JSONTCP::loadConfig(const std::string &file)
 
 void Output_JSONTCP::logAuditEvent(const json & eventJSON, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
-    json * value = new json;
-    // make a copy:
-    *value = eventJSON;
+    auto value = std::make_unique<json>(eventJSON);
     // push, if not report and go.
-    if (!queueValues.push(value,push_tmout_msecs))
+    if (!queueValues.push(value.get(),push_tmout_msecs))
     {
         LOG_APP->log0(__func__,Mantids30::Runtime::Logs::WARNING, "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId),get<1>(eventId),get<2>(eventId));
         dropped++;
-        delete value;
     }
+    else value.release(); // Mantids30 owns the successfully queued item.
 }
 
 void Output_JSONTCP::startThread()
@@ -78,17 +76,19 @@ void Output_JSONTCP::process()
     for (;;)
     {
         // Take one JSON value from the queue...
-        json * value = queueValues.pop();
+        auto value = std::unique_ptr<json>(queueValues.pop());
         if (value)
         {
-            // Try to send it...
-            while (!connection->writeString(transmitionMode==0?Mantids30::DataFormat::JSON::toString(*value) + "\n": UANLZ::JSON::toStyledString(*value)  ))
+            const auto payload = transmitionMode == 0
+                ? Mantids30::DataFormat::JSON::toString(*value) + "\n"
+                : UANLZ::JSON::toStyledString(*value);
+            // Keep the same serialized payload across reconnection attempts.
+            while (!connection->writeString(payload))
             {
                 // if not, try to reconnect.
                 while (!reconnect()) {}
             }
             processed++;
-            delete value;
         }
     }
 }
@@ -112,13 +112,7 @@ json Output_JSONTCP::getStats()
 
 bool Output_JSONTCP::reconnect()
 {
-    if (connection)
-    {
-        delete connection;
-        connection = nullptr;
-    }
-
-    connection = new Mantids30::Network::Sockets::Socket_TCP;
+    connection = std::make_unique<Mantids30::Network::Sockets::Socket_TCP>();
 
 
     if (!connection->connectTo(server.c_str(),
