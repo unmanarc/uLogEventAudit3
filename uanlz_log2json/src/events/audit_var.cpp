@@ -7,39 +7,12 @@ using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
 
-Audit_Var::Audit_Var()
+bool Audit_Var::append(const Audit_Var &v)
 {
-    valid = false;
-    rawPureSize=0;
-    rawPure=nullptr;
-    rawFancy=nullptr;
-}
-
-Audit_Var::~Audit_Var()
-{
-    if (rawPure)
-        delete [] rawPure;
-    if (rawFancy)
-        delete [] rawFancy;
-}
-
-bool Audit_Var::append(Audit_Var &v)
-{
-    if (!v.getValid())
-        return setValid(false);
-
-    // Concat raw pures...
-    char * n_rawPure = new char[v.getRawPureSize()+rawPureSize+1];
-    n_rawPure[v.getRawPureSize()+rawPureSize+1] = 0;
-    memcpy(n_rawPure, rawPure, rawPureSize );
-    memcpy(n_rawPure+rawPureSize, v.getRawPure(), v.getRawPureSize() );
-    delete [] rawPure;
-    rawPure = n_rawPure;
-
-    // Concat fancy's
-    fancy+=v.getFancy();
-
-    return true;
+    if (!v.getValid()) return setValid(false);
+    rawPure += v.rawPure;
+    fancy += v.fancy;
+    return setValid(true);
 }
 
 inline bool isHexUpperString(const char *value)
@@ -79,29 +52,16 @@ unsigned char fromHex16(const char *value)
 
 void Audit_Var::createFancyString()
 {
-    rawFancy = new char[rawPureSize+1];
-    memcpy(rawFancy,rawPure,rawPureSize);
-    rawFancy[rawPureSize] = 0;
-
-    // Replace special bytes..
-    for (char * r_iter = rawFancy; r_iter!=(rawFancy+rawPureSize);  r_iter++)
+    fancy = rawPure;
+    for (char &byte : fancy)
     {
-        switch(*r_iter)
-        {
-        case 0:
-        case 33:
-            *r_iter = ' ';
-            break;
-        default:
-            break;
-        }
+        if (byte == '\0' || byte == '!') byte = ' ';
     }
-    fancy=rawFancy;
 }
 
 size_t Audit_Var::getRawPureSize() const
 {
-    return rawPureSize;
+    return rawPure.size();
 }
 
 uint32_t Audit_Var::asUInt32() const
@@ -109,15 +69,15 @@ uint32_t Audit_Var::asUInt32() const
     return strtoul(fancy.c_str(),0,10);
 }
 
-string Audit_Var::getFancy() const
+const string &Audit_Var::getFancy() const
 {
     return fancy;
 }
 
 
-char *Audit_Var::getRawPure() const
+const char *Audit_Var::getRawPure() const
 {
-    return rawPure;
+    return rawPure.c_str();
 }
 
 
@@ -134,7 +94,9 @@ bool Audit_Var::setValid(bool value)
 
 bool Audit_Var::parse(const string &auditdEventType, const string &varName, const string &varValue)
 {
-    if (!varValue.size()) return setValid(false);
+    rawPure.clear();
+    fancy.clear();
+    if (varValue.empty()) return setValid(false);
 
     if (    (varValue.at(0) == '\'' && varValue.size()>2 && varValue.at(varValue.size()-1)=='\'')
             || (varValue.at(0) == '\"' && varValue.size()>2 && varValue.at(varValue.size()-1)=='\"')
@@ -143,10 +105,7 @@ bool Audit_Var::parse(const string &auditdEventType, const string &varName, cons
                 )
             )
     {
-        rawPureSize = varValue.size()-2;
-        rawPure = new char[rawPureSize+1];
-        memcpy(rawPure,varValue.c_str()+1,varValue.size()-2);
-        rawPure[rawPureSize]=0;
+        rawPure = varValue.substr(1, varValue.size() - 2);
 
         createFancyString();
 
@@ -156,12 +115,9 @@ bool Audit_Var::parse(const string &auditdEventType, const string &varName, cons
     {
         if (isHexUpperString(varValue.c_str()) && varValue.size()%2==0)
         {
-            rawPureSize = (varValue.size()/2);
-            rawPure = new char [rawPureSize+1];
-            int i=0;
-            for (const char * r_iter = varValue.c_str(); *r_iter;  r_iter+=2)
-                rawPure[i++] = fromHex16(r_iter);
-            rawPure[rawPureSize]=0;
+            rawPure.resize(varValue.size() / 2);
+            for (size_t i = 0; i < rawPure.size(); ++i)
+                rawPure[i] = fromHex16(varValue.data() + 2 * i);
 
             createFancyString();
             return setValid(true);
@@ -173,10 +129,7 @@ bool Audit_Var::parse(const string &auditdEventType, const string &varName, cons
     }
     else // Take the value as is.
     {
-        rawPureSize = varValue.size();
-        rawPure = new char[rawPureSize+1];
-        memcpy(rawPure,varValue.c_str(),rawPureSize);
-        rawPure[rawPureSize]=0;
+        rawPure = varValue;
         createFancyString();
         return setValid(true);
     }

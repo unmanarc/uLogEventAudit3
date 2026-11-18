@@ -13,11 +13,10 @@ namespace UANLZ { namespace LOG2JSON { namespace AuditdEvents {
 class Audit_ClassType
 {
 public:
-    Audit_ClassType();
-    ~Audit_ClassType();
+    Audit_ClassType() = default;
 
-    std::string *getRawInput() const;
-    void setRawInput(std::string *value);
+    std::string &getRawInput();
+    void setRawInput(std::string value);
 
     bool processToVarContent();
 
@@ -32,7 +31,7 @@ private:
     bool mergeSpplitedVars();
 
     std::set<std::string> getSpplitedVarNames();
-    std::string * rawInput;
+    std::string rawInput;
     std::string classTypeName;
     std::map<std::string, Audit_Var> contentVars;
 

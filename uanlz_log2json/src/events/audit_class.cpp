@@ -3,6 +3,10 @@
 #include "../globals.h"
 
 #include <sys/un.h>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstring>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -17,41 +21,32 @@ static boost::regex exSyslogAuditdData2("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDI
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-Audit_ClassType::Audit_ClassType()
-{
-    rawInput = nullptr;
-}
-
-Audit_ClassType::~Audit_ClassType()
-{
-    if (rawInput) delete rawInput;
-}
-
-string *Audit_ClassType::getRawInput() const
+string &Audit_ClassType::getRawInput()
 {
     return rawInput;
 }
 
-void Audit_ClassType::setRawInput(string *value)
+void Audit_ClassType::setRawInput(string value)
 {
-    rawInput = value;
+    rawInput = std::move(value);
 }
 
 unsigned char fromHex16(const char *value);
 
 bool Audit_ClassType::processToVarContent()
 {
+    contentVars.clear();
     boost::match_results<string::const_iterator> whatDataDecomposed;
     boost::match_flag_type flags = boost::match_default;
 
-    for (string::const_iterator start = (*rawInput).begin(), end =  (*rawInput).end();
+    for (string::const_iterator start = rawInput.begin(), end =  rawInput.end();
          boost::regex_search(start, end, whatDataDecomposed, exSyslogAuditdData1, flags);
          start = whatDataDecomposed[0].second)
     {
         parseVar(string(whatDataDecomposed[1].first, whatDataDecomposed[1].second),string(whatDataDecomposed[2].first, whatDataDecomposed[2].second));
     }
 
-    for (string::const_iterator start = (*rawInput).begin(), end =  (*rawInput).end();
+    for (string::const_iterator start = rawInput.begin(), end =  rawInput.end();
          boost::regex_search(start, end, whatDataDecomposed, exSyslogAuditdData2, flags);
          start = whatDataDecomposed[0].second)
     {
@@ -122,45 +117,55 @@ void Audit_ClassType::parseVar(const string &varName, const string &varValue)
         LOG_APP->log0(__func__,Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'", varName.c_str(), varValue.c_str());
     }
 
-    if (classTypeName == "SOCKADDR" && varName=="saddr" && varValue.size()<250)
+    if (classTypeName == "SOCKADDR" && varName == "saddr" &&
+        varValue.size() >= 2 * sizeof(sa_family_t) && varValue.size() < 250 &&
+        varValue.size() % 2 == 0 &&
+        varValue.find_first_not_of("0123456789abcdefABCDEF") == string::npos)
     {
         string family, laddr, path;
         unsigned short port = 0;
 
-        char data[128];
-        memset(data,0,128);
-        int i=0;
-        for (const char * r_iter = varValue.c_str(); *r_iter;  r_iter+=2)
-            data[i++] = fromHex16(r_iter);
+        std::array<char, 128> data{};
+        const auto dataSize = varValue.size() / 2;
+        for (size_t i = 0; i < dataSize; ++i)
+            data[i] = fromHex16(varValue.data() + 2 * i);
 
-        sa_family_t * sockFamily = (sa_family_t *)&data;
-
-        switch (*sockFamily)
+        sa_family_t socketFamily{};
+        std::memcpy(&socketFamily, data.data(), sizeof(socketFamily));
+        switch (socketFamily)
         {
         case AF_INET:
         {
+            if (dataSize < sizeof(sockaddr_in)) return;
+            sockaddr_in address{};
+            std::memcpy(&address, data.data(), sizeof(address));
+            char ipAddr[INET_ADDRSTRLEN]{};
+            if (!inet_ntop(AF_INET, &address.sin_addr, ipAddr, sizeof(ipAddr))) return;
             family = "AF_INET";
-            sockaddr_in * saddr = (sockaddr_in *)&data;
-            char ipAddr[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &(saddr->sin_addr), ipAddr, sizeof(ipAddr));
-            port = ntohs(saddr->sin_port);
+            port = ntohs(address.sin_port);
             laddr = ipAddr;
         } break;
         case AF_INET6:
         {
+            if (dataSize < sizeof(sockaddr_in6)) return;
+            sockaddr_in6 address{};
+            std::memcpy(&address, data.data(), sizeof(address));
+            char ipAddr[INET6_ADDRSTRLEN]{};
+            if (!inet_ntop(AF_INET6, &address.sin6_addr, ipAddr, sizeof(ipAddr))) return;
             family = "AF_INET6";
-            sockaddr_in6 * saddr = (sockaddr_in6 *)&data;
-            char ipAddr[INET6_ADDRSTRLEN];
-            inet_ntop(AF_INET6, &(saddr->sin6_addr), ipAddr, sizeof(ipAddr));
-            port = ntohs(saddr->sin6_port);
+            port = ntohs(address.sin6_port);
             laddr = ipAddr;
         } break;
         case AF_UNIX:
         {
+            constexpr auto offset = offsetof(sockaddr_un, sun_path);
+            if (dataSize < offset) return;
+            sockaddr_un address{};
+            std::memcpy(&address, data.data(), std::min(dataSize, sizeof(address)));
+            const auto length = std::min(dataSize - offset, sizeof(address.sun_path));
+            path.assign(address.sun_path, strnlen(address.sun_path, length));
             family = "AF_UNIX";
-            sockaddr_un * saddr = (sockaddr_un *)&data;
-            laddr="127.0.0.1";
-            path = saddr->sun_path;
+            laddr = "127.0.0.1";
         } break;
         default:
             break;
