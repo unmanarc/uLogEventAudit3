@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""Exercise the three real daemons using a temporary APISync fixture and TLS certificates.
+Checks APISync, authentication, the REST console and audit-to-action processing.
+No existing configuration, account, or running service is modified.
+"""
+import argparse
+import base64
+import hashlib
+import hmac
+import http.client
+import http.server
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import ssl
+import subprocess
+import tempfile
+import threading
+import time
+import urllib.parse
+
+ROOT = Path(__file__).resolve().parents[1]
+SECRET = 'integration-only-secret-with-at-least-32-bytes'
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
+
+
+def token(scopes, app='UAUDITANALYZER', expired=False):
+    def b64(value):
+        return base64.urlsafe_b64encode(value).rstrip(b'=')
+    head = b64(json.dumps({'alg': 'HS256', 'typ': 'JWT'}).encode())
+    body = b64(json.dumps({'sub': 'test-user', 'app': app, 'type': 'access',
+                          'scopes': scopes, 'jti': 'test-csrf-id', 'iat': int(time.time())-60,
+                          'exp': int(time.time()) + (-1 if expired else 3600)}).encode())
+    data = head+b'.'+body
+    return (data+b'.'+b64(hmac.new(SECRET.encode(), data, hashlib.sha256).digest())).decode()
+
+
+class AppSync(http.server.BaseHTTPRequestHandler):
+    requests = []
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        assert body['APIKEY'] == 'integration-app-key'
+        assert 'APP=UAUDITANALYZER' in self.path
+        name = urllib.parse.urlsplit(self.path).path.rsplit('/', 1)[-1]
+        self.requests.append((name, body))
+        if name == 'getApplicationJWTConfig':
+            result = {'tokensConfiguration': {'signAlgorithm': 'HS256'}}
+        elif name == 'getApplicationJWTValidationKey':
+            result = SECRET
+        elif name == 'updateAccessControlContext':
+            assert {s['id'] for s in body['scopes']} == {'stats', 'control'}
+            result = {}
+        else:
+            raise AssertionError(name)
+        payload = json.dumps(result).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--build-dir', type=Path, default=ROOT/'build/mantids30')
+    parser.add_argument('--library-dir', type=Path, help='Directory containing libMantids30 shared libraries')
+    args = parser.parse_args()
+    if args.library_dir:
+        os.environ['LD_LIBRARY_PATH'] = str(args.library_dir.resolve()) + ':' + os.environ.get('LD_LIBRARY_PATH', '')
+    processes = []
+    logfiles = []
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), AppSync)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    with tempfile.TemporaryDirectory(prefix='uaudit-rest-') as temp:
+        tmp = Path(temp)
+        try:
+            subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+                            '-keyout', str(tmp/'server.key'), '-out', str(tmp/'server.crt'),
+                            '-days', '1', '-subj', '/CN=localhost',
+                            '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1'],
+                           check=True, capture_output=True)
+            web_port, rpc_port, alert_port, input_port = [free_port() for _ in range(4)]
+            config = f'''
+Logs {{ ShowColors false ShowDate false }}
+Authentication {{ AppName UAUDITANALYZER APIKey integration-app-key }}
+RPCServer {{
+    AlertsApiKey integration-alert-key
+    Log2JSONApiKey integration-log-key
+    ListenAddr 127.0.0.1
+    ListenPort {rpc_port}
+    CertFile {tmp}/server.crt
+    KeyFile {tmp}/server.key
+}}
+WebService {{
+    Listener_TLS {{
+        Protocol TLS
+        ListenAddr 127.0.0.1
+        ListenPort {web_port}
+        TLS {{ CertFile {tmp}/server.crt KeyFile {tmp}/server.key }}
+    }}
+    Logs {{ Dir {tmp} File access.log }}
+    ResourcesPath {ROOT}/uanlz_web/var/www/uauditweb
+    JWT {{ UseAPISync true }}
+    APISync {{ APISyncHost 127.0.0.1 APISyncPort {server.server_port} UseTLS false }}
+    API {{ Origins https://localhost:{web_port} }}
+    Threads {{ UseThreadPool false MaxConcurrentClients 32 }}
+    Redirections {{ /login https://login.example.test/ }}
+}}
+'''
+            (tmp/'webserver.conf').write_text(config)
+            (tmp/'webserver.conf').chmod(0o600)
+
+            def launch(name, directory):
+                log = open(tmp/(name+'.log'), 'w+')
+                logfiles.append(log)
+                proc = subprocess.Popen([str(args.build_dir.resolve()/name/name), '-c', str(directory)],
+                                        stdout=log, stderr=subprocess.STDOUT)
+                processes.append(proc)
+                return proc
+
+            launch('uanlz_web', tmp)
+            context = ssl.create_default_context(cafile=str(tmp/'server.crt'))
+
+            def request(path, jwt=None, method='GET', data=None, csrf=None):
+                conn = http.client.HTTPSConnection('localhost', web_port, context=context, timeout=5)
+                headers = {'User-Agent': 'curl/8.0', 'Origin': f'https://localhost:{web_port}'}
+                if jwt:
+                    headers['Cookie'] = 'AccessToken='+jwt
+                if csrf:
+                    headers['X-CSRF-Token'] = csrf
+                if method == 'GET' and data is not None:
+                    path += '?'+urllib.parse.quote(json.dumps(data), safe='')
+                body = None if data is None or method == 'GET' else json.dumps(data)
+                if body:
+                    headers['Content-Type'] = 'application/json'
+                conn.request(method, path, body, headers)
+                response = conn.getresponse()
+                result = response.status, response.read().decode()
+                conn.close()
+                return result
+
+            def eventually(check, description):
+                deadline = time.monotonic()+15
+                while time.monotonic() < deadline:
+                    try:
+                        if check():
+                            return
+                    except (ConnectionError, OSError, http.client.HTTPException):
+                        pass
+                    if any(proc.poll() is not None for proc in processes):
+                        raise AssertionError('A service exited: '+description)
+                    time.sleep(.1)
+                raise AssertionError('Timed out: '+description)
+
+            admin, reader = token(['stats', 'control']), token(['stats'])
+            eventually(lambda: request('/api/v1/session', admin)[0] == 200, 'web startup / APISync')
+            status, payload = request('/api/v1/session', admin)
+            assert json.loads(payload)['csrfToken'] == 'test-csrf-id'
+            for jwt in (None, admin+'bad', token(['stats'], app='OTHER'), token(['stats'], expired=True)):
+                assert request('/api/v1/session', jwt)[0] == 403
+            assert request('/api/v1/alerts/stats', token([]))[0] == 401
+            assert request('/api/v1/alerts/stats', reader)[0] == 503
+            assert request('/api/v1/alerts/rules/save', reader, 'POST', {}, 'test-csrf-id')[0] == 401
+            assert request('/api/v1/alerts/rules/save', admin, 'POST', {})[0] == 403
+            assert request('/api/v1/not-a-resource', admin)[0] == 404
+            assert request('/resources.conf', admin)[0] in (403,404)
+            status, page = request('/mods/alerts/rules.html', admin)
+            assert status == 200 and '<!doctype html>' in page and '<%include:' not in page, (status, page[:400])
+
+            # Start actual alert and converter backends with empty temporary configurations.
+            for name, key_name, key in [('uanlz_alert', 'AlertsApiKey', 'integration-alert-key'),
+                                        ('uanlz_log2json', 'Log2JSONApiKey', 'integration-log-key')]:
+                directory = tmp/name
+                directory.mkdir()
+                shutil.copy(tmp/'server.crt', directory/'rpcca.crt')
+                ini = (ROOT/name/'etc/uauditanalyzer'/name/'config.ini').read_text()
+                ini = ini.replace('RemoteAddr=audit.localhost', 'RemoteAddr=localhost')
+                ini = ini.replace('RemotePort=33001', f'RemotePort={rpc_port}')
+                import re
+                ini = re.sub(key_name+'=.*', key_name+'='+key, ini)
+                ini = ini.replace('ToSyslog=true', 'ToSyslog=false')
+                (directory/'config.ini').write_text(ini)
+                (directory/'config.ini').chmod(0o600)
+                if name == 'uanlz_alert':
+                    for file in ['rules.json', 'actions.json']:
+                        (directory/file).write_text('[]')
+                    (directory/'inputs.json').write_text(json.dumps([{'Description':'test input', 'ListenAddr':'127.0.0.1', 'ListenPort':alert_port, 'id':'test-input'}]))
+                else:
+                    (directory/'receptors.d').mkdir()
+                    (directory/'dispatchers.d').mkdir()
+                    (directory/'receptors.d/test.ini').write_text(f'ListenAddr=127.0.0.1\nListenPort={input_port}\n')
+                    (directory/'dispatchers.d/test.ini').write_text(f'Host=127.0.0.1\nPort={alert_port}\nTransmitionMode=0\n')
+                launch(name, directory)
+            eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
+            eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
+            # Numeric GET arguments must survive encoded JSON and the JSONCpp boundary.
+            assert request('/api/v1/alerts/rules/item', admin, data={'id': 0})[0] == 200
+            action = {'name': 'test-action', 'description': 'test', 'path': '/bin/true', 'args': ['/bin/true']}
+            status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/actions/item', admin, data={'name': 'test-action'})
+            assert status == 200 and json.loads(body)['name'] == 'test-action', (status, body)
+            assert request('/api/v1/alerts/actions', admin, 'DELETE', {'name': 'test-action'}, 'test-csrf-id')[0] == 200
+            marker = tmp/'rule-executed'
+            action = {'name': 'pipeline-action', 'path': '/usr/bin/touch', 'args': ['/usr/bin/touch', str(marker)]}
+            status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            rule = {'name': 'pipeline-rule', 'action': 'EXEC', 'actionId': 'pipeline-action',
+                    'filter': 'IS_EQUAL($.CWD[0].cwd,"/tmp")'}
+            status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 0, 'rule': rule}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            with socket.create_connection(('127.0.0.1', input_port), timeout=5) as incoming:
+                line = f'node=integration type=CWD msg=audit({int(time.time())}.123:42): cwd="/tmp"\n'
+                incoming.sendall(line.encode())
+            eventually(marker.exists, 'audit input -> reconstructed JSON -> TCP output -> expression -> action')
+            for resource in ['actions', 'rules']:
+                status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
+                assert status == 200 and json.loads(body) is True, (status, body)
+                assert json.loads((tmp/'uanlz_alert'/ (resource+'.json')).read_text())
+            assert any(name == 'updateAccessControlContext'  for name, _ in AppSync.requests)
+            print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, GET parameters, persisted writes and audit-to-action pipeline')
+        except Exception:
+            for log in logfiles:
+                log.flush()
+                print('\n--- '+log.name+' ---\n'+Path(log.name).read_text()[-9000:])
+            raise
+        finally:
+            for proc in reversed(processes):
+                proc.terminate()
+            for proc in processes:
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            for log in logfiles:
+                log.close()
+            server.shutdown()
+
+
+if __name__ == '__main__':
+    main()
