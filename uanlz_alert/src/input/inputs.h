@@ -2,6 +2,8 @@
 #define INPUTS_H
 
 #include <mutex>
+#include <memory>
+#include <list>
 #include "tcpserver.h"
 
 namespace UANLZ { namespace JSONALERT { namespace Input {
@@ -25,7 +27,7 @@ public:
     static bool getModified();
 
 private:
-    static std::list<TCPServer *> tcpServers;
+    static std::list<std::unique_ptr<TCPServer>> tcpServers;
     static std::mutex mt;
     static std::string sConfigFilePath;
     static bool modified;

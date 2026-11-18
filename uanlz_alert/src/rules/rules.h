@@ -2,12 +2,14 @@
 #define RULEACTION_H
 
 #include <vector>
+#include <memory>
 #include <string>
 #include <mutex>
 
 #include <Mantids30/Scripting/JSONExprEval/jsoneval.h>
 #include <shared_mutex>
 #include <Mantids30/Core/Threads/safe_queue.h>
+#include <memory>
 
 #include <boost/property_tree/ptree.hpp>
 #include <audit_json.h>
@@ -23,41 +25,22 @@ enum eRuleAction {
 
 struct sRule
 {
-    sRule()
-    {
-        ruleAction = RULE_ACTION_UNDEFINED;
-        expr = nullptr;
-    }
-    ~sRule()
-    {
-        if (expr) delete expr;
-    }
-
-    eRuleAction ruleAction;
+    eRuleAction ruleAction = RULE_ACTION_UNDEFINED;
 
     std::string name;
     std::string actionId;
 
     std::string filter;
-    Mantids30::Scripting::JSONExprEval::JSONEval *expr;
+    std::unique_ptr<Mantids30::Scripting::JSONExprEval::JSONEval> expr;
 
     json jOriginalVal;
 };
 
 struct sAction
 {
-    sAction()
-    {
-        file = nullptr;
-    }
-    ~sAction()
-    {
-        if (file) free(file);
-    }
-
     void setFileName(const std::string & sFileName)
     {
-        file = strdup(sFileName.c_str());
+        file = sFileName;
     }
 
     void setArguments(const std::vector<std::string> & vArguments)
@@ -65,7 +48,7 @@ struct sAction
         this->vArguments = vArguments;
     }
 
-    char * file;
+    std::string file;
     std::vector<std::string> vArguments;
     json jOriginalVal;
 
@@ -156,8 +139,8 @@ private:
     static uint64_t maxQueuePushWaitTimeInMilliseconds, maxQueuePopTimeInMilliseconds;
     static Mantids30::Core::Threads::Safe::Queue<std::string> evaluationQueue;
     static std::shared_mutex mtRules;
-    static std::vector<sRule *> rules;
-    static std::map<std::string,sAction *> actions;
+    static std::vector<std::unique_ptr<sRule>> rules;
+    static std::map<std::string, std::unique_ptr<sAction>> actions;
 
     static std::atomic<uint64_t> queuedLinesCount, droppedInQueue;
     static std::atomic<uint64_t> badFormatLines, processedLines;

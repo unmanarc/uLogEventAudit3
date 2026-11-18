@@ -14,33 +14,35 @@ using namespace UANLZ::JSONALERT::Input;
 
 using namespace Mantids30::Core::Memory::Streams;
 using namespace Mantids30::Network::Sockets;
-using namespace Mantids30::Network::Sockets;
 using namespace Mantids30::Runtime;
 
 void logServerThr(void * obj, const std::shared_ptr<Socket_Stream> &baseClientSocket)
 {
-    TCPServer * server = (TCPServer *)obj;
-    TCPLineProcessor *  lineServer = new TCPLineProcessor(baseClientSocket,server);
+    auto *server = static_cast<TCPServer *>(obj);
+    TCPLineProcessor lineServer(baseClientSocket, *server);
 
     string sRemotePair = baseClientSocket->getRemotePairStr();
     bool secure = baseClientSocket->isSecure();
-    lineServer->setRemoteIP(sRemotePair);
+    lineServer.setRemoteIP(sRemotePair);
 
     string threadName = "IN_" + sRemotePair;
     pthread_setname_np(pthread_self(), threadName.c_str());
 
     LOG_APP->log1(__func__,sRemotePair,Logs::INFO,"Receiving %sJSONTCP Incoming connection...", secure? "secure " : "");
 
-    server->addClient(lineServer);
+    server->addClient(&lineServer);
+    struct ClientRegistration
+    {
+        TCPServer &server;
+        TCPLineProcessor &processor;
+        ~ClientRegistration() { server.remClient(&processor); }
+    } registration{*server, lineServer};
 
     Parser::ParseResult err;
-    lineServer->parseObject(&err);
+    lineServer.parseObject(&err);
     LOG_APP->log1(__func__,sRemotePair, err == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING,
                   "Incoming connection finished (parser status %d).", static_cast<int>(err));
 
-    server->remClient(lineServer);
-
-    delete lineServer;
 
 }
 
@@ -84,28 +86,25 @@ json TCPServer::getStats()
 
     v["description"] = description;
 
-    mt.lock();
+    std::lock_guard<std::mutex> lock(mt);
     for (auto i : clientProcessors)
     {
         v["clients"].as_array().emplace_back(i->getStats());
     }
-    mt.unlock();
 
     return v;
 }
 
 void TCPServer::addClient(TCPLineProcessor *clientProcessor)
 {
-    mt.lock();
+    std::lock_guard<std::mutex> lock(mt);
     clientProcessors.insert(clientProcessor);
-    mt.unlock();
 }
 
 void TCPServer::remClient(TCPLineProcessor *clientProcessor)
 {
-    mt.lock();
+    std::lock_guard<std::mutex> lock(mt);
     clientProcessors.erase(clientProcessor);
-    mt.unlock();
 }
 
 string TCPServer::getListenAddr() const

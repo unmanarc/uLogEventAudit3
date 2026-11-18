@@ -4,6 +4,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <Mantids30/Runtime/Logs/applog.h>
 #include <mutex>
+#include <memory>
 #include <list>
 
 //#define APPLOGS UANLZ::JSONALERT::Globals::getAppLog()
@@ -18,7 +19,7 @@ public:
     Globals();
 
     static Mantids30::Runtime::Logs::AppLog *getAppLog();
-    static void setAppLog(Mantids30::Runtime::Logs::AppLog *value);
+    static void setAppLog(std::unique_ptr<Mantids30::Runtime::Logs::AppLog> value);
 
     static boost::property_tree::ptree * getConfig_main();
 
@@ -26,7 +27,7 @@ public:
 private:
     static std::mutex mDatabase,mDirs;
     static boost::property_tree::ptree config_main;
-    static Mantids30::Runtime::Logs::AppLog * applog;
+    static std::unique_ptr<Mantids30::Runtime::Logs::AppLog> applog;
 
 };
 }}

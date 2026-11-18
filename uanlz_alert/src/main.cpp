@@ -32,11 +32,11 @@ using namespace Mantids30::Runtime::Service;
 class Main : public Application
 {
 public:
-    void _shutdown()
+    void _shutdown() override
     {
     }
 
-    int _start(int , char *[], Arguments::GlobalArguments *globalArguments)
+    int _start(int , char *[], Arguments::GlobalArguments *globalArguments) override
     {
         // Start input threads...
         Input::Inputs::startThreads();
@@ -47,7 +47,7 @@ public:
         return 0;
     }
 
-    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments)
+    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments) override
     {
         // init variables (pre-config):
         globalArguments->setInifiniteWaitAtEnd(true);
@@ -60,7 +60,7 @@ public:
         globalArguments->addCommandLineOption("Service Options", 'c', "config-dir" , "Configuration directory"  , "/etc/uauditanalyzer/" + globalArguments->getDaemonName(), Mantids30::Core::Memory::Abstract::Var::Type::STRING );
     }
 
-    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments)
+    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments) override
     {
         Mantids30::Network::Sockets::Socket_TLS::prepareTLS();
 
@@ -119,7 +119,7 @@ public:
         *(Globals::getConfig_main()) = config_main;
 
         if ( config_main.get<bool>("Logs.ToSyslog",true) ) logMode|=Logs::Mode::SYSLOG;
-        Globals::setAppLog(new Logs::AppLog(logMode));
+        Globals::setAppLog(std::make_unique<Logs::AppLog>(logMode));
         LOG_APP->enableEmptyFieldLogging = true;
         LOG_APP->enableColorLogging = config_main.get<bool>("Logs.ShowColors",true);
         LOG_APP->enableDateLogging = config_main.get<bool>("Logs.ShowDate",true);
@@ -152,7 +152,7 @@ public:
 
 int main(int argc, char *argv[])
 {
-    Main * main = new Main;
-    return StartApplication(argc,argv,main);
+    Main application;
+    return StartApplication(argc, argv, &application);
 }
 

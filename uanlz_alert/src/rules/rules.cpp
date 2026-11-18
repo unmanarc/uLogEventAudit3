@@ -15,6 +15,8 @@
 #include <sys/wait.h>
 
 #include <string>
+#include <cerrno>
+#include <system_error>
 #include <thread>
 
 
@@ -33,8 +35,8 @@ using namespace Mantids30::Scripting::JSONExprEval;
 using namespace Mantids30::Core::Helpers;
 
 
-vector<sRule *> Rules::rules;
-std::map<std::string,sAction *> Rules::actions;
+vector<unique_ptr<sRule>> Rules::rules;
+std::map<std::string, unique_ptr<sAction>> Rules::actions;
 std::shared_mutex Rules::mtRules;
 Mantids30::Core::Threads::Safe::Queue<std::string> Rules::evaluationQueue;
 uint64_t Rules::maxQueuePushWaitTimeInMilliseconds=0, Rules::maxQueuePopTimeInMilliseconds=10000;
@@ -55,41 +57,40 @@ bool Rules::bActionsModified = false;
 
 void forkExec(const std::string & ruleName, const char *file, std::vector<string> vArguments )
 {
-    char ** argv = (char **)malloc( (vArguments.size()+1)*sizeof(char *) );
-    for (size_t i=0; i<vArguments.size();i++)
-    {
-        argv[i] = (char *)strdup(vArguments[i].c_str());
-    }
-    argv[vArguments.size()] = 0;
+    std::vector<char *> argv;
+    argv.reserve(vArguments.size() + 1);
+    for (auto &argument : vArguments) argv.push_back(argument.data());
+    argv.push_back(nullptr);
 
-    //pid_t parent = getpid();
-    pid_t pid = fork();
-
+    const pid_t pid = fork();
     if (pid == -1)
     {
-        // error, failed to fork()
+        const auto error = std::error_code(errno, std::generic_category()).message();
+        LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to launch '%s': %s",
+                      ruleName.c_str(), file, error.c_str());
     }
-    else if (pid > 0)
+    else if (pid == 0)
     {
-        // Me...
-        int status;
-        waitpid(pid, &status, 0);
-        if (status!=0)
-        {
-            char cError[1024]="Unknown Error";
-
-            LOG_APP->log0(__func__,Logs::WARNING,"Rule '%s': execution of '%s' failed with %d (%s).", ruleName.c_str(), string(file).c_str(), status, strerror_r(errno,cError,sizeof(cError)));
-        }
+        execvp(file, argv.data());
+        _exit(EXIT_FAILURE);
     }
     else
     {
-        // the child... (process is replaced here)
-        execvp(file, argv);
-        _exit(EXIT_FAILURE);   // exec never returns
+        int status = 0;
+        pid_t result;
+        do { result = waitpid(pid, &status, 0); } while (result == -1 && errno == EINTR);
+        if (result == -1)
+        {
+            const auto error = std::error_code(errno, std::generic_category()).message();
+            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to wait for '%s': %s",
+                          ruleName.c_str(), file, error.c_str());
+        }
+        else if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        {
+            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': execution of '%s' failed (wait status %d).",
+                          ruleName.c_str(), file, status);
+        }
     }
-
-    for (int i=0; argv[i]; i++) free(argv[i]);
-    free(argv);
 }
 
 
@@ -158,14 +159,13 @@ void Rules::setEvaluationQueueMaxSize(const size_t &max)
 
 bool Rules::pushElementOnEvaluationQueue(const string &str)
 {
-    std::string * strc = new std::string;
-    *strc = str;
-    if (!evaluationQueue.push(strc,maxQueuePushWaitTimeInMilliseconds))
+    auto strc = std::make_unique<std::string>(str);
+    if (!evaluationQueue.push(strc.get(), maxQueuePushWaitTimeInMilliseconds))
     {
-        delete strc;
         droppedInQueue++;
         return false;
     }
+    strc.release(); // Mantids30 owns the successfully queued item.
     queueInLastSec_ct++;
     queuedLinesCount++;
     return true;
@@ -211,7 +211,7 @@ bool Rules::evaluate(const json &values)
     std::shared_lock<std::shared_mutex> lock(mtRules);
 
     bool activated = false;
-    for (sRule * rule: rules)
+    for (const auto &rule: rules)
     {
         if (rule->expr->evaluate(values))
         {
@@ -227,7 +227,7 @@ bool Rules::evaluate(const json &values)
                 else
                 {
                     LOG_APP->log0(__func__,Logs::DEBUG,"Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
-                    exec(rule->name, actions[rule->actionId]->file,  actions[rule->actionId]->vArguments,values);
+                    exec(rule->name, actions.at(rule->actionId)->file.c_str(),  actions.at(rule->actionId)->vArguments,values);
                     if (rule->ruleAction == RULE_ACTION_EXECANDABORT) break;
                 }
             }
@@ -260,9 +260,7 @@ bool Rules::ruleUp(uint32_t pos)
     if (pos>=rules.size()) return false;
     if (pos==0) return true;
 
-    auto * i = rules[pos-1];
-    rules[pos-1] = rules[pos];
-    rules[pos] = i;
+    std::swap(rules[pos - 1], rules[pos]);
 
     bRulesModified = true;
     return true;
@@ -275,9 +273,7 @@ bool Rules::ruleDown(uint32_t pos)
     if (pos>=rules.size()) return false;
     if (pos==(rules.size()-1)) return true;
 
-    auto * i = rules[pos+1];
-    rules[pos+1] = rules[pos];
-    rules[pos] = i;
+    std::swap(rules[pos + 1], rules[pos]);
 
     bRulesModified = true;
     return true;
@@ -315,13 +311,12 @@ void Rules::threadEvaluation(const uint32_t &threadId)
 #endif
 
     json v;
-    std::string * s;
     for (;;)
     {
-        s = evaluationQueue.pop(maxQueuePopTimeInMilliseconds);
-        queueOutLastSec_ct++;
+        auto s = std::unique_ptr<std::string>(evaluationQueue.pop(maxQueuePopTimeInMilliseconds));
         if (s)
         {
+            queueOutLastSec_ct++;
             auto start = chrono::high_resolution_clock::now();
             auto finish = chrono::high_resolution_clock::now();
             chrono::duration<double, milli> elapsed = finish - start;
@@ -340,8 +335,6 @@ void Rules::threadEvaluation(const uint32_t &threadId)
                 LOG_APP->log0(__func__,Logs::ERROR,"Evaluation Thread #%d received invalid JSON...", threadId);
                 badFormatLines++;
             }
-            delete s;
-            s=nullptr;
 
             finish = chrono::high_resolution_clock::now();
             elapsed = finish - start;
@@ -363,11 +356,8 @@ void Rules::threadPassCTStatsEverySecond()
 
     for (;;)
     {
-        queueInLastSec = (uint64_t)queueInLastSec_ct;
-        queueOutLastSec = (uint64_t)queueOutLastSec_ct;
-
-        queueInLastSec_ct = 0;
-        queueOutLastSec_ct = 0;
+        queueInLastSec = queueInLastSec_ct.exchange(0);
+        queueOutLastSec = queueOutLastSec_ct.exchange(0);
 
         sleep(1);
     }
@@ -485,15 +475,14 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
 
     boost::replace_all(filter,"\n", " ");
 
-    sRule * rule = new sRule;
+    auto rule = std::make_unique<sRule>();
     rule->name = name;
-    rule->expr = new JSONEval( filter );
+    rule->expr = std::make_unique<JSONEval>(filter);
     rule->jOriginalVal = jConfig;
 
     if (!rule->expr->isCompiled())
     {
         LOG_APP->log0(__func__,Logs::ERROR,"Rule '%s': 'Filter' compilation failed with '%s'.",name.c_str(), rule->expr->getLastCompilerError().c_str());
-        delete rule;
         return false;
     }
 
@@ -506,7 +495,6 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
         if (actions.find(rule->actionId) == actions.end())
         {
             LOG_APP->log0(__func__,Logs::ERROR,"Rule '%s': 'Filter' referenced unexistent action '%s'.",name.c_str(), rule->actionId.c_str());
-            delete rule;
             return false;
         }
     }
@@ -522,14 +510,13 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
     if (!replace)
     {
         if (pos >= rules.size())
-            rules.push_back(rule);
+            rules.push_back(std::move(rule));
         else
-            rules.insert( rules.begin()+pos, rule );
+            rules.insert(rules.begin() + pos, std::move(rule));
     }
     else
     {
-        delete rules[pos];
-        rules[pos] = rule;
+        rules[pos] = std::move(rule);
     }
 
 
@@ -561,7 +548,7 @@ bool Rules::_addAction(const json &jConfig, bool replace)
 
     LOG_APP->log0(__func__,Logs::INFO,"Creating Action '%s' - '%s'",actionName.c_str(), actionDescription.c_str());
 
-    sAction * action = new sAction;
+    auto action = std::make_unique<sAction>();
     action->jOriginalVal = jConfig;
     action->setFileName(std::string(Mantids30::DataFormat::JSON::ASSTRING(jConfig,"path","")));
     vector<string> arguments;
@@ -574,15 +561,7 @@ bool Rules::_addAction(const json &jConfig, bool replace)
     }
     action->setArguments(arguments);
 
-    if (replace)
-    {
-        delete actions[actionName];
-        actions[actionName] = action;
-    }
-    else
-    {
-        actions[actionName] = action;
-    }
+    actions.insert_or_assign(actionName, std::move(action));
 
     bActionsModified = true;
     return true;
@@ -593,7 +572,6 @@ bool Rules::_removeRule(const uint32_t &pos)
     if (pos>=rules.size())
         return false;
 
-    delete rules[pos];
     rules.erase(rules.begin()+pos);
 
     bRulesModified = true;
@@ -606,7 +584,6 @@ bool Rules::_removeAction(const string &actionName)
     if (actions.find(actionName) == actions.end())
         return false;
 
-    delete actions[actionName];
     actions.erase(actionName);
     bActionsModified = true;
 
@@ -615,13 +592,11 @@ bool Rules::_removeAction(const string &actionName)
 
 void Rules::resetRules()
 {
-    for (sRule * rule: rules) delete rule;
     rules.clear();
 }
 
 void Rules::resetActions()
 {
-    for (auto & i : actions) delete i.second;
     actions.clear();
 }
 
@@ -649,7 +624,7 @@ json Rules::getCurrentRunningAction(const string &sActionName)
     if (actions.find(sActionName) == actions.end())
         return r;
 
-    return actions[sActionName]->jOriginalVal;
+    return actions.at(sActionName)->jOriginalVal;
 }
 
 json Rules::getCurrentRunningRule(const uint32_t &pos)
@@ -669,7 +644,7 @@ json Rules::getCurrentRunningRules()
 
     boost::json::array r;
 
-    for (auto rule: rules) r.emplace_back(rule->jOriginalVal);
+    for (const auto &rule: rules) r.emplace_back(rule->jOriginalVal);
 
     return r;
 }

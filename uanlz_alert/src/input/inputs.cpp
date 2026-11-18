@@ -8,7 +8,7 @@
 using namespace UANLZ::JSONALERT::Input;
 using namespace Mantids30::Runtime;
 
-std::list<TCPServer *> Inputs::tcpServers;
+std::list<std::unique_ptr<TCPServer>> Inputs::tcpServers;
 std::mutex Inputs::mt;
 std::string Inputs::sConfigFilePath;
 bool Inputs::modified = false;
@@ -22,12 +22,11 @@ json Inputs::getStats()
 {
     boost::json::array v;
 
-    mt.lock();
-    for (auto i : tcpServers)
+    std::lock_guard<std::mutex> lock(mt);
+    for (const auto &i : tcpServers)
     {
         v.emplace_back(i->getStats());
     }
-    mt.unlock();
 
     return v;
 }
@@ -154,29 +153,21 @@ bool Inputs::loadConfig()
     // Read array:
     for ( u_int32_t i=0 ; i< root.as_array().size(); i++ )
     {
-        TCPServer * in = new TCPServer();
-        if (!in->loadConfig(root.as_array()[i]))
-        {
-            delete in;
-        }
-        else
-        {
-            mt.lock();
-            tcpServers.push_back(in);
-            mt.unlock();
-        }
+        auto in = std::make_unique<TCPServer>();
+        if (!in->loadConfig(root.as_array()[i])) continue;
+        std::lock_guard<std::mutex> lock(mt);
+        tcpServers.push_back(std::move(in));
     }
     return true;
 }
 
 void Inputs::startThreads()
 {
-    mt.lock();
-    for (auto i : tcpServers)
+    std::lock_guard<std::mutex> lock(mt);
+    for (const auto &i : tcpServers)
     {
         i->startThreaded();
     }
-    mt.unlock();
 }
 
 void Inputs::setConfigFilePath(const std::string &value)
