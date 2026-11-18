@@ -1,13 +1,13 @@
-%define name uAuditAnalyzer2
-%define version 2.4.1
+%define name uAuditAnalyzer3
+%define version 3.0.0
 %define build_timestamp %{lua: print(os.date("%Y%m%d"))}
 Name:           %{name}
 Version:        %{version}
 Release:        %{build_timestamp}.git%{?dist}
 Summary:        Unmanarc's Auditd Analyzer
 License:        GPLv3
-URL:            https://github.com/unmanarc/uAuditAnalyzer2
-Source0:        https://github.com/unmanarc/uAuditAnalyzer2/archive/master.tar.gz#/%{name}-%{version}-%{build_timestamp}.tar.gz
+URL:            https://github.com/unmanarc/uAuditAnalyzer3
+Source0:        https://github.com/unmanarc/uAuditAnalyzer3/archive/master.tar.gz#/%{name}-%{version}-%{build_timestamp}.tar.gz
 Group:          Applications/Internet
 %define cmake cmake
 %if 0%{?rhel} == 6
@@ -25,22 +25,22 @@ Group:          Applications/Internet
 %if 0%{?fedora} >= 33
 %define debug_package %{nil}
 %endif
-BuildRequires: libMantids-devel >= 2.8.29
-BuildRequires: %{cmake} systemd libMantids-sqlite zlib-devel boost-devel gcc-c++ jsoncpp-devel sqlite-devel
+BuildRequires: libMantids30-devel >= 3.0.0
+BuildRequires: %{cmake} systemd zlib-devel boost-devel gcc-c++ jsoncpp-devel sqlite-devel
 %if 0%{?rhel} == 7
 BuildRequires:  openssl11-devel
 %else
 BuildRequires:  openssl-devel
 %endif
-Requires: libMantids >= 2.8.29
-Requires: libMantids-sqlite zlib boost-regex boost-system jsoncpp sqlite
+Requires: libMantids30 >= 3.0.0
+Requires: zlib boost-regex boost-system jsoncpp sqlite
 %if 0%{?rhel} == 7
 Requires:       openssl11
 %else
 Requires:       openssl
 %endif
 %description
-This package contains uAuditAnalyzer2 is intended to be a highly-efficient application for processing auditd logs received via rsyslog. It is being actively used in many enterprise-level environments for detecting potential threats and providing instant alerts using messaging applications, bots or other means.
+This package contains uAuditAnalyzer3 is intended to be a highly-efficient application for processing auditd logs received via rsyslog. It is being actively used in many enterprise-level environments for detecting potential threats and providing instant alerts using messaging applications, bots or other means.
 %prep
 %autosetup -n %{name}-master
 %build
@@ -84,6 +84,7 @@ cp -a uanlz_alert/etc/uauditanalyzer/uanlz_alert $RPM_BUILD_ROOT/etc/uauditanaly
 chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_web/snakeoil.key
 chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_alert/*.json
 chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/*/*.ini
+chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_web/webserver.conf
 mkdir -vp $RPM_BUILD_ROOT/usr/lib/systemd/system
 cp uanlz_web/etc/systemd/system/uanlz_web.service $RPM_BUILD_ROOT/usr/lib/systemd/system/
 cp uanlz_log2json/etc/systemd/system/uanlz_log2json.service $RPM_BUILD_ROOT/usr/lib/systemd/system/

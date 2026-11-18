@@ -1,0 +1,8 @@
+function(audit_target target)
+    target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/common" "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(${target} PRIVATE Threads::Threads Boost::regex Boost::thread Boost::json PkgConfig::JSONCPP)
+    foreach(component IN LISTS ARGN)
+        pkg_check_modules(${component} REQUIRED IMPORTED_TARGET ${component})
+        target_link_libraries(${target} PRIVATE PkgConfig::${component})
+    endforeach()
+endfunction()
