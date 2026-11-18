@@ -18,7 +18,8 @@
 
 #include <pwd.h>
 #include <signal.h>
-#include <dirent.h>
+#include <filesystem>
+#include <set>
 #include <unistd.h>
 
 #include <inttypes.h>
@@ -35,11 +36,11 @@ using namespace Mantids30::Runtime::Service;
 class Main : public Application
 {
 public:
-    void _shutdown()
+    void _shutdown() override
     {
     }
 
-    int _start(int , char *[], Arguments::GlobalArguments *globalArguments)
+    int _start(int , char *[], Arguments::GlobalArguments *globalArguments) override
     {
         std::string configDir = globalArguments->getCommandLineOptionValue("config-dir")->toString();
 
@@ -65,7 +66,7 @@ public:
         return 0;
     }
 
-    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments)
+    void _initvars(int , char *[], Arguments::GlobalArguments * globalArguments) override
     {
         // init variables (pre-config):
         globalArguments->setInifiniteWaitAtEnd(true);
@@ -79,7 +80,7 @@ public:
         globalArguments->addCommandLineOption("Service Options", 'c', "config-dir" , "Configuration directory"  , "/etc/uauditanalyzer/" + globalArguments->getDaemonName(), Mantids30::Core::Memory::Abstract::Var::Type::STRING );
     }
 
-    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments)
+    bool _config(int , char *argv[], Arguments::GlobalArguments * globalArguments) override
     {
         Mantids30::Network::Sockets::Socket_TLS::prepareTLS();
 
@@ -138,7 +139,7 @@ public:
         *(Globals::getConfig_main()) = config_main;
 
         if ( config_main.get<bool>("Logs.ToSyslog",true) ) logMode|=Logs::Mode::SYSLOG;
-        Globals::setAppLog(new Logs::AppLog(logMode));
+        Globals::setAppLog(std::make_unique<Logs::AppLog>(logMode));
         LOG_APP->enableEmptyFieldLogging = true;
         LOG_APP->enableColorLogging = config_main.get<bool>("Logs.ShowColors",true);
         LOG_APP->enableDateLogging = config_main.get<bool>("Logs.ShowDate",true);
@@ -146,72 +147,32 @@ public:
         LOG_APP->enableAttributeNameLogging = false;
         LOG_APP->setDebug(Globals::getConfig_main()->get<bool>("Logs.Debug",false));
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        std::string dirPath = configDir + "/receptors.d";
-        if (!access(dirPath.c_str(),R_OK))
-        {
-            DIR *dir;
-            struct dirent *ent;
-            if ((dir = opendir (dirPath.c_str())) != NULL)
+        const auto loadDirectory = [&](const std::string &name, auto loadConfig) {
+            const auto directory = std::filesystem::path(configDir) / name;
+            std::error_code error;
+            std::filesystem::directory_iterator iterator(directory, error), end;
+            std::set<std::filesystem::path> files;
+            while (!error && iterator != end)
             {
-                std::set<std::string> files;
-                while ((ent = readdir (dir)) != NULL)
-                {
-                    if ((ent->d_type & DT_REG) != 0)
-                        files.insert(ent->d_name);
-                }
-                closedir (dir);
-
-                for (const std::string & file: files)
-                {
-                    boost::property_tree::ptree filters;
-                    std::string fullFilePath = dirPath + "/" + file;
-                    LOG_APP->log0(__func__,Logs::INFO, "Loading Log Receptor configuration from file: %s", fullFilePath.c_str());
-                    Input::Inputs::loadConfig(fullFilePath);
-                }
+                if (iterator->is_regular_file(error)) files.insert(iterator->path());
+                if (!error) iterator.increment(error);
             }
-            else
-                LOG_APP->log0(__func__,Logs::ERROR, "Failed to list directory: %s, no receptors loaded.", dirPath.c_str());
-        }
-        else
-        {
-            LOG_APP->log0(__func__,Logs::CRITICAL, "Missing/Unreadable receptors directory: %s", dirPath.c_str());
-            return false;
-        }
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        dirPath = configDir + "/dispatchers.d";
-        if (!access(dirPath.c_str(),R_OK))
-        {
-            DIR *dir;
-            struct dirent *ent;
-            if ((dir = opendir (dirPath.c_str())) != NULL)
+            if (error)
             {
-                std::set<std::string> files;
-                while ((ent = readdir (dir)) != NULL)
-                {
-                    if ((ent->d_type & DT_REG) != 0)
-                        files.insert(ent->d_name);
-                }
-                closedir (dir);
-
-                for (const std::string & file: files)
-                {
-                    boost::property_tree::ptree filters;
-                    std::string fullFilePath = dirPath + "/" + file;
-                    LOG_APP->log0(__func__,Logs::INFO, "Loading TCP JSON Dispatcher configuration from file: %s", fullFilePath.c_str());
-                    Output::Outputs::loadConfig(fullFilePath);
-                }
+                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s",
+                              directory.c_str(), error.message().c_str());
+                return false;
             }
-            else
-                LOG_APP->log0(__func__,Logs::ERROR, "Failed to list directory: %s, no TCP JSON dispatchers loaded.", dirPath.c_str());
-        }
-        else
-        {
-            LOG_APP->log0(__func__,Logs::CRITICAL, "Missing/Unreadable TCP JSON dispatchers directory: %s", dirPath.c_str());
-            return false;
-        }
+            for (const auto &file : files)
+            {
+                LOG_APP->log0(__func__, Logs::INFO, "Loading configuration from %s", file.c_str());
+                loadConfig(file.string());
+            }
+            return true;
+        };
+
+        if (!loadDirectory("receptors.d", Input::Inputs::loadConfig)) return false;
+        if (!loadDirectory("dispatchers.d", Output::Outputs::loadConfig)) return false;
 
         return true;
     }
@@ -220,6 +181,6 @@ public:
 
 int main(int argc, char *argv[])
 {
-    Main * main = new Main;
-    return StartApplication(argc,argv,main);
+    Main application;
+    return StartApplication(argc, argv, &application);
 }
