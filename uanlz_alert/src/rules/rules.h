@@ -5,12 +5,12 @@
 #include <string>
 #include <mutex>
 
-#include <mdz_scripts_jsonexpreval/jsoneval.h>
-#include <mdz_thr_mutex/mutex_shared.h>
-#include <mdz_thr_safecontainers/queue.h>
+#include <Mantids30/Scripting/JSONExprEval/jsoneval.h>
+#include <shared_mutex>
+#include <Mantids30/Core/Threads/safe_queue.h>
 
 #include <boost/property_tree/ptree.hpp>
-#include <mdz_hlp_functions/json.h>
+#include <audit_json.h>
 
 namespace UANLZ { namespace JSONALERT { namespace Filters {
 
@@ -39,7 +39,7 @@ struct sRule
     std::string actionId;
 
     std::string filter;
-    Mantids::Scripts::Expressions::JSONEval *expr;
+    Mantids30::Scripting::JSONExprEval::JSONEval *expr;
 
     json jOriginalVal;
 };
@@ -154,8 +154,8 @@ private:
     static std::string getRandomTag(const std::string & str, uint64_t t);
 
     static uint64_t maxQueuePushWaitTimeInMilliseconds, maxQueuePopTimeInMilliseconds;
-    static Mantids::Threads::Safe::Queue<std::string> evaluationQueue;
-    static Mantids::Threads::Sync::Mutex_Shared mtRules;
+    static Mantids30::Core::Threads::Safe::Queue<std::string> evaluationQueue;
+    static std::shared_mutex mtRules;
     static std::vector<sRule *> rules;
     static std::map<std::string,sAction *> actions;
 

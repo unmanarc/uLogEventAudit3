@@ -12,7 +12,7 @@ using namespace std;
 using namespace UANLZ::JSONALERT::Input;
 using namespace UANLZ::JSONALERT;
 
-TCPLineProcessor::TCPLineProcessor(Mantids::Memory::Streams::StreamableObject *sock, void *server) : LineRecv(sock)
+TCPLineProcessor::TCPLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &sock, void *server) : LineRecv(sock)
 {
     processedLinesCount=0;
     this->server = server;

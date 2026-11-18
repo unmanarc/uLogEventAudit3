@@ -1,4 +1,5 @@
 #include "rpcimpl.h"
+#include "audit_rpc.h"
 #include <inttypes.h>
 
 #include "globals.h"
@@ -6,10 +7,10 @@
 #include "input/inputs.h"
 #include "rules/rules.h"
 
-#include <mdz_net_sockets/socket_tls.h>
-#include <mdz_xrpc_fast/fastrpc.h>
+#include <Mantids30/Network/Sockets/socket_tls.h>
+#include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 
-using namespace Mantids::Application;
+using namespace Mantids30::Runtime;
 using namespace UANLZ::JSONALERT;
 
 RPCImpl::RPCImpl()
@@ -22,68 +23,70 @@ void RPCImpl::runRPClient()
     std::string remoteAddr = Globals::getConfig_main()->get<std::string>("RPCConnector.RemoteAddr","127.0.0.1");
     std::string rpcApiKey = Globals::getConfig_main()->get<std::string>("RPCConnector.AlertsApiKey","REPLACEME_XABCXAPIX_ALERT");
 
-    Mantids::RPC::Fast::FastRPC fastRPC;
+    Mantids30::Protocol::FastRPC1 fastRPC;
 
     // RULES:
-    fastRPC.addMethod( "control.RulesReload",            {&controlRulesReload,nullptr} );
-    fastRPC.addMethod( "control.RulesActions",           {&controlActionsReload,nullptr} );
-    fastRPC.addMethod( "control.RemoveRule",             {&controlRemoveRule,nullptr} );
-    fastRPC.addMethod( "control.SaveRunningRules",       {&controlSaveRunningRules,nullptr} );
-    fastRPC.addMethod( "control.WriteRulesFileConfig",   {&controlWriteRulesFileConfig,nullptr} );
-    fastRPC.addMethod( "stats.ReadRunningRules",         {&statReadRunningRules,nullptr} );
-    fastRPC.addMethod( "stats.ReadRunningRule",          {&statReadRunningRule,nullptr} );
-    fastRPC.addMethod( "stats.ReadRulesFileConfig",      {&statReadRulesFileConfig,nullptr} );
-    fastRPC.addMethod( "stats.AreRulesModified",         {&statAreRulesModified,nullptr} );
-    fastRPC.addMethod( "control.AddRule",                {&controlAddRule,nullptr} );
-    fastRPC.addMethod( "control.EditRule",               {&controlEditRule,nullptr} );
-    fastRPC.addMethod( "control.RuleUp",                 {&controlRuleUp,nullptr} );
-    fastRPC.addMethod( "control.RuleDown",               {&controlRuleDown,nullptr} );
+    fastRPC.addMethod( "control.RulesReload",            UANLZ::JSON::rpcMethod<&controlRulesReload>() );
+    fastRPC.addMethod( "control.RulesActions",           UANLZ::JSON::rpcMethod<&controlActionsReload>() );
+    fastRPC.addMethod( "control.RemoveRule",             UANLZ::JSON::rpcMethod<&controlRemoveRule>() );
+    fastRPC.addMethod( "control.SaveRunningRules",       UANLZ::JSON::rpcMethod<&controlSaveRunningRules>() );
+    fastRPC.addMethod( "control.WriteRulesFileConfig",   UANLZ::JSON::rpcMethod<&controlWriteRulesFileConfig>() );
+    fastRPC.addMethod( "stats.ReadRunningRules",         UANLZ::JSON::rpcMethod<&statReadRunningRules>() );
+    fastRPC.addMethod( "stats.ReadRunningRule",          UANLZ::JSON::rpcMethod<&statReadRunningRule>() );
+    fastRPC.addMethod( "stats.ReadRulesFileConfig",      UANLZ::JSON::rpcMethod<&statReadRulesFileConfig>() );
+    fastRPC.addMethod( "stats.AreRulesModified",         UANLZ::JSON::rpcMethod<&statAreRulesModified>() );
+    fastRPC.addMethod( "control.AddRule",                UANLZ::JSON::rpcMethod<&controlAddRule>() );
+    fastRPC.addMethod( "control.EditRule",               UANLZ::JSON::rpcMethod<&controlEditRule>() );
+    fastRPC.addMethod( "control.RuleUp",                 UANLZ::JSON::rpcMethod<&controlRuleUp>() );
+    fastRPC.addMethod( "control.RuleDown",               UANLZ::JSON::rpcMethod<&controlRuleDown>() );
 
     // ACTIONS:
-    fastRPC.addMethod( "control.WriteActionsFileConfig", {&controlWriteActionsFileConfig,nullptr} );
-    fastRPC.addMethod( "control.AddAction",              {&controlAddAction,nullptr} );
-    fastRPC.addMethod( "control.EditAction",             {&controlEditAction,nullptr} );
-    fastRPC.addMethod( "control.RemoveAction",           {&controlRemoveAction,nullptr} );
-    fastRPC.addMethod( "control.SaveRunningActions",     {&controlSaveRunningActions,nullptr} );
-    fastRPC.addMethod( "stats.AreActionsModified",       {&statAreActionsModified,nullptr} );
-    fastRPC.addMethod( "stats.ReadRunningActions",       {&statReadRunningActions,nullptr} );
-    fastRPC.addMethod( "stats.ReadRunningAction",        {&statReadRunningAction,nullptr} );
-    fastRPC.addMethod( "stats.ReadActionsFileConfig",    {&statReadActionsFileConfig,nullptr} );
+    fastRPC.addMethod( "control.WriteActionsFileConfig", UANLZ::JSON::rpcMethod<&controlWriteActionsFileConfig>() );
+    fastRPC.addMethod( "control.AddAction",              UANLZ::JSON::rpcMethod<&controlAddAction>() );
+    fastRPC.addMethod( "control.EditAction",             UANLZ::JSON::rpcMethod<&controlEditAction>() );
+    fastRPC.addMethod( "control.RemoveAction",           UANLZ::JSON::rpcMethod<&controlRemoveAction>() );
+    fastRPC.addMethod( "control.SaveRunningActions",     UANLZ::JSON::rpcMethod<&controlSaveRunningActions>() );
+    fastRPC.addMethod( "stats.AreActionsModified",       UANLZ::JSON::rpcMethod<&statAreActionsModified>() );
+    fastRPC.addMethod( "stats.ReadRunningActions",       UANLZ::JSON::rpcMethod<&statReadRunningActions>() );
+    fastRPC.addMethod( "stats.ReadRunningAction",        UANLZ::JSON::rpcMethod<&statReadRunningAction>() );
+    fastRPC.addMethod( "stats.ReadActionsFileConfig",    UANLZ::JSON::rpcMethod<&statReadActionsFileConfig>() );
 
     // INPUTS:
-    fastRPC.addMethod( "stats.ReadRunningInputs",        {&statGetRunningInputs,nullptr} );
-    fastRPC.addMethod( "stats.ReadInputsFileConfig",     {&statReadInputsFileConfig,nullptr} );
-    fastRPC.addMethod( "control.AddInputToFileConfig",   {&AddInputToFileConfig,nullptr} );
-    fastRPC.addMethod( "control.RemInputFromFileConfig",   {&RemInputFromFileConfig,nullptr} );
+    fastRPC.addMethod( "stats.ReadRunningInputs",        UANLZ::JSON::rpcMethod<&statGetRunningInputs>() );
+    fastRPC.addMethod( "stats.ReadInputsFileConfig",     UANLZ::JSON::rpcMethod<&statReadInputsFileConfig>() );
+    fastRPC.addMethod( "control.AddInputToFileConfig",   UANLZ::JSON::rpcMethod<&AddInputToFileConfig>() );
+    fastRPC.addMethod( "control.RemInputFromFileConfig",   UANLZ::JSON::rpcMethod<&RemInputFromFileConfig>() );
 
 
-    fastRPC.addMethod( "stats.SystemStats",              {&statSystemStats,nullptr} );
-    fastRPC.addMethod( "control.ReloadApp",              {&controlReloadApp,nullptr} );
+    fastRPC.addMethod( "stats.SystemStats",              UANLZ::JSON::rpcMethod<&statSystemStats>() );
+    fastRPC.addMethod( "control.ReloadApp",              UANLZ::JSON::rpcMethod<&controlReloadApp>() );
 
     for (;;)
     {
-        Mantids::Network::Sockets::Socket_TLS sockRPCClient;
+        auto sockRPCClient = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
 
 
         // Set the SO default security level:
-        sockRPCClient.keys.setSecurityLevel(-1);
 
 
-        if (!sockRPCClient.keys.loadCAFromPEMFile( "rpcca.crt" ))
+
+        if (!sockRPCClient->tlsKeys.loadCAFromPEMFile( Globals::getConfig_main()->get<std::string>("RPCConnector.CAFile","rpcca.crt").c_str() ))
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
+            LOG_APP->log0(__func__,Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
             _exit(-3);
         }
 
-        if ( sockRPCClient.connectTo( remoteAddr.c_str(), remotePort ) )
+        sockRPCClient->tlsKeys.setValidateServerHostname(true);
+        if ( sockRPCClient->connectTo( remoteAddr.c_str(), remotePort ) )
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_INFO,  "Connected to %s:%" PRIu16, remoteAddr.c_str(), remotePort);
-            sockRPCClient.writeStringEx<uint16_t>(rpcApiKey);
-            fastRPC.processConnection(&sockRPCClient,"SERVER");
+            LOG_APP->log0(__func__,Logs::INFO,  "Connected to %s:%" PRIu16, remoteAddr.c_str(), remotePort);
+            if (sockRPCClient->writeStringEx<uint16_t>(rpcApiKey))
+                fastRPC.processConnection(sockRPCClient,"SERVER");
+            sleep(3);
         }
         else
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, sockRPCClient.getLastError().c_str());
+            LOG_APP->log0(__func__,Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddr.c_str(), remotePort, sockRPCClient->getLastError().c_str());
             sleep(3);
         }
     }
@@ -221,7 +224,7 @@ void sleepAndExit()
 json RPCImpl::controlReloadApp(void *, const std::string &, const json &, void*, const std::string &)
 {
     json j = true;
-    LOG_APP->log0(__func__,Logs::LEVEL_WARN,  "Reload requested via RPC");
+    LOG_APP->log0(__func__,Logs::WARNING,  "Reload requested via RPC");
 
     std::thread(sleepAndExit).detach();
     return j;

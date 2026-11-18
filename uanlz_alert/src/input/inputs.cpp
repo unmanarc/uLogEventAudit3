@@ -1,12 +1,12 @@
 #include "inputs.h"
 #include <fstream>
-#include <mdz_hlp_functions/random.h>
+#include <Mantids30/Core/Helpers/random.h>
 #include <inttypes.h>
 
 #include "../globals.h"
 
 using namespace UANLZ::JSONALERT::Input;
-using namespace Mantids::Application;
+using namespace Mantids30::Runtime;
 
 std::list<TCPServer *> Inputs::tcpServers;
 std::mutex Inputs::mt;
@@ -42,7 +42,7 @@ json Inputs::readInputs(bool * readOK)
         // Create empty JSON for unexistent file:
         json r;
 
-        LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Inputs file '%s' not found, creating an empty file.", sConfigFilePath.c_str());
+        LOG_APP->log0(__func__,Logs::INFO,"Inputs file '%s' not found, creating an empty file.", sConfigFilePath.c_str());
 
         std::ofstream config_doc(sConfigFilePath, std::ifstream::binary);
         if (!config_doc.is_open()) return false;
@@ -86,7 +86,7 @@ bool Inputs::addInput(json jConfig)
     if (!readOK)
         return false;
 
-    jConfig["id"] = Mantids::Helpers::Random::createRandomString(8).c_str();
+    jConfig["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
 
     std::string listenAddr, description;
     uint16_t listenPort;
@@ -95,7 +95,7 @@ bool Inputs::addInput(json jConfig)
     listenPort = JSON_ASUINT(jConfig,"ListenPort",0);
     description = JSON_ASSTRING(jConfig,"Description","");
 
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(jConfig,"id",""),description.c_str(),listenAddr.c_str(),listenPort );
+    LOG_APP->log0(__func__,Logs::INFO,"Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(jConfig,"id",""),description.c_str(),listenAddr.c_str(),listenPort );
 
     rt[0]=jConfig;
     // Read array:
@@ -128,7 +128,7 @@ bool Inputs::remInput(const std::string &inputId)
             listenPort = JSON_ASUINT(root[i],"ListenPort",0);
             description = JSON_ASSTRING(root[i],"Description","");
 
-            LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(root[i],"id",""),description.c_str(),listenAddr.c_str(),listenPort );
+            LOG_APP->log0(__func__,Logs::INFO,"Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16, JSON_ASCSTRING(root[i],"id",""),description.c_str(),listenAddr.c_str(),listenPort );
 
         }
     }
@@ -138,7 +138,7 @@ bool Inputs::remInput(const std::string &inputId)
 
 bool Inputs::loadConfig()
 {
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Loading inputs from file: %s", sConfigFilePath.c_str());
+    LOG_APP->log0(__func__,Logs::INFO,"Loading inputs from file: %s", sConfigFilePath.c_str());
 
     bool readOK;
     json root = readInputs(&readOK);

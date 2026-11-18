@@ -2,7 +2,7 @@
 
 using namespace UANLZ::JSONALERT;
 
-Mantids::Application::Logs::AppLog * Globals::applog = nullptr;
+Mantids30::Runtime::Logs::AppLog * Globals::applog = nullptr;
 std::mutex Globals::mDatabase, Globals::mDirs;
 boost::property_tree::ptree Globals::config_main;
 
@@ -10,12 +10,12 @@ Globals::Globals()
 {
 }
 
-Mantids::Application::Logs::AppLog *Globals::getAppLog()
+Mantids30::Runtime::Logs::AppLog *Globals::getAppLog()
 {
     return applog;
 }
 
-void Globals::setAppLog(Mantids::Application::Logs::AppLog *value)
+void Globals::setAppLog(Mantids30::Runtime::Logs::AppLog *value)
 {
     applog = value;
 }

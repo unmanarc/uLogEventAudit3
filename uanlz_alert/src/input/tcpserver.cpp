@@ -3,7 +3,7 @@
 #include "../globals.h"
 #include "../input/tcplineprocessor.h"
 
-#include <mdz_net_sockets/socket_tcp.h>
+#include <Mantids30/Network/Sockets/socket_tcp.h>
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <inttypes.h>
@@ -12,51 +12,36 @@ using namespace std;
 using namespace UANLZ::JSONALERT;
 using namespace UANLZ::JSONALERT::Input;
 
-using namespace Mantids::Memory::Streams;
-using namespace Mantids::Network::Sockets;
-using namespace Mantids::Network::Sockets;
-using namespace Mantids::Application;
+using namespace Mantids30::Core::Memory::Streams;
+using namespace Mantids30::Network::Sockets;
+using namespace Mantids30::Network::Sockets;
+using namespace Mantids30::Runtime;
 
-bool logServerThr(void * obj, Socket_StreamBase * baseClientSocket, const char * remotePair, bool secure)
+void logServerThr(void * obj, const std::shared_ptr<Socket_Stream> &baseClientSocket)
 {
     TCPServer * server = (TCPServer *)obj;
     TCPLineProcessor *  lineServer = new TCPLineProcessor(baseClientSocket,server);
 
-    string sRemotePair = remotePair;
+    string sRemotePair = baseClientSocket->getRemotePairStr();
+    bool secure = baseClientSocket->isSecure();
     lineServer->setRemoteIP(sRemotePair);
 
     string threadName = "IN_" + sRemotePair;
     pthread_setname_np(pthread_self(), threadName.c_str());
 
-    LOG_APP->log1(__func__,sRemotePair,Logs::LEVEL_INFO,"Receiving %sJSONTCP Incoming connection...", secure? "secure " : "");
+    LOG_APP->log1(__func__,sRemotePair,Logs::INFO,"Receiving %sJSONTCP Incoming connection...", secure? "secure " : "");
 
     server->addClient(lineServer);
 
-    // Process the line.
-    Parser::ErrorMSG err;
+    Parser::ParseResult err;
     lineServer->parseObject(&err);
-    //
-    switch (err)
-    {
-    case Parser::PARSING_SUCCEED:
-        LOG_APP->log1(__func__,sRemotePair,Logs::LEVEL_INFO,"Incoming connection finished.");
-        break;
-    case Parser::PARSING_ERR_INIT:
-        LOG_APP->log1(__func__,sRemotePair,Logs::LEVEL_WARN,"Connection finished with PARSING_ERR_INIT");
-        break;
-    case Parser::PARSING_ERR_READ:
-        LOG_APP->log1(__func__,sRemotePair,Logs::LEVEL_WARN,"Connection finished with PARSING_ERR_READ");
-        break;
-    case Parser::PARSING_ERR_PARSE:
-        LOG_APP->log1(__func__,sRemotePair,Logs::LEVEL_WARN,"Connection finished with PARSING_ERR_PARSE");
-        break;
-    }
+    LOG_APP->log1(__func__,sRemotePair, err == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING,
+                  "Incoming connection finished (parser status %d).", static_cast<int>(err));
 
     server->remClient(lineServer);
 
     delete lineServer;
 
-    return true;
 }
 
 TCPServer::TCPServer()
@@ -69,28 +54,28 @@ bool TCPServer::loadConfig(const json & jConfig)
     listenPort = JSON_ASUINT(jConfig,"ListenPort",0);
     description = JSON_ASSTRING(jConfig,"Description","");
 
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Configuring JSON input '%s' @%s:%" PRIu16,description.c_str(),listenAddr.c_str(),listenPort );
+    LOG_APP->log0(__func__,Logs::INFO,"Configuring JSON input '%s' @%s:%" PRIu16,description.c_str(),listenAddr.c_str(),listenPort );
 
     return true;
 }
 
 void TCPServer::startThreaded()
 {
-    Socket_TCP * tcpListener = new Socket_TCP();
+    auto tcpListener = std::make_shared<Socket_TCP>();
 
     if (!tcpListener->listenOn(listenPort,listenAddr.c_str(),true))
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_ERR,"Error creating JSON TCP listener @%s:%" PRIu16,listenAddr.c_str(),listenPort);
-        delete tcpListener;
+        LOG_APP->log0(__func__,Logs::ERROR,"Error creating JSON TCP listener @%s:%" PRIu16,listenAddr.c_str(),listenPort);
         return;
     }
 
-    LOG_APP->log0(__func__,Logs::LEVEL_WARN,"JSON TCP Listener listener running @%s:%" PRIu16 "...",  listenAddr.c_str(),tcpListener->getPort());
+    LOG_APP->log0(__func__,Logs::WARNING,"JSON TCP Listener listener running @%s:%" PRIu16 "...",  listenAddr.c_str(),tcpListener->getLocalPort());
 
     // STREAM MANAGER:
-    acceptor.setAcceptorSocket(tcpListener);
-    acceptor.setCallbackOnConnect(&logServerThr, this);
-    acceptor.startThreaded();
+    acceptor->addAcceptorSocket(tcpListener);
+    acceptor->callbacks.onClientConnected = &logServerThr;
+    acceptor->callbacks.contextOnConnect = this;
+    acceptor->startInBackground();
 }
 
 json TCPServer::getStats()

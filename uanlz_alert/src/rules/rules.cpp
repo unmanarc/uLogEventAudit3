@@ -1,6 +1,6 @@
 #include "rules.h"
-#include <mdz_thr_mutex/lock_shared.h>
-#include <mdz_hlp_functions/random.h>
+#include <shared_mutex>
+#include <Mantids30/Core/Helpers/random.h>
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/algorithm/string.hpp>
@@ -19,24 +19,24 @@
 
 
 #ifdef _WIN32
-#include <mdz_mem_vars/w32compat.h>
+#include <unistd.h>
 #endif
 
 using namespace std;
-using namespace boost;
+
 
 using namespace UANLZ::JSONALERT;
 using namespace UANLZ::JSONALERT::Filters;
 
-using namespace Mantids::Application;
-using namespace Mantids::Scripts::Expressions;
-using namespace Mantids::Helpers;
-using namespace Mantids::Threads::Sync;
+using namespace Mantids30::Runtime;
+using namespace Mantids30::Scripting::JSONExprEval;
+using namespace Mantids30::Core::Helpers;
+
 
 vector<sRule *> Rules::rules;
 std::map<std::string,sAction *> Rules::actions;
-Mantids::Threads::Sync::Mutex_Shared Rules::mtRules;
-Mantids::Threads::Safe::Queue<std::string> Rules::evaluationQueue;
+std::shared_mutex Rules::mtRules;
+Mantids30::Core::Threads::Safe::Queue<std::string> Rules::evaluationQueue;
 uint64_t Rules::maxQueuePushWaitTimeInMilliseconds=0, Rules::maxQueuePopTimeInMilliseconds=10000;
 
 std::atomic<uint64_t> Rules::queuedLinesCount, Rules::droppedInQueue;
@@ -78,7 +78,7 @@ void forkExec(const std::string & ruleName, const char *file, std::vector<string
         {
             char cError[1024]="Unknown Error";
 
-            LOG_APP->log0(__func__,Logs::LEVEL_WARN,"Rule '%s': execution of '%s' failed with %d (%s).", ruleName.c_str(), string(file).c_str(), status, strerror_r(errno,cError,sizeof(cError)));
+            LOG_APP->log0(__func__,Logs::WARNING,"Rule '%s': execution of '%s' failed with %d (%s).", ruleName.c_str(), string(file).c_str(), status, strerror_r(errno,cError,sizeof(cError)));
         }
     }
     else
@@ -108,7 +108,7 @@ Rules::Rules()
 Rules::~Rules()
 {
     {
-        Lock_RW lock(mtRules);
+        std::unique_lock<std::shared_mutex> lock(mtRules);
         resetRules();
         resetActions();
     }
@@ -180,10 +180,10 @@ bool Rules::pushElementOnEvaluationQueue(const string &str)
 
 bool Rules::reloadRules()
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     resetRules();
     json root = readRulesFileConfig();
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Loading filters from file: %s", sRulesFilePath.c_str());
+    LOG_APP->log0(__func__,Logs::INFO,"Loading filters from file: %s", sRulesFilePath.c_str());
 
     for (uint32_t i=0;i<root.size();i++)
     {
@@ -197,11 +197,11 @@ bool Rules::reloadRules()
 
 bool Rules::reloadActions()
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     resetActions();
     json root = readActionsFileConfig();
 
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Loading actions from file: %s", sActionsFilePath.c_str());
+    LOG_APP->log0(__func__,Logs::INFO,"Loading actions from file: %s", sActionsFilePath.c_str());
     for (uint32_t i=0;i<root.size();i++)
     {
         _addAction(root[i]);
@@ -215,12 +215,13 @@ bool Rules::reloadActions()
 
 bool Rules::evaluate(const json &values)
 {
-    Lock_RD lock(mtRules);
+    const auto evaluationValues = UANLZ::JSON::toMantids(values);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
 
     bool activated = false;
     for (sRule * rule: rules)
     {
-        if (rule->expr->evaluate(values))
+        if (rule->expr->evaluate(evaluationValues))
         {
             // Activate
             activated = true;
@@ -229,18 +230,18 @@ bool Rules::evaluate(const json &values)
             {
                 if (actions.find(rule->actionId) == actions.end())
                 {
-                    LOG_APP->log0(__func__,Logs::LEVEL_ERR,"Rule '%s' activated, but action '%s' not found", rule->name.c_str(), rule->actionId.c_str());
+                    LOG_APP->log0(__func__,Logs::ERROR,"Rule '%s' activated, but action '%s' not found", rule->name.c_str(), rule->actionId.c_str());
                 }
                 else
                 {
-                    LOG_APP->log0(__func__,Logs::LEVEL_DEBUG,"Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
+                    LOG_APP->log0(__func__,Logs::DEBUG,"Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
                     exec(rule->name, actions[rule->actionId]->file,  actions[rule->actionId]->vArguments,values);
                     if (rule->ruleAction == RULE_ACTION_EXECANDABORT) break;
                 }
             }
             else if (rule->ruleAction == RULE_ACTION_ABORT)
             {
-                LOG_APP->log0(__func__,Logs::LEVEL_DEBUG,"Rule '%s' activated, aborting next rules...", rule->name.c_str());
+                LOG_APP->log0(__func__,Logs::DEBUG,"Rule '%s' activated, aborting next rules...", rule->name.c_str());
                 break;
             }
         }
@@ -250,19 +251,19 @@ bool Rules::evaluate(const json &values)
 
 bool Rules::editRule(uint32_t pos, const json &jConfig)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _addRule(pos,jConfig,true);
 }
 
 bool Rules::editAction(const json &jConfig)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _addAction(jConfig,true);
 }
 
 bool Rules::ruleUp(uint32_t pos)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
 
     if (pos>=rules.size()) return false;
     if (pos==0) return true;
@@ -277,7 +278,7 @@ bool Rules::ruleUp(uint32_t pos)
 
 bool Rules::ruleDown(uint32_t pos)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
 
     if (pos>=rules.size()) return false;
     if (pos==(rules.size()-1)) return true;
@@ -292,25 +293,25 @@ bool Rules::ruleDown(uint32_t pos)
 
 bool Rules::addRule(uint32_t pos, const json &jConfig)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _addRule(pos,jConfig);
 }
 
 bool Rules::addAction(const json &jConfig)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _addAction(jConfig);
 }
 
 bool Rules::removeRule(const uint32_t &pos)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _removeRule(pos);
 }
 
 bool Rules::removeAction(const string & actionName)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     return _removeAction(actionName);
 }
 
@@ -344,7 +345,7 @@ void Rules::threadEvaluation(const uint32_t &threadId)
             }
             else
             {
-                LOG_APP->log0(__func__,Logs::LEVEL_ERR,"Evaluation Thread #%d received invalid JSON...", threadId);
+                LOG_APP->log0(__func__,Logs::ERROR,"Evaluation Thread #%d received invalid JSON...", threadId);
                 badFormatLines++;
             }
             delete s;
@@ -356,7 +357,7 @@ void Rules::threadEvaluation(const uint32_t &threadId)
         }
         else
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_DEBUG,"Evaluation Thread #%d timed out (no elements)...", threadId);
+            LOG_APP->log0(__func__,Logs::DEBUG,"Evaluation Thread #%d timed out (no elements)...", threadId);
         }
     }
 }
@@ -457,12 +458,12 @@ string Rules::getValueForVar(const string &var, const string &ruleName, const js
         {
             return ruleName;
         }
-        LOG_APP->log0(__func__,Logs::LEVEL_DEBUG,"Invalid Argument Variable '%s' on rule '%s'", var.c_str(),ruleName.c_str());
+        LOG_APP->log0(__func__,Logs::DEBUG,"Invalid Argument Variable '%s' on rule '%s'", var.c_str(),ruleName.c_str());
         return "INVALID_VARGUMENT_VARIABLE";
     }
     else
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_DEBUG,"Invalid Argument Variable '%s' on rule '%s'", var.c_str(),ruleName.c_str());
+        LOG_APP->log0(__func__,Logs::DEBUG,"Invalid Argument Variable '%s' on rule '%s'", var.c_str(),ruleName.c_str());
         return "INVALID_VARGUMENT_VARIABLE";
     }
 
@@ -477,13 +478,13 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
     {
         if (pos >= rules.size())
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_WARN,"Rule '%d': pos not found during replacement.",pos);
+            LOG_APP->log0(__func__,Logs::WARNING,"Rule '%d': pos not found during replacement.",pos);
             return false;
         }
         // TODO: match internal uniqid..
     }
 
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Creating Rule '%s'",name.c_str());
+    LOG_APP->log0(__func__,Logs::INFO,"Creating Rule '%s'",name.c_str());
 
     std::string filter = JSON_ASSTRING(jConfig,"filter","");
 
@@ -494,9 +495,9 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
     rule->expr = new JSONEval( filter );
     rule->jOriginalVal = jConfig;
 
-    if (!rule->expr->getIsCompiled())
+    if (!rule->expr->isCompiled())
     {
-        LOG_APP->log0(__func__,Logs::LEVEL_ERR,"Rule '%s': 'Filter' compilation failed with '%s'.",name.c_str(), rule->expr->getLastCompilerError().c_str());
+        LOG_APP->log0(__func__,Logs::ERROR,"Rule '%s': 'Filter' compilation failed with '%s'.",name.c_str(), rule->expr->getLastCompilerError().c_str());
         delete rule;
         return false;
     }
@@ -509,7 +510,7 @@ bool Rules::_addRule(uint32_t pos, const json &jConfig, bool replace)
 
         if (actions.find(rule->actionId) == actions.end())
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_ERR,"Rule '%s': 'Filter' referenced unexistent action '%s'.",name.c_str(), rule->actionId.c_str());
+            LOG_APP->log0(__func__,Logs::ERROR,"Rule '%s': 'Filter' referenced unexistent action '%s'.",name.c_str(), rule->actionId.c_str());
             delete rule;
             return false;
         }
@@ -550,7 +551,7 @@ bool Rules::_addAction(const json &jConfig, bool replace)
     {
         if (actions.find(actionName) != actions.end())
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_WARN,"Action '%s': duplicated name.",actionName.c_str());
+            LOG_APP->log0(__func__,Logs::WARNING,"Action '%s': duplicated name.",actionName.c_str());
             return false;
         }
     }
@@ -558,12 +559,12 @@ bool Rules::_addAction(const json &jConfig, bool replace)
     {
         if (actions.find(actionName) == actions.end())
         {
-            LOG_APP->log0(__func__,Logs::LEVEL_WARN,"Action '%s': name not found during replacement.",actionName.c_str());
+            LOG_APP->log0(__func__,Logs::WARNING,"Action '%s': name not found during replacement.",actionName.c_str());
             return false;
         }
     }
 
-    LOG_APP->log0(__func__,Logs::LEVEL_INFO,"Creating Action '%s' - '%s'",actionName.c_str(), actionDescription.c_str());
+    LOG_APP->log0(__func__,Logs::INFO,"Creating Action '%s' - '%s'",actionName.c_str(), actionDescription.c_str());
 
     sAction * action = new sAction;
     action->jOriginalVal = jConfig;
@@ -637,7 +638,7 @@ string Rules::getRandomTag(const string &str, uint64_t t)
 
 json Rules::getCurrentRunningActions()
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
     json r;
 
     uint32_t i=0;
@@ -649,7 +650,7 @@ json Rules::getCurrentRunningActions()
 
 json Rules::getCurrentRunningAction(const string &sActionName)
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
     json r;
 
     if (actions.find(sActionName) == actions.end())
@@ -660,7 +661,7 @@ json Rules::getCurrentRunningAction(const string &sActionName)
 
 json Rules::getCurrentRunningRule(const uint32_t &pos)
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
     json r;
 
     if (pos>=rules.size())
@@ -671,7 +672,7 @@ json Rules::getCurrentRunningRule(const uint32_t &pos)
 
 json Rules::getCurrentRunningRules()
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
 
     json r;
 
@@ -683,31 +684,31 @@ json Rules::getCurrentRunningRules()
 
 bool Rules::getActionsModified()
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
     return bActionsModified;
 }
 
 bool Rules::getRulesModified()
 {
-    Lock_RD lock(mtRules);
+    std::shared_lock<std::shared_mutex> lock(mtRules);
     return bRulesModified;
 }
 
 void Rules::setActionsFilePath(const std::string &value)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     sActionsFilePath = value;
 }
 
 void Rules::setRulesFilePath(const std::string &value)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     sRulesFilePath = value;
 }
 
 void Rules::setMaxQueuePopTimeInMilliseconds(const uint64_t &value)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     maxQueuePopTimeInMilliseconds = value;
 }
 
@@ -773,6 +774,6 @@ json Rules::readActionsFileConfig()
 
 void Rules::setMaxQueuePushWaitTimeInMilliseconds(const uint64_t &value)
 {
-    Lock_RW lock(mtRules);
+    std::unique_lock<std::shared_mutex> lock(mtRules);
     maxQueuePushWaitTimeInMilliseconds = value;
 }
