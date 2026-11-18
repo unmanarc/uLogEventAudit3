@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Rules";
@@ -58,15 +58,10 @@
 
 function saveToDisk()
 {
-  var method = "remote.control";
-  var payloadData = { "target": "ALERTS", 
+  var payloadData = { "target": "ALERTS",
                       "remoteMethod": "control.SaveRunningRules",
                     }
-  $.ajax({
-    url: '/japi_exec?method=' + method,
-    type: 'POST',
-    headers: { "CSRFToken": csrfToken },
-    data: { payload: JSON.stringify(payloadData) },
+  auditRequest(payloadData, {
     success: function (result) {
       if (result == true)
       {
@@ -98,7 +93,7 @@ function drawRules(result)
       ` <tr>
             <td id="ruleName${i}"></td>
             <td id="action${i}"></td>
-            <td align="right"> 
+            <td align="right">
               <a href="javascript:ruleCmd('${i}', 'control.RuleUp')" class="btn btn-secondary btn-sm" role="button">&#8679;</a>
               <a href="javascript:ruleCmd('${i}', 'control.RuleDown')" class="btn btn-secondary btn-sm" role="button">&#8681;</a>
               <a href="./rule-add?${i}" class="btn btn-info btn-sm" role="button">Edit...</a>
@@ -115,18 +110,13 @@ function drawRules(result)
 
 function ruleCmd(ruleId, cmd)
 {
-  var method = "remote.control";
-  var payloadData = { "target": "ALERTS", 
+  var payloadData = { "target": "ALERTS",
                       "remoteMethod": cmd,
                       "payload" : {
                         "pos" : parseInt(ruleId)
-                      } 
+                      }
                     }
-  $.ajax({
-    url: '/japi_exec?method=' + method,
-    type: 'POST',
-    headers: { "CSRFToken": csrfToken },
-    data: { payload: JSON.stringify(payloadData) },
+  auditRequest(payloadData, {
     success: function (result) {
       if (result == true)
       {
@@ -145,13 +135,8 @@ function ruleCmd(ruleId, cmd)
 
 function drawRunningRulesStart()
 {
-  var method = "remote.stats";
   var payloadData = { "target": "ALERTS", "remoteMethod": "stats.ReadRunningRules" }
-  $.ajax({
-    url: '/japi_exec?method=' + method,
-    type: 'POST',
-    headers: { "CSRFToken": csrfToken },
-    data: { payload: JSON.stringify(payloadData) },
+  auditRequest(payloadData, {
     success: function (result) {
       drawRules(result);
     },
@@ -163,13 +148,8 @@ function drawRunningRulesStart()
 
 function drawIfModified()
 {
-  var method = "remote.stats";
   var payloadData = { "target": "ALERTS", "remoteMethod": "stats.AreRulesModified" }
-  $.ajax({
-    url: '/japi_exec?method=' + method,
-    type: 'POST',
-    headers: { "CSRFToken": csrfToken },
-    data: { payload: JSON.stringify(payloadData) },
+  auditRequest(payloadData, {
     success: function (result) {
       if (result == true)
       {
@@ -191,5 +171,5 @@ function drawIfModified()
 </script>
 
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Actions";
@@ -18,7 +18,7 @@
   <table width=100% align="center">
     <tr>
       <td>
-  
+
         <div class="alert alert-warning fade show" role="alert" id="saveAlert" style="visibility: collapse; display: none;">
           <strong>Alert!</strong> <br>
           This running configuration has not been saved to disk.
@@ -26,9 +26,9 @@
             <a href="javascript:saveToDisk();" class="btn btn-warning btn-sm" role="button">Save To Disk...</a>
           </div>
         </div>
-  
+
         <br>
-  
+
         <table class="table table-hover">
           <thead>
             <tr>
@@ -37,36 +37,31 @@
               <th align="right"></th>
             </tr>
           </thead>
-  
+
           <tbody id="actionsBody">
-  
+
           </tbody>
         </table>
-  
+
         <hr>
         <div class="d-flex flex-row-reverse">
           <!--          <a href="./action-upload" class="btn btn-info btn-sm" role="button">Upload Actions...</a> &nbsp;-->
           <a href="./action-add" class="btn btn-success btn-sm" role="button">Add New...</a>
         </div>
-  
+
       </td>
     </tr>
-  
+
   </table>
 
 <script>
 
   function saveToDisk()
   {
-    var method = "remote.control";
-    var payloadData = { "target": "ALERTS", 
+    var payloadData = { "target": "ALERTS",
                         "remoteMethod": "control.SaveRunningActions",
                       }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
         {
@@ -98,7 +93,7 @@
         ` <tr>
               <td id="actionName${i}"></td>
               <td id="actionDescription${i}"></td>
-              <td align="right"> 
+              <td align="right">
                 <a href="./action-add?${actionId}" class="btn btn-info btn-sm" role="button">Edit...</a>
                 <a href="javascript:actionRemove('${actionId}')" class="btn btn-danger btn-sm" role="button">Remove</a>
               </td>
@@ -114,18 +109,13 @@
   function actionRemove(actionId)
   {
     let actionName = atob(actionId);
-    var method = "remote.control";
-    var payloadData = { "target": "ALERTS", 
+    var payloadData = { "target": "ALERTS",
                         "remoteMethod": "control.RemoveAction",
                         "payload" : {
                           "name" : actionName
-                        } 
+                        }
                       }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
         {
@@ -144,13 +134,8 @@
 
   function drawRunningActionsStart()
   {
-    var method = "remote.stats";
     var payloadData = { "target": "ALERTS", "remoteMethod": "stats.ReadRunningActions" }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         drawActions(result);
       },
@@ -162,13 +147,8 @@
 
   function drawIfModified()
   {
-    var method = "remote.stats";
     var payloadData = { "target": "ALERTS", "remoteMethod": "stats.AreActionsModified" }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
         {
@@ -189,5 +169,5 @@
 
 </script>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

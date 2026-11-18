@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/log2json/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/log2json/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Log-&gt;JSON Dissector &#9658; Syslog+Auditd Inputs";
@@ -42,7 +42,7 @@
             $(`#span-log2json-input-description-${i}`).text(input["description"]);
             $(`#span-log2json-input-proclines-${i}`).text(input["processedLinesCount"]);
             $(`#span-log2json-input-invlines-${i}`).text(input["invalidLinesCount"]);
-            
+
             let x = 0;
             for (let client of input["clients"]) {
                 $("#tbody-log2json-input-" + i).append(
@@ -58,13 +58,8 @@
     }
 
     function mainview_log2json_inputs_start() {
-        var method = "remote.stats";
         var payloadData = { "target": "LOG2JSON", "remoteMethod": "stats.Inputs" }
-        $.ajax({
-            url: '/japi_exec?method=' + method,
-            type: 'POST',
-            headers: { "CSRFToken": csrfToken },
-            data: { payload: JSON.stringify(payloadData) },
+        auditRequest(payloadData, {
             success: function (result) {
                 drawLog2JSONInputStats(result["inputs"]);
             },
@@ -78,5 +73,5 @@
     }
 </script>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

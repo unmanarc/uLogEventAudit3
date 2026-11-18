@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Input";
@@ -12,9 +12,7 @@
   }
 
   function addInput() {
-
-    var method = "remote.control";
-    var payloadData = { "target": "ALERTS", 
+    var payloadData = { "target": "ALERTS",
                         "remoteMethod": "control.AddInputToFileConfig",
                         "payload": {
                           "Description" : $("#inputDescription").val(),
@@ -22,11 +20,7 @@
                           "ListenPort" : parseInt($("#inputPort").val())
                         }
                       }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
           document.location = "./inputsconfig";
@@ -66,5 +60,5 @@
     <button class="btn btn-success btn-sm" role="button"  onclick="javascript:addInput()">Add...</a>
   </div>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

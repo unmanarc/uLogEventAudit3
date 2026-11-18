@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Inputs Configuration";
@@ -14,16 +14,11 @@
 
   function reloadAlerts()
   {
-    var method = "remote.control";
-    var payloadData = { "target": "ALERTS", 
+    var payloadData = { "target": "ALERTS",
                         "remoteMethod": "control.ReloadApp",
                         "payload": {}
                       }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
         {
@@ -77,20 +72,13 @@
   function removeInput(localId)
   {
     let id =  document.getElementById(`span-alerts-inputsconfig-id-${localId}`).value;
-
-
-    var method = "remote.control";
-    var payloadData = { "target": "ALERTS", 
+    var payloadData = { "target": "ALERTS",
                         "remoteMethod": "control.RemInputFromFileConfig",
                         "payload": {
                           "id" : id
                         }
                       }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
           document.location = "./inputsconfig";
@@ -135,13 +123,8 @@
   }
 
   function mainview_alerts_inputs_start() {
-    var method = "remote.stats";
     var payloadData = { "target": "ALERTS", "remoteMethod": "stats.ReadInputsFileConfig" }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result["modified"] == true)
         {
@@ -162,5 +145,5 @@
   }
 </script>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

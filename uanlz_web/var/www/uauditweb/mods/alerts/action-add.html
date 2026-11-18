@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Action";
@@ -18,7 +18,6 @@
   }
 
   function displayAction(actionId) {
-    var method = "remote.stats";
 
     var payloadData = {
       "target": "ALERTS",
@@ -28,11 +27,7 @@
       }
     }
 
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == null)
         {
@@ -51,7 +46,7 @@
         document.getElementById("actionDescription").value = result['description'];
         document.getElementById("actionExecPath").value = result['path'];
         document.getElementById("inputArg0").value = result['args'][0];
-        
+
         for(var i = 1; i < result['args'].length; i++) {
           addNewArgument();
           document.getElementById(`inputArg${i}`).value = result['args'][i];
@@ -67,8 +62,6 @@
 
   function addAction(editMode) {
 
-    var method = "remote.control";
-    
     if (editMode == "add")
     {
       remoteMethod = "control.AddAction";
@@ -94,11 +87,7 @@
       payloadData["payload"]["args"][i] = $(`#inputArg${i}`).val();
     }
 
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
           document.location = "./actions/";
@@ -185,5 +174,5 @@
   <button class="btn btn-success " id="EditButton" role="button" onclick="javascript:addAction('edit')" style="visibility: collapse; display: none;">Edit...</a>
 </div>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

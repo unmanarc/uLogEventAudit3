@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/log2json/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/log2json/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Log-&gt;JSON Dissector &#9658; Syslog Incoming Auditd Events";
@@ -24,39 +24,39 @@
             <span class="h2 font-weight-bold" id=log2json-eventsQueuePercentage1></span> <span><sup class="small">%</sup></span>
           </div>
         </div>
-  
+
         <br>
         <div class="font-weight-bold text-center mb-4" id=log2json-eventsQueueSize>1/x</span>
-  
+
       </td>
-  
+
       <td width="75%">
-  
+
         <h3> Values: </h3><br>
-  
+
         <table class="table table-hover">
-  
+
           <thead>
             <tr>
               <th>Auditd JSON Queue Speed</th>
               <th></th>
             </tr>
           </thead>
-  
+
           <tbody>
             <tr>
               <td>Events - Last 10 Second</td>
               <td id="log2json-queueInLast10Sec">x</td>
             </tr>
           </tbody>
-  
+
           <thead>
             <tr>
               <th>Auditd JSON Processing</th>
               <th></th>
             </tr>
           </thead>
-  
+
           <tbody>
             <tr>
               <td>Dropped In Queue (Full)</td>
@@ -67,9 +67,9 @@
               <td id="log2json-total">x</td>
             </tr>
           </tbody>
-  
+
         </table>
-  
+
       </td>
     </tr>
   </table>
@@ -94,13 +94,8 @@ $(`#log2json-eventsQueueSize`).text( filterStats["eventsQueue"]["curSize"] + "/"
 }
 
   function mainview_log2json_events_start() {
-    var method = "remote.stats";
     var payloadData = { "target": "LOG2JSON", "remoteMethod": "stats.OutputsDistributionThreads" }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         drawLog2JSONFilterStats(result["events"]);
       },
@@ -114,5 +109,5 @@ $(`#log2json-eventsQueueSize`).text( filterStats["eventsQueue"]["curSize"] + "/"
   }
 </script>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->

@@ -1,7 +1,7 @@
-<%include:/inc.header.html%>
-<%include:/inc.layout.leftpanel.header.html%>
-<%include:/mods/alerts/inc.links.html%>
-<%include:/inc.layout.leftpanel.middle.html%>
+<!--<%include:/inc.header.html%>-->
+<!--<%include:/inc.layout.leftpanel.header.html%>-->
+<!--<%include:/mods/alerts/inc.links.html%>-->
+<!--<%include:/inc.layout.leftpanel.middle.html%>-->
 
 <script>
   document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Rule";
@@ -15,7 +15,6 @@
 
 
   function displayRule(pos) {
-    var method = "remote.stats";
 
     var payloadData = {
       "target": "ALERTS",
@@ -25,11 +24,7 @@
       }
     }
 
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == null)
         {
@@ -80,23 +75,17 @@
   }
 
   function loadActions() {
-
-    var method = "remote.stats";
     var payloadData = {
       "target": "ALERTS",
       "remoteMethod": "stats.ReadRunningActions"
     }
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
 
         if (result != null)
         {
 
-        
+
         document.getElementById("actions").innerHTML = "";
         let i = 0;
 
@@ -145,7 +134,7 @@
 
     if (document.getElementById("bEXECANDABORT").checked) action = "EXECANDABORT";
     else if (document.getElementById("bABORT").checked) action = "ABORT";
-    
+
     if (editMode == "add")
     {
       remoteMethod = "control.AddRule";
@@ -154,8 +143,6 @@
     {
       remoteMethod = "control.EditRule";
     }
-
-    var method = "remote.control";
     var payloadData = {};
 
     if (document.getElementById("bEXECANDABORT").checked || document.getElementById("bEXEC").checked) {
@@ -188,11 +175,7 @@
       }
     }
 
-    $.ajax({
-      url: '/japi_exec?method=' + method,
-      type: 'POST',
-      headers: { "CSRFToken": csrfToken },
-      data: { payload: JSON.stringify(payloadData) },
+    auditRequest(payloadData, {
       success: function (result) {
         if (result == true)
           document.location = "./rules/";
@@ -269,5 +252,5 @@
 
 </div>
 
-<%include:/inc.layout.leftpanel.footer.html%>
-<%include:/inc.footer.html%>
+<!--<%include:/inc.layout.leftpanel.footer.html%>-->
+<!--<%include:/inc.footer.html%>-->
