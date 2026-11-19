@@ -25,6 +25,14 @@ function auditRequest(request, handlers = {}) {
         type: method,
         dataType: "json"
     };
+    const track = typeof auditRequestStarted === "function";
+    if (track) {
+        auditRequestStarted(method);
+        options.complete = (xhr, status) => {
+            auditRequestFinished(!["success", "notmodified", "nocontent"].includes(status));
+            if (handlers.complete) handlers.complete(xhr, status);
+        };
+    }
     if (method === "GET") {
         if (request.payload) options.url += "?" + encodeURIComponent(JSON.stringify(request.payload));
         return $.ajax(options);
@@ -36,16 +44,27 @@ function auditRequest(request, handlers = {}) {
     return $.ajax({url: API_BASE + "/session", dataType: "json", cache: false}).then(session => {
         options.headers = {"X-CSRF-Token": session.csrfToken};
         return $.ajax(options);
-    }, handlers.error || commonFunctionError);
+    }, xhr => {
+        if (track) auditRequestFinished(true);
+        (handlers.error || commonFunctionError)(xhr);
+    });
 }
 
 async function ajaxLoadInfo() {
+    const welcome = document.getElementById("welcome");
+    const displayName = typeof ufad3_accountPublicData !== "undefined"
+        ? ufad3_accountPublicData?.body?.displayName : null;
+    if (welcome && typeof displayName === "string" && displayName.trim()) {
+        welcome.textContent = displayName;
+    }
     try {
         const response = await fetch(API_BASE + "/session", {credentials: "same-origin", cache: "no-store"});
         if (!response.ok) { location.assign("/auth/retokenize/"); return; }
+        if (typeof auditStatus === "function") auditStatus("Session connected");
         if (auditHasScope("stats") && typeof auditReady === "function") auditReady();
     } catch (error) {
         showToast("Could not load the audit session", "error");
+        if (typeof auditStatus === "function") auditStatus("Connection failed · reload to retry", "error");
     }
 }
 
@@ -55,7 +74,15 @@ function showToast(message, type = "success") {
     toast.setAttribute("role", "status");
     const body = document.createElement("div");
     body.className = "toast-body";
-    body.textContent = message;
+    const text = document.createElement("span");
+    text.textContent = message;
+    body.appendChild(text);
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-close btn-close-white";
+    close.setAttribute("aria-label", "Dismiss notification");
+    close.setAttribute("data-bs-dismiss", "toast");
+    body.appendChild(close);
     toast.appendChild(body);
     document.querySelector(".toast-container").appendChild(toast);
     toast.addEventListener("hidden.bs.toast", () => toast.remove());

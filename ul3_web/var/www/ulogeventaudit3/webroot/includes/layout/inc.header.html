@@ -1,75 +1,87 @@
 <!doctype html>
-<html lang="en" class="h-100" data-bs-theme="auto">
+<html lang="en" data-bs-theme="light">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="">
-    <meta name="author" content="">
+    <meta name="description"
+        content="uLogEventAudit3 — logs, events and insight. Monitor event processing and manage your alert pipeline.">
     <title>uLogEventAudit3</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/images/icon.svg" />
-    <!-- Bootstrap core CSS -->
-    <link href="/assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
-    <link href="/assets/css/progress.css" rel="stylesheet" type="text/css">
+    <link rel="icon" type="image/svg+xml" href="/assets/images/icon.svg">
+    <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/css/progress.css" rel="stylesheet">
+    <link href="/assets/css/console.css" rel="stylesheet">
     <script src="/assets/js/jquery.min.js"></script>
     <script src="/assets/js/audit.js"></script>
+    <!-- imported auth assets: -->
+    <script src="/auth/assets/js/auth.js"></script>
 </head>
 
-
-
-
-<body onload="javascript:ajaxLoadInfo();" class="d-flex flex-column h-100">
-    <header>
-        <nav class="navbar navbar-expand-md navbar-dark bg-black fixed-top">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/"><img src="/assets/images/logo.svg" height="40" alt="uLogEventAudit3" /></a>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-                    <ul class="navbar-nav ml-auto">
-                        <li class="nav-item active">
-                            <div class="nav-link" id="welcome" style="color:white;">Welcome, {{#print_htmlescaped[$session.user]!}}</div>
-                        </li>
-                        <li class="nav-item active">
-                            <div class="nav-link" style="color:greenyellow;">-</div>
-                        </li>
-                        {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
-                                data-bs-toggle="dropdown" aria-expanded="false" style="color:white;">
-                                Subsystems
-                            </a>
-                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-                                <li><a class="dropdown-item" href="/mods/log2json/">&#9658; Log-&gt;JSON Dissectors</a></li>
-                                <li><a class="dropdown-item" href="/mods/alerts/">&#9658; Rules/Alerts</a></li>
-                            </ul>
-                        </li>
-
-                        {{/if}}{{/foreach}}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="dropdown01" data-bs-toggle="dropdown"
-                                aria-haspopup="true" aria-expanded="false" style="color:white;">
-                                My Account
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown01">
-
-                                <li><a class="dropdown-item" onclick="javascript:logout()">Logout</a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
+<body onload="ajaxLoadInfo()">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="app-header">
+        <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-controls="app-sidebar"
+            aria-expanded="false" aria-label="Open navigation">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+        <a class="app-brand" href="/" aria-label="uLogEventAudit3 home"><img src="/assets/images/logo.svg" width="255"
+                height="48" alt="uLogEventAudit3 — Logs, events, insight"></a>
+        <div class="header-context">Audit workspace</div>
+        <div class="account-menu dropdown">
+            <button class="account-button dropdown-toggle" id="profile-dropdown" type="button" data-bs-toggle="dropdown"
+                aria-expanded="false">
+                <span class="account-avatar" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="1.7">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 22v-3a8 8 0 0 1 16 0v3" />
+                    </svg></span>
+                <span class="account-label">My Profile ( <strong><span id="welcome">{{#print_htmlescaped[$session.user]!}}</span></strong> )</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profile-dropdown">
+                <li><a class="dropdown-item" href="https://iamuser.localhost:11443/" target="_blank" rel="noopener noreferrer">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <circle cx="10" cy="7" r="4" /><path d="M3 21v-3a7 7 0 0 1 11-5M16 21l5-5-3-3-5 5v3z" />
+                        </svg> Manage My Account</a></li>
+                <li><button class="dropdown-item" type="button" onclick="logout()">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                            <path d="M9 21H4V3h5M10 12h11M16 7l5 5-5 5" />
+                        </svg> Sign Out</button></li>
+            </ul>
+        </div>
     </header>
-
-    <ul id="audit-scopes" hidden>
-{{#foreach [$session.scopes as scope]}}<li>{{#print_htmlescaped[$scope]!}}</li>{{/foreach}}
-</ul>
-<main role="main" style="padding-top: 68px" class="flex-shrink-0">
-        <center>
-            <h4 style="color: black;" id="apptitle"> uLogEventAudit3 </h4>
-        </center>
-        <hr>
+    <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Close navigation" hidden></button>
+    <aside class="app-sidebar" id="app-sidebar" aria-label="Workspace navigation">
+        <nav>
+            <a class="sidebar-home nav-link" href="/" data-page="home"><span class="nav-symbol"
+                    aria-hidden="true">⌂</span>Overview</a>
+            {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
+            <a class="nav-section-label" href="/mods/alerts/stats.html">Rules &amp; alerts</a>
+            <ul class="nav flex-column">{{#render[/includes/alerts/inc.links.html]!}}</ul>
+            <a class="nav-section-label" href="/mods/log2json/events.html">Log to JSON</a>
+            <ul class="nav flex-column">{{#render[/includes/log2json/inc.links.html]!}}</ul>
+            {{/if}}{{/foreach}}
+        </nav>
+        <div class="sidebar-footer"><span class="sidebar-mark" aria-hidden="true">u</span>
+            <div>uLogEventAudit3<small>Logs. Events. Insight.</small></div>
+        </div>
+    </aside>
+    <ul id="audit-scopes" hidden>{{#foreach [$session.scopes as scope]}}<li>{{#print_htmlescaped[$scope]!}}</li>
+        {{/foreach}}</ul>
+    <main class="workspace" id="main-content" tabindex="-1">
+        <div class="page-heading">
+            <div>
+                <div class="page-eyebrow" id="page-section">Workspace</div>
+                <h1 id="apptitle">Overview</h1>
+                <p id="page-description">Your event pipeline at a glance.</p>
+            </div>
+            <div class="page-tools"><span class="data-status" id="data-status" role="status"
+                    aria-live="polite">Connecting…</span><button class="btn btn-outline-secondary refresh-button"
+                    id="refresh-data" type="button" hidden><svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path d="M20 7v5h-5M4 17v-5h5" />
+                        <path d="M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9" />
+                    </svg>Refresh</button></div>
+        </div>

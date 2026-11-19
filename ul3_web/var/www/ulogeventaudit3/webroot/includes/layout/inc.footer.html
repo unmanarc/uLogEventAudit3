@@ -1,37 +1,11 @@
-
-</main>
-
-<footer class="footer mt-auto py-3 bg-body-tertiary">
-    <center>
-        <span class="text-muted"> uLogEventAudit3</span>
-        <span id="version">{{#print_htmlescaped[$software.version]!}}</span>
-        <span>
-- <a href="https://github.com/unmanarc/uAuditAnalyzer3"> Go
-            To uLogEventAudit3
-            Project Page...</a>
-        </span>
-    </center>
-</footer>
-
-
-
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-
-</div>
-
-
-
-<!-- Footer -->
-
-<!-- Bootstrap core JavaScript
-  ================================================== -->
-<!-- Placed at the end of the document so the pages load faster -->
-<script src="/assets/js/bootstrap.bundle.min.js"></script>
-
-<script src="/assets/js/progress.js"></script>
-<script src="/auth/assets/js/auth.js"></script>
-
-
+<footer class="app-footer"><span>uLogEventAudit3 <span id="version">{{#print_htmlescaped[$software.version]!}}</span></span><a href="https://github.com/unmanarc/uLogEventAudit3" target="_blank" rel="noopener noreferrer">Project &amp; documentation</a></footer>
+    </main>
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="false"></div>
+    <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+        <form method="dialog"><div class="dialog-icon" aria-hidden="true">!</div><h2 id="confirm-title">Remove this item?</h2><p id="confirm-message"></p><div class="form-actions"><button class="btn btn-outline-secondary" value="cancel" autofocus>Cancel</button><button class="btn btn-danger" value="confirm">Remove</button></div></form>
+    </dialog>
+    <script src="/assets/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/js/progress.js"></script>
+    <script src="/assets/js/console.js"></script>
 </body>
-
 </html>
