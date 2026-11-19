@@ -15,10 +15,15 @@ struct AuditLine
     std::string sourceIp;
     std::string type;
     std::string payload;
-    std::tuple<time_t, uint32_t, uint64_t> eventId{};
+    std::tuple<time_t, uint32_t, uint64_t> eventId;
 };
 
-enum class AuditLineStatus { Parsed, Ignored, Invalid };
+enum class AuditLineStatus : std::uint8_t
+{
+    Parsed,
+    Ignored,
+    Invalid
+};
 
 /**
  * @brief Decode supported syslog framing and the auditd event identifier.

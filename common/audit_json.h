@@ -4,6 +4,7 @@
  */
 #pragma once
 #include <Mantids30/DataFormat/JSON/json.h>
+#include <cstddef>
 #include <istream>
 #include <iterator>
 #include <string>
@@ -23,7 +24,9 @@ inline bool readConfigArray(std::istream &input, boost::json::value &result)
     boost::system::error_code error;
     auto parsed = boost::json::parse(document, error);
     if (input.bad() || error || (!parsed.is_array() && !parsed.is_null()))
+    {
         return false;
+    }
     result = parsed.is_null() ? boost::json::value(boost::json::array{}) : std::move(parsed);
     return true;
 }
@@ -36,7 +39,7 @@ inline bool readConfigArray(std::istream &input, boost::json::value &result)
  */
 inline void appendStyled(std::string &output, const boost::json::value &value, unsigned depth)
 {
-    const auto indent = [&](unsigned level) { output.append(level * 3, ' '); };
+    const auto indent = [&](unsigned level) { output.append(static_cast<std::string::size_type>(level) * 3, ' '); };
     const auto *object = value.if_object();
     if (object && !object->empty())
     {
@@ -45,7 +48,9 @@ inline void appendStyled(std::string &output, const boost::json::value &value, u
         for (const auto &member : *object)
         {
             if (!first)
+            {
                 output += ",\n";
+            }
             first = false;
             indent(depth + 1);
             output += boost::json::serialize(boost::json::value(member.key()));
@@ -63,7 +68,9 @@ inline void appendStyled(std::string &output, const boost::json::value &value, u
         for (const auto &element : value.as_array())
         {
             if (!first)
+            {
                 output += ",\n";
+            }
             first = false;
             indent(depth + 1);
             appendStyled(output, element, depth + 1);
@@ -73,7 +80,9 @@ inline void appendStyled(std::string &output, const boost::json::value &value, u
         output += ']';
     }
     else
+    {
         output += Mantids30::DataFormat::JSON::toString(value);
+    }
 }
 
 /**
