@@ -6,6 +6,7 @@ Checks: >
   performance-*,
   portability-*,
   modernize-*,
+  google-readability-casting,
   -modernize-use-auto,
   -bugprone-assignment-in-if-condition,
   -cppcoreguidelines-special-member-functions,
