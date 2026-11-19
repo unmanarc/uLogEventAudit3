@@ -26,7 +26,7 @@ void runGarbageCollector()
     EventsManager::collectExpiredEvents();
 }
 
-EventsManager::EventsManager() {}
+EventsManager::EventsManager() = default;
 
 boost::json::array EventsManager::getStats()
 {
@@ -52,7 +52,9 @@ void EventsManager::collectExpiredEvents()
         uint64_t collectionIntervalSeconds = Globals::getMainConfig()->get<uint64_t>("GC.GCPeriodInSecs", 5);
 
         for (const auto &entry : snapshotHosts())
+        {
             entry.second->flushExpiredEvents(maxEventAgeSeconds);
+        }
         sleep(collectionIntervalSeconds);
     }
 }
@@ -66,7 +68,7 @@ void EventsManager::insertClassContents(const AuditHostId &hostId, const std::tu
 {
     std::shared_ptr<AuditHost> hostState;
     {
-        std::lock_guard<std::mutex> lock(hostsMutex);
+        std::scoped_lock lock(hostsMutex);
         auto position = hostsById.find(hostId);
         if (position == hostsById.end())
         {
@@ -83,7 +85,7 @@ void EventsManager::insertClassContents(const AuditHostId &hostId, const std::tu
 
 EventsManager::HostMap EventsManager::snapshotHosts()
 {
-    std::lock_guard<std::mutex> lock(hostsMutex);
+    std::scoped_lock lock(hostsMutex);
     // Copy owners, not event buffers; callers inspect each host under its own lock.
     return hostsById;
 }

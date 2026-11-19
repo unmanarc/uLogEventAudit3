@@ -54,11 +54,11 @@ public:
     /**
      * @brief Return the number of host events rejected by the distribution queue.
      */
-    uint64_t getDroppedEventsCount() const;
+    [[nodiscard]] uint64_t getDroppedEventsCount() const;
     /**
      * @brief Return the number of host events accepted by the distribution queue.
      */
-    uint64_t getProcessedEventsCount() const;
+    [[nodiscard]] uint64_t getProcessedEventsCount() const;
 
 private:
     bool enforceMaxAge;

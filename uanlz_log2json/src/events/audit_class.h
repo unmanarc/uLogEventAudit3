@@ -42,7 +42,7 @@ public:
     /**
      * @brief Return the auditd record type, such as EXECVE or PATH.
      */
-    std::string getClassTypeName() const;
+    [[nodiscard]] std::string getClassTypeName() const;
     /**
      * @brief Set the auditd record type used to interpret field values.
      * @param value Auditd record type name.

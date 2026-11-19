@@ -73,7 +73,7 @@ void runDistributionCounters()
     }
 }
 
-EventDistribution::EventDistribution() {}
+EventDistribution::EventDistribution() = default;
 
 boost::json::object EventDistribution::getStats()
 {
@@ -110,9 +110,13 @@ bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditEvent> event)
 {
     bool queued = eventsQueue.push(event.get(), pushTimeoutMs);
     if (queued)
-        event.release(); // Ownership transfers to Mantids30 only on success.
+    {
+        static_cast<void>(event.release()); // Ownership transfers to Mantids30 only on success.
+    }
     else
+    {
         eventsDropped++;
+    }
     return queued;
 }
 

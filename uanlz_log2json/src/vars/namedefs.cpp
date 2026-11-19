@@ -9,7 +9,7 @@ using namespace UANLZ::LOG2JSON::AuditdEvents;
 std::set<std::string> NameDefs::textVariableNames;
 std::set<std::string> NameDefs::terminalEventTypes;
 
-NameDefs::NameDefs() {}
+NameDefs::NameDefs() = default;
 
 void NameDefs::init()
 {

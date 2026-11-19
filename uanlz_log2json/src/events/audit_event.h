@@ -61,7 +61,7 @@ public:
     /**
      * @brief Return the audit timestamp, milliseconds and 64-bit serial number.
      */
-    std::tuple<time_t, uint32_t, uint64_t> getEventId() const;
+    [[nodiscard]] std::tuple<time_t, uint32_t, uint64_t> getEventId() const;
     /**
      * @brief Set the timestamp and serial number identifying this event.
      * @param value Timestamp and serial number to store.
@@ -71,7 +71,7 @@ public:
     /**
      * @brief Return the hostname and source address associated with this event.
      */
-    AuditHostId getHostId() const;
+    [[nodiscard]] AuditHostId getHostId() const;
     /**
      * @brief Associate the event or host buffer with its hostname and source address.
      * @param value Hostname and source address to associate with the buffer or event.

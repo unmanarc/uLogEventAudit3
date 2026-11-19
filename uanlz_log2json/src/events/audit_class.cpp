@@ -80,7 +80,9 @@ boost::json::object AuditClass::getJson()
                 commandLine += displayValue + " ";
             }
             if (!commandLine.empty())
+            {
                 commandLine.pop_back();
+            }
             return boost::json::object{{"argc", argc->second.getDisplayValue()}, {"argv", std::move(arguments)}, {"cmdline", commandLine}};
         }
     }
@@ -109,7 +111,9 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
         std::array<char, 128> data{};
         const auto addressSize = variableValue.size() / 2;
         for (size_t index = 0; index < addressSize; ++index)
-            data[index] = decodeHexByte(variableValue.data() + 2 * index);
+        {
+            data[index] = static_cast<char>(decodeHexByte(variableValue.data() + 2 * index));
+        }
 
         // Socket records are byte sequences; copy into aligned types before reading fields.
         sa_family_t socketFamily{};
@@ -119,12 +123,16 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
         case AF_INET:
         {
             if (addressSize < sizeof(sockaddr_in))
+            {
                 return;
+            }
             sockaddr_in address{};
             std::memcpy(&address, data.data(), sizeof(address));
             char addressText[INET_ADDRSTRLEN]{};
             if (!inet_ntop(AF_INET, &address.sin_addr, addressText, sizeof(addressText)))
+            {
                 return;
+            }
             family = "AF_INET";
             port = ntohs(address.sin_port);
             ipAddress = addressText;
@@ -133,12 +141,16 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
         case AF_INET6:
         {
             if (addressSize < sizeof(sockaddr_in6))
+            {
                 return;
+            }
             sockaddr_in6 address{};
             std::memcpy(&address, data.data(), sizeof(address));
             char addressText[INET6_ADDRSTRLEN]{};
             if (!inet_ntop(AF_INET6, &address.sin6_addr, addressText, sizeof(addressText)))
+            {
                 return;
+            }
             family = "AF_INET6";
             port = ntohs(address.sin6_port);
             ipAddress = addressText;
@@ -148,7 +160,9 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
         {
             constexpr auto offset = offsetof(sockaddr_un, sun_path);
             if (addressSize < offset)
+            {
                 return;
+            }
             sockaddr_un address{};
             std::memcpy(&address, data.data(), std::min(addressSize, sizeof(address)));
             const auto length = std::min(addressSize - offset, sizeof(address.sun_path));
@@ -163,8 +177,10 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
 
         variablesByName["family"].parse(classTypeName, "family", family);
         variablesByName["ipaddr"].parse(classTypeName, "ipaddr", ipAddress);
-        if (path.size())
+        if (!path.empty())
+        {
             variablesByName["unix_path"].parse(classTypeName, "unix_path", path);
+        }
         variablesByName["port"].parse(classTypeName, "port", to_string(port));
     }
 }

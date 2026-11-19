@@ -10,7 +10,7 @@ std::unique_ptr<Mantids30::Runtime::Logs::AppLog> Globals::appLog;
 std::mutex Globals::databaseMutex, Globals::directoriesMutex;
 boost::property_tree::ptree Globals::mainConfig;
 
-Globals::Globals() {}
+Globals::Globals() = default;
 
 Mantids30::Runtime::Logs::AppLog *Globals::getAppLog()
 {

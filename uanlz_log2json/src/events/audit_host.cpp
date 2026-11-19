@@ -55,15 +55,19 @@ void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eve
             ++droppedEventsCount;
         }
         else
+        {
             ++processedEventsCount;
+        }
     }
 }
 
 void AuditHost::setHostId(const AuditHostId &value)
 {
-    lock_guard<mutex> lock(eventsMutex);
+    std::scoped_lock lock(eventsMutex);
     if (hostId.hostname.empty())
+    {
         hostId = value;
+    }
 }
 
 void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
@@ -71,7 +75,7 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
     vector<unique_ptr<AuditEvent>> expired;
     string hostname;
     {
-        lock_guard<mutex> lock(eventsMutex);
+        std::scoped_lock lock(eventsMutex);
         hostname = hostId.hostname;
         for (auto it = auditEvents.begin(); it != auditEvents.end();)
         {
@@ -81,7 +85,9 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
                 it = auditEvents.erase(it);
             }
             else
+            {
                 ++it;
+            }
         }
     }
 
@@ -91,7 +97,9 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
         for (const auto &event : expired)
         {
             if (!eventLabels.empty())
+            {
                 eventLabels += ",";
+            }
             eventLabels += formatEventId(*event);
         }
         LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queueing uncompleted events for host='%s' (%s)...", hostname.c_str(), eventLabels.c_str());
@@ -107,13 +115,15 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
             ++droppedEventsCount;
         }
         else
+        {
             ++processedEventsCount;
+        }
     }
 }
 
 size_t AuditHost::getPendingEventsCount()
 {
-    lock_guard<mutex> lock(eventsMutex);
+    std::scoped_lock lock(eventsMutex);
     return auditEvents.size();
 }
 

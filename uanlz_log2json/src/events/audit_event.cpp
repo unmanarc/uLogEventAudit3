@@ -77,7 +77,9 @@ std::set<string> AuditEvent::getClassNames()
 {
     std::set<string> records;
     for (auto &record : classRecords)
+    {
         records.insert(record.first);
+    }
     return records;
 }
 
@@ -93,7 +95,9 @@ std::list<AuditClass *> AuditEvent::getClassRecords(const string &groupName)
     for (auto &record : classRecords)
     {
         if (record.first == groupName)
+        {
             records.push_back(&record.second);
+        }
     }
     return records;
 }
@@ -101,7 +105,9 @@ std::list<AuditClass *> AuditEvent::getClassRecords(const string &groupName)
 AuditClass *AuditEvent::getFirstClassRecord(const string &groupName)
 {
     if (auto it = classRecords.find(groupName); it != classRecords.end())
+    {
         return &it->second;
+    }
     return nullptr;
 }
 
@@ -111,10 +117,14 @@ boost::json::object AuditEvent::getJson()
     std::tm localTime{};
     char formattedTime[32]{};
     if (localtime_r(&unixTime, &localTime))
+    {
         std::strftime(formattedTime, sizeof(formattedTime), "%a %b %e %H:%M:%S %Y", &localTime);
+    }
     std::string formattedTimestamp = formattedTime;
     while (ends_with(formattedTimestamp, "\n"))
+    {
         formattedTimestamp.pop_back();
+    }
 
     std::string auditId = to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
 
@@ -147,7 +157,9 @@ boost::json::object AuditEvent::getJson()
             info.emplace("key", Mantids30::DataFormat::JSON::MEMBER_OR_NULL(entries.front(), "key"));
         }
         if (!entries.empty())
+        {
             records.emplace(className, std::move(entries));
+        }
     }
     boost::json::object eventJson{{"AUDITD", boost::json::object{{"id", auditId}}}, {"INFO", std::move(info)}};
     for (auto &record : records)
