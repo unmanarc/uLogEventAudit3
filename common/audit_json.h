@@ -9,8 +9,6 @@
 #include <string>
 #include <utility>
 
-using json = boost::json::value;
-
 namespace UANLZ::JSON {
 
 /**
@@ -19,14 +17,14 @@ namespace UANLZ::JSON {
  * @param result Output JSON value, assigned only after successful parsing.
  * @return False for I/O errors, malformed JSON or a non-array/non-null root.
  */
-inline bool readConfigArray(std::istream &input, json &result)
+inline bool readConfigArray(std::istream &input, boost::json::value &result)
 {
     const std::string document{std::istreambuf_iterator<char>(input), {}};
     boost::system::error_code error;
     auto parsed = boost::json::parse(document, error);
     if (input.bad() || error || (!parsed.is_array() && !parsed.is_null()))
         return false;
-    result = parsed.is_null() ? json(boost::json::array{}) : std::move(parsed);
+    result = parsed.is_null() ? boost::json::value(boost::json::array{}) : std::move(parsed);
     return true;
 }
 
@@ -36,7 +34,7 @@ inline bool readConfigArray(std::istream &input, json &result)
  * @param value Value to serialize.
  * @param depth Current object/array nesting level used for indentation.
  */
-inline void appendStyled(std::string &output, const json &value, unsigned depth)
+inline void appendStyled(std::string &output, const boost::json::value &value, unsigned depth)
 {
     const auto indent = [&](unsigned level) { output.append(level * 3, ' '); };
     const auto *object = value.if_object();
@@ -50,7 +48,7 @@ inline void appendStyled(std::string &output, const json &value, unsigned depth)
                 output += ",\n";
             first = false;
             indent(depth + 1);
-            output += boost::json::serialize(json(member.key()));
+            output += boost::json::serialize(boost::json::value(member.key()));
             output += " : ";
             appendStyled(output, member.value(), depth + 1);
         }
@@ -82,7 +80,7 @@ inline void appendStyled(std::string &output, const json &value, unsigned depth)
  * @brief Return indented JSON followed by a newline for action arguments and TCP output.
  * @param value Value to serialize.
  */
-inline std::string toStyledString(const json &value)
+inline std::string toStyledString(const boost::json::value &value)
 {
     std::string output;
     appendStyled(output, value, 0);
