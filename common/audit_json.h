@@ -40,11 +40,12 @@ inline bool readConfigArray(std::istream &input, json &result)
 inline void appendStyled(std::string &output, const json &value, unsigned depth)
 {
     const auto indent = [&](unsigned level) { output.append(level * 3, ' '); };
-    if (value.is_object() && !value.as_object().empty())
+    const auto *object = value.if_object();
+    if (object && !object->empty())
     {
         output += "{\n";
         bool first = true;
-        for (const auto &member : value.as_object())
+        for (const auto &member : *object)
         {
             if (!first)
                 output += ",\n";
