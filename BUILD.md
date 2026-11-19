@@ -41,6 +41,28 @@ The web resources install into `/var/www/ulogeventaudit3`; configuration goes in
 Configure credentials, certificates, origins and login URLs before enabling
 services; see [ul3_web/README.md](ul3_web/README.md).
 
+## Local development installation
+
+After building into `build/devel-root`, run:
+
+```bash
+python3 tools/setup-dev.py
+```
+
+This prepares `~/Devel/ROOT/etc/ulogeventaudit3`, links the web tree and binaries
+to this checkout, generates a local TLS certificate and RPC keys, and creates
+`~/Devel/ROOT/bin/ul3_{web,alert,log2json}-dev` launchers. Existing configuration
+and credentials are preserved. Use `--prefix` or `--build-dir` to override paths.
+The prefix must already contain libMantids30 and the uFastAuthD3 CA at
+`etc/ufastauthd3/tls/ca.crt`.
+
+The web listens at `https://localhost:33100`, RPC at `33101`, syslog input at
+`11514`, and JSON alert input at `19999`, all on loopback. Rules and actions start
+empty. Register `ULOGEVENTAUDIT3` in your local uFastAuthD3 and configure its API
+key before starting the web. The generated `etc/ulogeventaudit3/README.txt`
+contains launch commands, callback settings and certificate details. Optional
+systemd user unit files are placed under the prefix without enabling them.
+
 ## C++ regression tests
 
 CTest builds `audit_modernization_test` when `BUILD_TESTING` is enabled (the
