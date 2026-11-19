@@ -5,6 +5,7 @@
 #include "audit_var.h"
 #include "../vars/namedefs.h"
 #include <boost/algorithm/string.hpp>
+#include <boost/regex.hpp>
 
 using namespace boost::algorithm;
 using namespace std;
@@ -20,28 +21,13 @@ bool AuditVariable::append(const AuditVariable &other)
 }
 
 /**
- * @brief Check that a NUL-terminated field contains only auditd uppercase hex digits.
- * @param encodedValue Borrowed input text to inspect.
+ * @brief Check that a field contains only auditd uppercase hex digits.
+ * @param encodedValue Input text to inspect.
  * @return True for an empty string or a string containing only 0-9 and A-F.
  */
-inline bool isUppercaseHexString(const char *encodedValue)
+inline bool isUppercaseHexString(const std::string &encodedValue)
 {
-    for (; encodedValue && *encodedValue; encodedValue++)
-    {
-        if (!(*encodedValue >= 'A' && *encodedValue <= 'F') && !(*encodedValue >= '0' && *encodedValue <= '9'))
-            return false;
-    }
-    return true;
-}
-
-/**
- * @brief Test an ASCII character without locale-dependent classification.
- * @param encodedValue Character to inspect.
- * @return True for characters between 0 and 9.
- */
-inline bool isDecimalDigit(const char encodedValue)
-{
-    return (encodedValue >= '0' && encodedValue <= '9');
+    return boost::all(encodedValue, boost::is_any_of("0123456789ABCDEF"));
 }
 
 /**
@@ -68,8 +54,8 @@ inline unsigned char decodeHexDigit(const char encodedValue)
  */
 inline bool isExecveArgument(const string &eventType, const string &variableName)
 {
-    return (eventType == "EXECVE" && variableName.size() >= 2 && variableName.at(0) == 'a' &&
-            isDecimalDigit(variableName.at(1)) && !ends_with(variableName, "n"));
+    static const boost::regex argumentPattern(R"(a[0-9]+(\[[0-9]+\])?)");
+    return eventType == "EXECVE" && boost::regex_match(variableName, argumentPattern);
 }
 
 /**
@@ -131,12 +117,11 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
     if (variableValue.empty())
         return setValid(false);
 
-    if ((variableValue.at(0) == '\'' && variableValue.size() > 2 &&
-         variableValue.at(variableValue.size() - 1) == '\'') ||
-        (variableValue.at(0) == '\"' && variableValue.size() > 2 &&
-         variableValue.at(variableValue.size() - 1) == '\"') ||
-        (variableValue.at(0) == '(' && variableValue.size() > 2 && variableValue.at(variableValue.size() - 1) == ')') ||
-        (variableValue.at(0) == '{' && variableValue.size() > 2 && variableValue.at(variableValue.size() - 1) == '}'))
+    if (variableValue.size() > 2 &&
+        ((starts_with(variableValue, "'") && ends_with(variableValue, "'")) ||
+         (starts_with(variableValue, "\"") && ends_with(variableValue, "\"")) ||
+         (starts_with(variableValue, "(") && ends_with(variableValue, ")")) ||
+         (starts_with(variableValue, "{") && ends_with(variableValue, "}"))))
     {
         rawValue = variableValue.substr(1, variableValue.size() - 2);
 
@@ -147,7 +132,7 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
     else if (NameDefs::isTextVar(variableName) || isExecveArgument(eventType, variableName))
     {
         // Unquoted auditd text is hexadecimal; numeric and other literal fields use the final branch.
-        if (isUppercaseHexString(variableValue.c_str()) && variableValue.size() % 2 == 0)
+        if (isUppercaseHexString(variableValue) && variableValue.size() % 2 == 0)
         {
             rawValue.resize(variableValue.size() / 2);
             for (size_t byteIndex = 0; byteIndex < rawValue.size(); ++byteIndex)

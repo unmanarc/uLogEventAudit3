@@ -78,6 +78,16 @@ void auditVariables()
     require(copy.getRawValueSize() == 4 && copy.getDisplayValue() == "AB  ", "independent value copy");
     require(head.parse("CWD", "cwd", "\"/tmp\""), "repeated parse");
     require(head.getDisplayValue() == "/tmp", "repeated parse replaces data");
+    require(head.parse("EXECVE", "a0[12]", "6563686F") && head.getDisplayValue() == "echo",
+            "indexed EXECVE argument decoded");
+    require(head.parse("EXECVE", "a0_len", "42") && head.getDisplayValue() == "42",
+            "EXECVE length metadata stays numeric text");
+    for (const auto *quoted : {"'text'", "\"text\"", "(text)", "{text}"})
+    {
+        require(head.parse("CWD", "cwd", quoted) && head.getDisplayValue() == "text",
+                "matching wrappers removed");
+    }
+    require(!head.parse("EXECVE", "a0", std::string("41\0G", 4)), "embedded NUL is not hexadecimal");
     require(!head.parse("EXECVE", "a0", "ABC"), "odd hex rejected");
     require(head.getRawValueSize() == 0 && head.getDisplayValue().empty(), "invalid parse clears old data");
 }
