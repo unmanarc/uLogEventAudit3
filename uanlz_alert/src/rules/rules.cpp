@@ -116,15 +116,15 @@ Rules::~Rules()
 
 boost::json::object Rules::getStats()
 {
-    boost::json::object evaluationStats{{"queue", boost::json::object{{"count", (uint64_t) evaluationQueue.size()}, {"max", (uint64_t) evaluationQueue.getMaxItems()}}},
-                                        {"queuedLinesCount", (uint64_t) queuedLinesCount},
-                                        {"droppedInQueue", (uint64_t) droppedInQueue},
-                                        {"badFormatLines", (uint64_t) badFormatLines},
-                                        {"processedLines", (uint64_t) processedLines},
-                                        {"rulesActivated", (uint64_t) rulesActivated},
-                                        {"queueInLastSec", (uint64_t) queueInLastSecond},
-                                        {"queueOutLastSec", (uint64_t) queueOutLastSecond},
-                                        {"lastEvaluationTimeInMS", (double) evaluationTimeMs}};
+    boost::json::object evaluationStats{{"queue", boost::json::object{{"count", static_cast<uint64_t>(evaluationQueue.size())}, {"max", static_cast<uint64_t>(evaluationQueue.getMaxItems())}}},
+                                        {"queuedLinesCount", queuedLinesCount.load()},
+                                        {"droppedInQueue", droppedInQueue.load()},
+                                        {"badFormatLines", badFormatLines.load()},
+                                        {"processedLines", processedLines.load()},
+                                        {"rulesActivated", rulesActivated.load()},
+                                        {"queueInLastSec", queueInLastSecond.load()},
+                                        {"queueOutLastSec", queueOutLastSecond.load()},
+                                        {"lastEvaluationTimeInMS", evaluationTimeMs.load()}};
 
     return evaluationStats;
 }

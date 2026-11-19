@@ -130,9 +130,9 @@ boost::json::object AuditEvent::getJson()
 
     boost::json::object info{{"source", "auditd"},
                              {"parserVersion", 1},
-                             {"unixTime", (int64_t) unixTime},
+                             {"unixTime", static_cast<int64_t>(unixTime)},
                              {"msecs", std::get<1>(eventId)},
-                             {"id", (uint64_t) std::get<2>(eventId)},
+                             {"id", std::get<2>(eventId)},
                              {"host", hostId.hostname},
                              {"ip", hostId.ipAddress},
                              {"time", formattedTimestamp}};

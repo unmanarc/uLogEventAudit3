@@ -78,8 +78,10 @@ EventDistribution::EventDistribution() = default;
 boost::json::object EventDistribution::getStats()
 {
     boost::json::object distributionStats{{"eventsQueue",
-                                           boost::json::object{{"maxItems", (uint64_t) eventsQueue.getMaxItems()}, {"curSize", (uint64_t) eventsQueue.size()}, {"dropped", (uint64_t) eventsDropped}}},
-                                          {"eventsProcessed", boost::json::object{{"last10s", (uint64_t) eventsProcessedLastTenSeconds}, {"total", (uint64_t) eventsProcessed}}}};
+                                           boost::json::object{{"maxItems", static_cast<uint64_t>(eventsQueue.getMaxItems())},
+                                                               {"curSize", static_cast<uint64_t>(eventsQueue.size())},
+                                                               {"dropped", eventsDropped.load()}}},
+                                          {"eventsProcessed", boost::json::object{{"last10s", eventsProcessedLastTenSeconds.load()}, {"total", eventsProcessed.load()}}}};
 
     return distributionStats;
 }

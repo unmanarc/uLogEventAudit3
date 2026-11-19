@@ -36,9 +36,9 @@ boost::json::array EventsManager::getStats()
         boost::json::object hostJson{{"host", hostId.hostname},
                                      {"ip", hostId.ipAddress},
                                      {"events",
-                                      boost::json::object{{"pending", (uint64_t) hostState->getPendingEventsCount()},
-                                                          {"processed", (uint64_t) hostState->getProcessedEventsCount()},
-                                                          {"dropped", (uint64_t) hostState->getDroppedEventsCount()}}}};
+                                      boost::json::object{{"pending", static_cast<uint64_t>(hostState->getPendingEventsCount())},
+                                                          {"processed", hostState->getProcessedEventsCount()},
+                                                          {"dropped", hostState->getDroppedEventsCount()}}}};
         hostStats.emplace_back(std::move(hostJson));
     }
     return hostStats;
