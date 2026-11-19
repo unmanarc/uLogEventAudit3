@@ -187,13 +187,13 @@ WebService {{
             for path in ['/mods/alerts/rules.html', '/mods/alerts/rules', '/mods/alerts/']:
                 status, page = request(path, reader)
                 assert status == 200 and '{{' not in page, (path, status, page[:400])
-                assert '>Remove</a>' not in page and '>Add New...</a>' not in page
+                assert '>Remove</a>' not in page and 'href="/mods/alerts/rule-add.html"' not in page
             for path in ['/includes/layout/inc.header.html', '/includes/alerts/inc.links.html']:
                 assert request(path, admin)[0] in (403, 404), path
             for path in ['/mods/alerts/rule-add.html', '/mods/alerts/action-add', '/mods/alerts/input-add.html']:
                 assert request(path, reader)[0] == 403, path
                 status, page = request(path, admin)
-                assert status == 200 and '{{' not in page and '<form>' in page, (path, status)
+                assert status == 200 and '{{' not in page and 'id="editor-form"' in page, (path, status)
             assert request('/mods/alerts/stats.html', token([]))[0] == 403
             status, page = request('/mods/alerts/rules.html', token(['stats', 'controller']))
             assert status == 200 and '>Remove</a>' not in page
@@ -203,7 +203,8 @@ WebService {{
                 assert status == 200 and '{{' not in page and 'Welcome, test-user' in page, (path, status)
             for path in ['/index.html', '/assets/js/jquery.min.js', '/mods/alerts/rules.html']:
                 assert request(path)[0] == 302, path
-            for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js']:
+            for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js',
+                         '/assets/css/console.css', '/assets/js/console.js']:
                 status, asset = request(path, reader)
                 assert status == 200 and len(asset) > 1000, (path, status)
             for path in ['/package.json', '/node_modules/jquery/dist/jquery.min.js']:
