@@ -98,8 +98,7 @@ void eventReconstruction()
     event.insertClassContents("PATH", "item=1 name=\"/tmp\"");
     require(event.process(), "process event");
     auto value = event.getJson();
-    require(value.is_object(), "event JSON object");
-    const auto &object = *value.if_object();
+    const auto &object = value;
     const auto &args = object.at("EXECVE").as_array().at(0).if_object()->at("argv").as_array();
     require(args.size() == 2 && args[0].as_string() == "echo" && args[1].as_string() == "hello", "split arguments and merged records reconstructed");
     require(object.at("PATH").as_array().size() == 2, "PATH records remain separate");
@@ -122,16 +121,16 @@ void socketAddresses()
     record.setRawInput("saddr=020000507F0000010000000000000000");
     require(record.parseVariables(), "IPv4 address record");
     auto value = record.getJson();
-    require(value.if_object()->at("ipaddr").as_string() == "127.0.0.1" && value.if_object()->at("port").as_string() == "80", "IPv4 decoding");
+    require(value.at("ipaddr").as_string() == "127.0.0.1" && value.at("port").as_string() == "80", "IPv4 decoding");
     for (const auto *input : {"saddr=0", "saddr=0200", "saddr=0200005", "saddr=GGGG"})
     {
         record.setRawInput(input);
         require(record.parseVariables(), "malformed address record");
-        require(!record.getJson().if_object()->contains("ipaddr"), "invalid address not decoded");
+        require(!record.getJson().contains("ipaddr"), "invalid address not decoded");
     }
     record.setRawInput("saddr=01002F746D702F736F636B00");
     record.parseVariables();
-    require(record.getJson().if_object()->at("unix_path").as_string() == "/tmp/sock", "UNIX path decoding");
+    require(record.getJson().at("unix_path").as_string() == "/tmp/sock", "UNIX path decoding");
 }
 } // namespace
 
