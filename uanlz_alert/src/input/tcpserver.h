@@ -27,7 +27,7 @@ public:
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    bool loadConfig(const json &configValue);
+    bool loadConfig(const boost::json::value &configValue);
     /**
      * @brief Bind the configured address and start the Mantids30 connection acceptor.
      */
@@ -36,7 +36,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    json getStats();
+    boost::json::object getStats();
 
     /**
      * @brief Register a borrowed connection parser for statistics reporting.

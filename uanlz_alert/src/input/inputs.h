@@ -22,25 +22,25 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    static json getStats();
+    static boost::json::array getStats();
     /**
      * @brief Read input definitions, accepting a legacy null document as an empty list.
      * @param readOk Optional output flag set when the input document was read successfully.
      */
-    static json readInputs(bool *readOk = nullptr);
+    static boost::json::value readInputs(bool *readOk = nullptr);
     /**
      * @brief Persist an array of input definitions and mark changed configuration.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    static bool writeInputs(const json &configValue);
+    static bool writeInputs(const boost::json::value &configValue);
 
     /**
      * @brief Assign an input identifier and prepend its definition to the persisted configuration.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    static bool addInput(json configValue);
+    static bool addInput(boost::json::value configValue);
     /**
      * @brief Remove the matching input definition from persisted configuration.
      * @param inputId Identifier assigned when the input definition was created.

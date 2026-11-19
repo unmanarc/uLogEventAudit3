@@ -85,123 +85,123 @@ void RpcImpl::runRpcClient()
     }
 }
 
-json RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(configValue);
 }
 
-json RpcImpl::statReadRulesFileConfig(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::value RpcImpl::statReadRulesFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::readRulesFileConfig();
 }
 
-json RpcImpl::statReadRunningRules(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::array RpcImpl::statReadRunningRules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningRules();
 }
 
-json RpcImpl::statReadRunningRule(void *, const std::string &, const json &configValue, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "id", 0xFFFFFFFF));
 }
 
-json RpcImpl::statAreRulesModified(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::statAreRulesModified(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::getRulesModified();
 }
 
-json RpcImpl::controlRemoveRule(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlRemoveRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::removeRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RpcImpl::controlRemoveAction(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlRemoveAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::removeAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
-json RpcImpl::controlSaveRunningRules(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::controlSaveRunningRules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(Filters::Rules::getCurrentRunningRules());
 }
 
-json RpcImpl::controlSaveRunningActions(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::controlSaveRunningActions(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(Filters::Rules::getCurrentRunningActions());
 }
 
-json RpcImpl::controlAddAction(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlAddAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::addAction(configValue);
 }
 
-json RpcImpl::controlEditAction(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlEditAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::editAction(configValue);
 }
 
-json RpcImpl::controlEditRule(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlEditRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::editRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-json RpcImpl::controlAddRule(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlAddRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::addRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-json RpcImpl::controlRuleUp(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlRuleUp(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::moveRuleUp(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RpcImpl::controlRuleDown(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlRuleDown(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::moveRuleDown(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(configValue);
 }
 
-json RpcImpl::statReadActionsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::value RpcImpl::statReadActionsFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::readActionsFileConfig();
 }
 
-json RpcImpl::statAreActionsModified(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::statAreActionsModified(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::getActionsModified();
 }
 
-json RpcImpl::statReadRunningActions(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::array RpcImpl::statReadRunningActions(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningActions();
 }
 
-json RpcImpl::statReadRunningAction(void *, const std::string &, const json &configValue, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
-json RpcImpl::controlRemoveInput(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlRemoveInput(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Input::Inputs::removeInput(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "id", "")));
 }
 
-json RpcImpl::controlAddInput(void *, const std::string &, const json &configValue, void *, const std::string &)
+bool RpcImpl::controlAddInput(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
     return Input::Inputs::addInput(configValue);
 }
 
-json RpcImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statReadInputsFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     boost::json::object response{{"modified", Input::Inputs::getModified()}, {"inputs", Input::Inputs::readInputs()}};
     return response;
 }
 
-json RpcImpl::statReadRunningInputs(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::array RpcImpl::statReadRunningInputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     return Input::Inputs::getStats();
 }
@@ -215,29 +215,29 @@ void sleepAndExit()
     _exit(0);
 }
 
-json RpcImpl::controlReloadApp(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::controlReloadApp(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    json response = true;
+    bool response = true;
     LOG_APP->log0(__func__, Logs::WARNING, "Reload requested via RPC");
 
     std::thread(sleepAndExit).detach();
     return response;
 }
 
-json RpcImpl::statSystemStats(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statSystemStats(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    json response = Filters::Rules::getStats();
+    boost::json::object response = Filters::Rules::getStats();
     return response;
 }
 
-json RpcImpl::controlRulesReload(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::controlRulesReload(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    json response = Filters::Rules::reloadRules();
+    bool response = Filters::Rules::reloadRules();
     return response;
 }
 
-json RpcImpl::controlActionsReload(void *, const std::string &, const json &, void *, const std::string &)
+bool RpcImpl::controlActionsReload(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    json response = Filters::Rules::reloadActions();
+    bool response = Filters::Rules::reloadActions();
     return response;
 }

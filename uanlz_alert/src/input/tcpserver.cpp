@@ -56,7 +56,7 @@ void processClientConnection(void *context, const std::shared_ptr<Socket_Stream>
 
 TcpServer::TcpServer() {}
 
-bool TcpServer::loadConfig(const json &configValue)
+bool TcpServer::loadConfig(const boost::json::value &configValue)
 {
     listenAddress = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "ListenAddr", ""));
     listenPort = Mantids30::DataFormat::JSON::ASUINT(configValue, "ListenPort", 0);
@@ -86,7 +86,7 @@ void TcpServer::startListener()
     acceptor->startInBackground();
 }
 
-json TcpServer::getStats()
+boost::json::object TcpServer::getStats()
 {
     boost::json::array clients;
     std::lock_guard<std::mutex> lock(registryMutex);

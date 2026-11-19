@@ -19,7 +19,7 @@ bool Inputs::modified = false;
 
 Inputs::Inputs() {}
 
-json Inputs::getStats()
+boost::json::array Inputs::getStats()
 {
     boost::json::array inputStats;
 
@@ -32,9 +32,9 @@ json Inputs::getStats()
     return inputStats;
 }
 
-json Inputs::readInputs(bool *readOk)
+boost::json::value Inputs::readInputs(bool *readOk)
 {
-    json configuredInputs;
+    boost::json::value configuredInputs;
     if (readOk)
         *readOk = false;
 
@@ -71,7 +71,7 @@ json Inputs::readInputs(bool *readOk)
     return configuredInputs;
 }
 
-bool Inputs::writeInputs(const json &configValue)
+bool Inputs::writeInputs(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
         return false;
@@ -87,10 +87,10 @@ bool Inputs::writeInputs(const json &configValue)
     return true;
 }
 
-bool Inputs::addInput(json configValue)
+bool Inputs::addInput(boost::json::value configValue)
 {
     bool readOk;
-    json configuredInputs = readInputs(&readOk);
+    boost::json::value configuredInputs = readInputs(&readOk);
     boost::json::array updatedInputs;
     if (!readOk)
         return false;
@@ -127,7 +127,7 @@ bool Inputs::addInput(json configValue)
 bool Inputs::removeInput(const std::string &inputId)
 {
     bool readOk;
-    json configuredInputs = readInputs(&readOk);
+    boost::json::value configuredInputs = readInputs(&readOk);
     boost::json::array updatedInputs;
     if (!readOk)
         return false;
@@ -163,7 +163,7 @@ bool Inputs::loadConfig()
     LOG_APP->log0(__func__, Logs::INFO, "Loading inputs from file: %s", configFilePath.c_str());
 
     bool readOk;
-    json configuredInputs = readInputs(&readOk);
+    boost::json::value configuredInputs = readInputs(&readOk);
 
     if (!readOk)
     {

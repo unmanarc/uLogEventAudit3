@@ -114,7 +114,7 @@ Rules::~Rules()
     }
 }
 
-json Rules::getStats()
+boost::json::object Rules::getStats()
 {
     boost::json::object evaluationStats{{"queue", boost::json::object{{"count", (uint64_t) evaluationQueue.size()}, {"max", (uint64_t) evaluationQueue.getMaxItems()}}},
                                         {"queuedLinesCount", (uint64_t) queuedLinesCount},
@@ -179,7 +179,7 @@ bool Rules::reloadRules()
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     resetRules();
-    json root = readRulesFileConfig();
+    boost::json::value root = readRulesFileConfig();
     LOG_APP->log0(__func__, Logs::INFO, "Loading filters from file: %s", rulesFilePath.c_str());
 
     for (uint32_t index = 0; index < Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size(); index++)
@@ -196,7 +196,7 @@ bool Rules::reloadActions()
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     resetActions();
-    json root = readActionsFileConfig();
+    boost::json::value root = readActionsFileConfig();
 
     LOG_APP->log0(__func__, Logs::INFO, "Loading actions from file: %s", actionsFilePath.c_str());
     for (uint32_t index = 0; index < Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size(); index++)
@@ -209,7 +209,7 @@ bool Rules::reloadActions()
     return true;
 }
 
-bool Rules::evaluate(const json &values)
+bool Rules::evaluate(const boost::json::value &values)
 {
     // Keep rules and referenced actions alive through synchronous process execution.
     std::shared_lock<std::shared_mutex> lock(rulesMutex);
@@ -245,13 +245,13 @@ bool Rules::evaluate(const json &values)
     return activated;
 }
 
-bool Rules::editRule(uint32_t position, const json &configValue)
+bool Rules::editRule(uint32_t position, const boost::json::value &configValue)
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     return addRuleUnlocked(position, configValue, true);
 }
 
-bool Rules::editAction(const json &configValue)
+bool Rules::editAction(const boost::json::value &configValue)
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     return addActionUnlocked(configValue, true);
@@ -287,13 +287,13 @@ bool Rules::moveRuleDown(uint32_t position)
     return true;
 }
 
-bool Rules::addRule(uint32_t position, const json &configValue)
+bool Rules::addRule(uint32_t position, const boost::json::value &configValue)
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     return addRuleUnlocked(position, configValue);
 }
 
-bool Rules::addAction(const json &configValue)
+bool Rules::addAction(const boost::json::value &configValue)
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
     return addActionUnlocked(configValue);
@@ -318,7 +318,7 @@ void Rules::runEvaluationWorker(const uint32_t &workerId)
     pthread_setname_np(pthread_self(), threadName.c_str());
 #endif
 
-    json eventValue;
+    boost::json::value eventValue;
     for (;;)
     {
         auto queuedLine = std::unique_ptr<std::string>(evaluationQueue.pop(queuePopTimeoutMs));
@@ -371,13 +371,13 @@ void Rules::runQueueCounters()
     }
 }
 
-void Rules::executeAction(const std::string &ruleName, const char *file, std::vector<string> arguments, const json &values)
+void Rules::executeAction(const std::string &ruleName, const char *file, std::vector<string> arguments, const boost::json::value &values)
 {
     expandArguments(arguments, ruleName, values);
     executeProcess(ruleName, file, arguments);
 }
 
-void Rules::expandArguments(std::vector<string> &arguments, const std::string &ruleName, const json &values)
+void Rules::expandArguments(std::vector<string> &arguments, const std::string &ruleName, const boost::json::value &values)
 {
     size_t index = 0;
     for (std::string &argument : arguments)
@@ -388,7 +388,7 @@ void Rules::expandArguments(std::vector<string> &arguments, const std::string &r
     }
 }
 
-void Rules::expandArgument(string &argument, const std::string &ruleName, const json &values)
+void Rules::expandArgument(string &argument, const std::string &ruleName, const boost::json::value &values)
 {
     boost::match_flag_type flags = boost::match_default;
 
@@ -413,7 +413,7 @@ void Rules::expandArgument(string &argument, const std::string &ruleName, const 
     }
 }
 
-string Rules::resolvePlaceholder(const string &placeholder, const string &ruleName, const json &values)
+string Rules::resolvePlaceholder(const string &placeholder, const string &ruleName, const boost::json::value &values)
 {
     if (placeholder.empty())
         return "%";
@@ -427,7 +427,7 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
         // The leading marker selects JSON formatting for the resolved path.
         Mantids30::DataFormat::JSON::Path path(placeholder.substr(1));
         const auto *resolved = path.resolve(values);
-        const json result = resolved ? *resolved : json{};
+        const boost::json::value result = resolved ? *resolved : boost::json::value{};
         return UANLZ::JSON::toStyledString(result);
     }
     else if (placeholder.at(0) == '-')
@@ -435,7 +435,7 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
         // Serialize the resolved value as compact JSON.
         Mantids30::DataFormat::JSON::Path path(placeholder.substr(1));
         const auto *resolved = path.resolve(values);
-        const json result = resolved ? *resolved : json{};
+        const boost::json::value result = resolved ? *resolved : boost::json::value{};
         return Mantids30::DataFormat::JSON::toString(result);
     }
     else if (placeholder.at(0) == '+')
@@ -443,7 +443,7 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
         // Uppercase the compact JSON representation.
         Mantids30::DataFormat::JSON::Path path(placeholder.substr(1));
         const auto *resolved = path.resolve(values);
-        const json result = resolved ? *resolved : json{};
+        const boost::json::value result = resolved ? *resolved : boost::json::value{};
         return boost::to_upper_copy(Mantids30::DataFormat::JSON::toString(result));
     }
     else if (placeholder.at(0) == '#')
@@ -462,7 +462,7 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
     }
 }
 
-bool Rules::addRuleUnlocked(uint32_t position, const json &configValue, bool replace)
+bool Rules::addRuleUnlocked(uint32_t position, const boost::json::value &configValue, bool replace)
 {
     std::string name = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", ""));
     std::string action = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "action", ""));
@@ -529,7 +529,7 @@ bool Rules::addRuleUnlocked(uint32_t position, const json &configValue, bool rep
     return true;
 }
 
-bool Rules::addActionUnlocked(const json &configValue, bool replace)
+bool Rules::addActionUnlocked(const boost::json::value &configValue, bool replace)
 {
     std::string actionName = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", ""));
     std::string actionDescription = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "description", ""));
@@ -611,7 +611,7 @@ string Rules::makePlaceholderTag(const string &tagPrefix, uint64_t tagIndex)
     return "__" + tagPrefix + "[" + std::to_string(tagIndex) + "]";
 }
 
-json Rules::getCurrentRunningActions()
+boost::json::array Rules::getCurrentRunningActions()
 {
     std::shared_lock<std::shared_mutex> lock(rulesMutex);
     boost::json::array result;
@@ -622,10 +622,10 @@ json Rules::getCurrentRunningActions()
     return result;
 }
 
-json Rules::getCurrentRunningAction(const string &actionName)
+boost::json::value Rules::getCurrentRunningAction(const string &actionName)
 {
     std::shared_lock<std::shared_mutex> lock(rulesMutex);
-    json result;
+    boost::json::value result;
 
     if (actions.find(actionName) == actions.end())
         return result;
@@ -633,10 +633,10 @@ json Rules::getCurrentRunningAction(const string &actionName)
     return actions.at(actionName)->originalConfig;
 }
 
-json Rules::getCurrentRunningRule(const uint32_t &position)
+boost::json::value Rules::getCurrentRunningRule(const uint32_t &position)
 {
     std::shared_lock<std::shared_mutex> lock(rulesMutex);
-    json result;
+    boost::json::value result;
 
     if (position >= rules.size())
         return result;
@@ -644,7 +644,7 @@ json Rules::getCurrentRunningRule(const uint32_t &position)
     return rules[position]->originalConfig;
 }
 
-json Rules::getCurrentRunningRules()
+boost::json::array Rules::getCurrentRunningRules()
 {
     std::shared_lock<std::shared_mutex> lock(rulesMutex);
 
@@ -686,7 +686,7 @@ void Rules::setQueuePopTimeoutMs(const uint64_t &value)
     queuePopTimeoutMs = value;
 }
 
-bool Rules::writeRulesFileConfig(const json &configValue)
+bool Rules::writeRulesFileConfig(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
         return false;
@@ -708,7 +708,7 @@ bool Rules::writeRulesFileConfig(const json &configValue)
     return true;
 }
 
-bool Rules::writeActionsFileConfig(const json &configValue)
+bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
         return false;
@@ -729,9 +729,9 @@ bool Rules::writeActionsFileConfig(const json &configValue)
     return true;
 }
 
-json Rules::readRulesFileConfig()
+boost::json::value Rules::readRulesFileConfig()
 {
-    json root;
+    boost::json::value root;
     std::ifstream configFile(rulesFilePath, std::ifstream::binary);
     if (!configFile.is_open())
         return root;
@@ -740,9 +740,9 @@ json Rules::readRulesFileConfig()
     return root;
 }
 
-json Rules::readActionsFileConfig()
+boost::json::value Rules::readActionsFileConfig()
 {
-    json root;
+    boost::json::value root;
     std::ifstream configFile(actionsFilePath, std::ifstream::binary);
     if (!configFile.is_open())
         return root;
