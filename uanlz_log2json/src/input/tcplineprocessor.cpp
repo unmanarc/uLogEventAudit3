@@ -37,7 +37,7 @@ TcpLineProcessor::~TcpLineProcessor() = default;
 
 boost::json::object TcpLineProcessor::getStats()
 {
-    boost::json::object connectionStats{{"ip", remoteIp}, {"processedLinesCount", (uint64_t) processedLinesCount}, {"invalidLinesCount", (uint64_t) invalidLinesCount}};
+    boost::json::object connectionStats{{"ip", remoteIp}, {"processedLinesCount", processedLinesCount.load()}, {"invalidLinesCount", invalidLinesCount.load()}};
     return connectionStats;
 }
 

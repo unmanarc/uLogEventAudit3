@@ -113,8 +113,8 @@ boost::json::object TcpServer::getStats()
     return boost::json::object{
         {"clients", std::move(clients)},
         {"description", description},
-        {"processedLinesCount", (uint64_t) processedLinesCount},
-        {"invalidLinesCount", (uint64_t) invalidLinesCount},
+        {"processedLinesCount", processedLinesCount.load()},
+        {"invalidLinesCount", invalidLinesCount.load()},
     };
 }
 

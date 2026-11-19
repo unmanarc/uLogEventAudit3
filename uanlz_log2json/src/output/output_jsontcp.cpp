@@ -111,11 +111,11 @@ boost::json::object JsonTcpOutput::getStats()
 
     boost::json::object outputStats{{"id", server + ":" + to_string(port)},
                                     {"queue",
-                                     boost::json::object{{"size", (uint64_t) pendingEvents.size()},
-                                                         {"maxItems", (uint64_t) pendingEvents.getMaxItems()},
-                                                         {"dropped", (uint64_t) dropped},
-                                                         {"processed", (uint64_t) processed}}},
-                                    {"connected", (bool) connected}};
+                                     boost::json::object{{"size", static_cast<uint64_t>(pendingEvents.size())},
+                                                         {"maxItems", static_cast<uint64_t>(pendingEvents.getMaxItems())},
+                                                         {"dropped", dropped.load()},
+                                                         {"processed", processed.load()}}},
+                                    {"connected", connected.load()}};
 
     return outputStats;
 }
