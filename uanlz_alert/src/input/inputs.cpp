@@ -98,7 +98,13 @@ bool Inputs::addInput(json configValue)
 
     if (!configValue.is_object())
         return false;
-    configValue.as_object()["id"] = Mantids30::Core::Helpers::Random::createRandomString(8).c_str();
+    const std::string inputId = Mantids30::Core::Helpers::Random::createRandomString(8);
+    boost::json::object inputConfig{{"id", inputId}};
+    for (const auto &member : *configValue.if_object())
+    {
+        if (member.key() != "id")
+            inputConfig.emplace(member.key(), member.value());
+    }
 
     std::string listenAddress, description;
     uint16_t listenPort;
@@ -108,10 +114,10 @@ bool Inputs::addInput(json configValue)
     description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
     LOG_APP->log0(__func__, Logs::INFO, "Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16,
-                  Mantids30::DataFormat::JSON::ASCSTRING(configValue, "id", ""), description.c_str(),
+                  inputId.c_str(), description.c_str(),
                   listenAddress.c_str(), listenPort);
 
-    updatedInputs.emplace_back(configValue);
+    updatedInputs.emplace_back(std::move(inputConfig));
     // Read array:
     for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
