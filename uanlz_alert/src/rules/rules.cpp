@@ -3,7 +3,6 @@
  * @brief Implementation for uanlz_alert/src/rules/rules.
  */
 #include "rules.h"
-#include <Mantids30/Core/Helpers/random.h>
 #include <shared_mutex>
 
 #include <boost/algorithm/string.hpp>
@@ -33,7 +32,6 @@ using namespace UANLZ::JSONALERT::Filters;
 
 using namespace Mantids30::Runtime;
 using namespace Mantids30::Scripting::JSONExprEval;
-using namespace Mantids30::Core::Helpers;
 
 vector<unique_ptr<Rule>> Rules::rules;
 std::map<std::string, unique_ptr<Action>> Rules::actions;
@@ -390,27 +388,18 @@ void Rules::expandArguments(std::vector<string> &arguments, const std::string &r
 
 void Rules::expandArgument(string &argument, const std::string &ruleName, const boost::json::value &values)
 {
-    boost::match_flag_type flags = boost::match_default;
-
-    std::string tagPrefix = Random::createRandomString(16);
-    uint64_t tagIndex = 0;
-    // Substitute temporary markers first so percent signs in event values stay literal.
-    std::map<std::string, std::string> placeholderNames;
-
-    boost::regex placeholderPattern("(?<STATIC_TEXT>\\%[^\\%]*\\%)");
-    boost::match_results<string::const_iterator> placeholderMatch;
-    for (string::const_iterator start = argument.begin(), end = argument.end(); boost::regex_search(start, end, placeholderMatch, placeholderPattern, flags);
-         start = argument.begin(), end = argument.end())
+    static const boost::regex placeholderPattern(R"(%([^%]*)%)");
+    std::string expanded;
+    auto start = argument.cbegin();
+    for (boost::sregex_iterator placeholder(argument.begin(), argument.end(), placeholderPattern), end;
+         placeholder != end; ++placeholder)
     {
-        std::string placeholderName = string(placeholderMatch[1].first, placeholderMatch[1].second).substr(1);
-        placeholderName.pop_back();
-        boost::replace_all(argument, string(placeholderMatch[1].first, placeholderMatch[1].second), makePlaceholderTag(tagPrefix, tagIndex));
-        placeholderNames[makePlaceholderTag(tagPrefix, tagIndex++)] = placeholderName;
+        expanded.append(start, (*placeholder)[0].first);
+        expanded += resolvePlaceholder((*placeholder)[1].str(), ruleName, values);
+        start = (*placeholder)[0].second;
     }
-    for (const auto &replacement : placeholderNames)
-    {
-        boost::replace_all(argument, replacement.first, resolvePlaceholder(replacement.second, ruleName, values));
-    }
+    expanded.append(start, argument.cend());
+    argument = std::move(expanded);
 }
 
 string Rules::resolvePlaceholder(const string &placeholder, const string &ruleName, const boost::json::value &values)
@@ -604,11 +593,6 @@ void Rules::resetRules()
 void Rules::resetActions()
 {
     actions.clear();
-}
-
-string Rules::makePlaceholderTag(const string &tagPrefix, uint64_t tagIndex)
-{
-    return "__" + tagPrefix + "[" + std::to_string(tagIndex) + "]";
 }
 
 boost::json::array Rules::getCurrentRunningActions()

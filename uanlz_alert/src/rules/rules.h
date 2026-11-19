@@ -338,13 +338,6 @@ private:
      */
     static void resetActions();
 
-    /**
-     * @brief Build a temporary marker that protects inserted values from repeated expansion.
-     * @param tagPrefix Random prefix that isolates temporary substitution markers.
-     * @param tagIndex Sequence number distinguishing markers within an argument.
-     */
-    static std::string makePlaceholderTag(const std::string &tagPrefix, uint64_t tagIndex);
-
     static uint64_t queuePushTimeoutMs, queuePopTimeoutMs;
     static Mantids30::Core::Threads::Safe::Queue<std::string> evaluationQueue;
     static std::shared_mutex rulesMutex;

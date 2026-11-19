@@ -5,9 +5,6 @@
 #include "tcplineprocessor.h"
 #include "tcpserver.h"
 
-#include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp>
-
 #include "../rules/rules.h"
 
 #include "../globals.h"
