@@ -38,7 +38,7 @@ public:
      * @brief Report whether this variable currently contains a successfully decoded value.
      * @return The current decoded-value validity flag.
      */
-    bool isValid() const;
+    [[nodiscard]] bool isValid() const;
     /**
      * @brief Set and return the validity flag used by parsing and fragment reconstruction.
      * @param isValid Validity flag to store and return.
@@ -50,21 +50,21 @@ public:
      * @brief Return a borrowed buffer containing the decoded bytes, including any embedded NULs.
      * @return Borrowed data; use getRawValueSize() instead of strlen() for binary values.
      */
-    const char *getRawValue() const;
+    [[nodiscard]] const char *getRawValue() const;
     /**
      * @brief Return a borrowed display string with NUL and exclamation bytes replaced by spaces.
      * @return Reference valid until this variable is changed or destroyed.
      */
-    const std::string &getDisplayValue() const;
+    [[nodiscard]] const std::string &getDisplayValue() const;
     /**
      * @brief Return the number of decoded bytes, excluding the trailing string terminator.
      */
-    size_t getRawValueSize() const;
+    [[nodiscard]] size_t getRawValueSize() const;
     /**
      * @brief Convert the display string using the existing base-10 strtoul semantics.
      * @return Decimal conversion narrowed to uint32_t; this method does not validate overflow.
      */
-    uint32_t asUint32() const;
+    [[nodiscard]] uint32_t asUint32() const;
 
 private:
     /**

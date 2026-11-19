@@ -4,6 +4,7 @@
  */
 #include "audit_var.h"
 #include "../vars/namedefs.h"
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
@@ -14,7 +15,9 @@ using namespace UANLZ::LOG2JSON::AuditdEvents;
 bool AuditVariable::append(const AuditVariable &other)
 {
     if (!other.isValid())
+    {
         return setValid(false);
+    }
     rawValue += other.rawValue;
     displayValue += other.displayValue;
     return setValid(true);
@@ -27,7 +30,7 @@ bool AuditVariable::append(const AuditVariable &other)
  */
 inline bool isUppercaseHexString(const std::string &encodedValue)
 {
-    return boost::all(encodedValue, boost::is_any_of("0123456789ABCDEF"));
+    return std::all_of(encodedValue.begin(), encodedValue.end(), [](unsigned char digit) { return (digit >= '0' && digit <= '9') || (digit >= 'A' && digit <= 'F'); });
 }
 
 /**
@@ -38,11 +41,17 @@ inline bool isUppercaseHexString(const std::string &encodedValue)
 inline unsigned char decodeHexDigit(const char encodedValue)
 {
     if (encodedValue >= 'A' && encodedValue <= 'F')
+    {
         return (encodedValue - 'A') + 10;
+    }
     else if (encodedValue >= '0' && encodedValue <= '9')
+    {
         return (encodedValue - '0');
+    }
     else if (encodedValue >= 'a' && encodedValue <= 'f')
+    {
         return (encodedValue - 'a') + 10;
+    }
     return 0;
 }
 
@@ -75,7 +84,9 @@ void AuditVariable::updateDisplayValue()
     for (char &byte : displayValue)
     {
         if (byte == '\0' || byte == '!')
+        {
             byte = ' ';
+        }
     }
 }
 
@@ -86,7 +97,7 @@ size_t AuditVariable::getRawValueSize() const
 
 uint32_t AuditVariable::asUint32() const
 {
-    return strtoul(displayValue.c_str(), 0, 10);
+    return strtoul(displayValue.c_str(), nullptr, 10);
 }
 
 const string &AuditVariable::getDisplayValue() const
@@ -115,7 +126,9 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
     rawValue.clear();
     displayValue.clear();
     if (variableValue.empty())
+    {
         return setValid(false);
+    }
 
     if (variableValue.size() >= 2
         && ((starts_with(variableValue, "'") && ends_with(variableValue, "'")) || (starts_with(variableValue, "\"") && ends_with(variableValue, "\""))
@@ -134,7 +147,9 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
         {
             rawValue.resize(variableValue.size() / 2);
             for (size_t byteIndex = 0; byteIndex < rawValue.size(); ++byteIndex)
-                rawValue[byteIndex] = decodeHexByte(variableValue.data() + 2 * byteIndex);
+            {
+                rawValue[byteIndex] = static_cast<char>(decodeHexByte(variableValue.data() + 2 * byteIndex));
+            }
 
             updateDisplayValue();
             return setValid(true);
