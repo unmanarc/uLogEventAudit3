@@ -55,6 +55,24 @@ LD_LIBRARY_PATH="$HOME/Devel/ROOT/lib" \
 These flags instrument the application test sources; installed libMantids30
 libraries retain their own build flags.
 
+## Static analysis
+
+Generate the compilation database and run clang-tidy from the repository root:
+
+```bash
+cmake -S . -B build/mantids30 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+run-clang-tidy-21 -p build/mantids30 -j 4
+```
+
+The repository configuration covers application, common and test headers. If
+Clang selects an incomplete GCC installation and cannot find standard headers,
+select the installed GCC toolchain explicitly, for example:
+
+```bash
+run-clang-tidy-21 -p build/mantids30 -j 4 \
+  -extra-arg=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/15
+```
+
 ## Integration test
 
 ```bash
