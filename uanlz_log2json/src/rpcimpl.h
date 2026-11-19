@@ -26,19 +26,19 @@ private:
     /**
      * @brief Return per-host pending, processed and dropped event counts.
      */
-    static json statEventsPerHost(void *, const std::string &, const json &, void *, const std::string &);
+    static boost::json::object statEventsPerHost(void *, const std::string &, const boost::json::value &, void *, const std::string &);
     /**
      * @brief Return event distribution queue and worker counters.
      */
-    static json statOutputsDistributionThreads(void *, const std::string &, const json &, void *, const std::string &);
+    static boost::json::object statOutputsDistributionThreads(void *, const std::string &, const boost::json::value &, void *, const std::string &);
     /**
      * @brief Return configured output connection and queue statistics.
      */
-    static json statOutputs(void *, const std::string &, const json &, void *, const std::string &);
+    static boost::json::object statOutputs(void *, const std::string &, const boost::json::value &, void *, const std::string &);
     /**
      * @brief Return configured input server and client statistics.
      */
-    static json statInputs(void *, const std::string &, const json &, void *, const std::string &);
+    static boost::json::object statInputs(void *, const std::string &, const boost::json::value &, void *, const std::string &);
 };
 
 } // namespace UANLZ::LOG2JSON

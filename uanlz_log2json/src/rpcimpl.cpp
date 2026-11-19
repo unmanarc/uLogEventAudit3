@@ -60,25 +60,25 @@ void RpcImpl::runRpcClient()
     }
 }
 
-json RpcImpl::statEventsPerHost(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statEventsPerHost(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     boost::json::object response{{"hosts", AuditdEvents::EventsManager::getStats()}, {"ok", true}};
     return response;
 }
 
-json RpcImpl::statOutputsDistributionThreads(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statOutputsDistributionThreads(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     boost::json::object response{{"events", AuditdEvents::EventDistribution::getStats()}, {"ok", true}};
     return response;
 }
 
-json RpcImpl::statOutputs(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statOutputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     boost::json::object response{{"outputs", Output::Outputs::getStats()}, {"ok", true}};
     return response;
 }
 
-json RpcImpl::statInputs(void *, const std::string &, const json &, void *, const std::string &)
+boost::json::object RpcImpl::statInputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
     boost::json::object response{{"ok", true}, {"inputs", Input::Inputs::getStats()}};
     return response;
