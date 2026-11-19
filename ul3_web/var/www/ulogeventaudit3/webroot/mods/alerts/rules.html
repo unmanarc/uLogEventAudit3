@@ -1,0 +1,171 @@
+{{#render[/includes/layout/inc.header.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
+{{#render[/includes/alerts/inc.links.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
+<script>
+  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Rules";
+  document.getElementById('mainview-alerts-rules-link').style.color = "white";
+
+  // Default Main View:
+  function auditReady() {
+    drawRunningRulesStart();
+    drawIfModified();
+  }
+</script>
+
+
+<table width=100% align="center">
+  <tr>
+    <td>
+
+      <div class="alert alert-warning fade show" role="alert" id="saveAlert" style="visibility: collapse; display: none;">
+        <strong>Alert!</strong> <br>
+        This running configuration has not been saved to disk.
+        <div class="d-flex flex-row-reverse">
+          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:saveToDisk();" class="btn btn-warning btn-sm" role="button">Save To Disk...</a>{{/if}}{{/foreach}}
+        </div>
+      </div>
+
+      <br>
+
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Filter Name</th>
+            <th>Action</th>
+            <th align="right"></th>
+          </tr>
+        </thead>
+
+        <tbody id="rulesBody">
+
+        </tbody>
+      </table>
+
+      <hr>
+      <div class="d-flex flex-row-reverse">
+        <!--          <a href="/mods/alerts/rule-upload.html" class="btn btn-info btn-sm" role="button">Upload Rules...</a> &nbsp;-->
+        {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/rule-add.html" class="btn btn-success btn-sm" role="button">Add New...</a>{{/if}}{{/foreach}}
+      </div>
+
+    </td>
+  </tr>
+
+</table>
+
+<script>
+
+function saveToDisk()
+{
+  var payloadData = { "method": "POST", "resource": "alerts/rules/save",
+                    }
+  auditRequest(payloadData, {
+    success: function (result) {
+      if (result == true)
+      {
+        location.reload();
+      }
+      else
+      {
+        alert("Error Saving Running Configuration.");
+      }
+    },
+    error: function (result) {
+      alert("Error removing object (1).");
+    }
+  });
+}
+
+function drawRules(result)
+{
+  document.getElementById("rulesBody").innerHTML = "";
+  if (result==null)
+    return;
+  let i = 0;
+
+  for (let rule of result) {
+
+
+
+    $("#rulesBody").append(
+      ` <tr>
+            <td id="ruleName${i}"></td>
+            <td id="action${i}"></td>
+            <td align="right">
+              {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:ruleCmd('${i}', 'up')" class="btn btn-secondary btn-sm" role="button">&#8679;</a>{{/if}}{{/foreach}}
+              {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:ruleCmd('${i}', 'down')" class="btn btn-secondary btn-sm" role="button">&#8681;</a>{{/if}}{{/foreach}}
+              {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/rule-add.html?${i}" class="btn btn-info btn-sm" role="button">Edit...</a>{{/if}}{{/foreach}}
+              {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:ruleCmd('${i}', 'remove')" class="btn btn-danger btn-sm" role="button">Remove</a>{{/if}}{{/foreach}}
+            </td>
+          </tr>`
+    );
+    $(`#ruleName${i}`).text(rule["name"]);
+    $(`#action${i}`).text(rule["action"]);
+
+    i++;
+  }
+}
+
+function ruleCmd(ruleId, cmd)
+{
+  var payloadData = { "method": cmd === "remove" ? "DELETE" : "POST",
+                      "resource": "alerts/rules" + (cmd === "remove" ? "" : "/" + cmd),
+                      "payload" : {
+                        "pos" : parseInt(ruleId)
+                      }
+                    }
+  auditRequest(payloadData, {
+    success: function (result) {
+      if (result == true)
+      {
+        location.reload();
+      }
+      else
+      {
+        alert("Error manipulating object (2).");
+      }
+    },
+    error: function (result) {
+      alert("Error manipulating object (1).");
+    }
+  });
+}
+
+function drawRunningRulesStart()
+{
+  var payloadData = { "method": "GET", "resource": "alerts/rules" }
+  auditRequest(payloadData, {
+    success: function (result) {
+      drawRules(result);
+    },
+    error: function (result) {
+      console.log("ERR");
+    }
+  });
+}
+
+function drawIfModified()
+{
+  var payloadData = { "method": "GET", "resource": "alerts/rules/modified" }
+  auditRequest(payloadData, {
+    success: function (result) {
+      if (result == true)
+      {
+        document.getElementById("saveAlert").style.visibility = "visible";
+        document.getElementById("saveAlert").style.display = "block";
+      }
+      else
+      {
+        document.getElementById("saveAlert").style.visibility = "collapse";
+        document.getElementById("saveAlert").style.display = "none";
+      }
+    },
+    error: function (result) {
+      console.log("ERR");
+    }
+  });
+}
+
+</script>
+{{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
+{{#render[/includes/layout/inc.footer.html]!}}

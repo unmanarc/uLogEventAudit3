@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" class="h-100" data-bs-theme="auto">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>uLogEventAudit3</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/images/icon.svg" />
+    <!-- Bootstrap core CSS -->
+    <link href="/assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/progress.css" rel="stylesheet" type="text/css">
+    <script src="/assets/js/jquery.min.js"></script>
+    <script src="/assets/js/audit.js"></script>
+</head>
+
+
+
+
+<body onload="javascript:ajaxLoadInfo();" class="d-flex flex-column h-100">
+    <header>
+        <nav class="navbar navbar-expand-md navbar-dark bg-black fixed-top">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/"><img src="/assets/images/logo.svg" height="40" alt="uLogEventAudit3" /></a>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                    <ul class="navbar-nav ml-auto">
+                        <li class="nav-item active">
+                            <div class="nav-link" id="welcome" style="color:white;">Welcome, {{#print_htmlescaped[$session.user]!}}</div>
+                        </li>
+                        <li class="nav-item active">
+                            <div class="nav-link" style="color:greenyellow;">-</div>
+                        </li>
+                        {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
+                                data-bs-toggle="dropdown" aria-expanded="false" style="color:white;">
+                                Subsystems
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                                <li><a class="dropdown-item" href="/mods/log2json/">&#9658; Log-&gt;JSON Dissectors</a></li>
+                                <li><a class="dropdown-item" href="/mods/alerts/">&#9658; Rules/Alerts</a></li>
+                            </ul>
+                        </li>
+
+                        {{/if}}{{/foreach}}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="dropdown01" data-bs-toggle="dropdown"
+                                aria-haspopup="true" aria-expanded="false" style="color:white;">
+                                My Account
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown01">
+
+                                <li><a class="dropdown-item" onclick="javascript:logout()">Logout</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <ul id="audit-scopes" hidden>
+{{#foreach [$session.scopes as scope]}}<li>{{#print_htmlescaped[$scope]!}}</li>{{/foreach}}
+</ul>
+<main role="main" style="padding-top: 68px" class="flex-shrink-0">
+        <center>
+            <h4 style="color: black;" id="apptitle"> uLogEventAudit3 </h4>
+        </center>
+        <hr>

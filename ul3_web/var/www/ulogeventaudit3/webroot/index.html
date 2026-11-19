@@ -1,0 +1,9 @@
+{{#render[/includes/layout/inc.header.html]!}}
+<div class="container py-4">
+<h1>Audit console</h1>
+{{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
+<p><a href="/mods/alerts/stats.html">Rules and alerts</a></p>
+<p><a href="/mods/log2json/events.html">Log to JSON</a></p>
+{{/if}}{{/foreach}}
+</div>
+{{#render[/includes/layout/inc.footer.html]!}}

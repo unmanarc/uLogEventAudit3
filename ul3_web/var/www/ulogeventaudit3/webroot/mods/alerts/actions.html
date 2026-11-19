@@ -1,0 +1,169 @@
+{{#render[/includes/layout/inc.header.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
+{{#render[/includes/alerts/inc.links.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
+<script>
+  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Actions";
+  document.getElementById('mainview-alerts-actions-link').style.color = "white";
+
+  // Default Main View:
+  function auditReady() {
+    drawRunningActionsStart();
+    drawIfModified();
+  }
+</script>
+
+
+  <table width=100% align="center">
+    <tr>
+      <td>
+
+        <div class="alert alert-warning fade show" role="alert" id="saveAlert" style="visibility: collapse; display: none;">
+          <strong>Alert!</strong> <br>
+          This running configuration has not been saved to disk.
+          <div class="d-flex flex-row-reverse">
+            {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:saveToDisk();" class="btn btn-warning btn-sm" role="button">Save To Disk...</a>{{/if}}{{/foreach}}
+          </div>
+        </div>
+
+        <br>
+
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Name/Key</th>
+              <th>Description</th>
+              <th align="right"></th>
+            </tr>
+          </thead>
+
+          <tbody id="actionsBody">
+
+          </tbody>
+        </table>
+
+        <hr>
+        <div class="d-flex flex-row-reverse">
+          <!--          <a href="/mods/alerts/action-upload.html" class="btn btn-info btn-sm" role="button">Upload Actions...</a> &nbsp;-->
+          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/action-add.html" class="btn btn-success btn-sm" role="button">Add New...</a>{{/if}}{{/foreach}}
+        </div>
+
+      </td>
+    </tr>
+
+  </table>
+
+<script>
+
+  function saveToDisk()
+  {
+    var payloadData = { "method": "POST", "resource": "alerts/actions/save",
+                      }
+    auditRequest(payloadData, {
+      success: function (result) {
+        if (result == true)
+        {
+          location.reload();
+        }
+        else
+        {
+          alert("Error Saving Running Configuration.");
+        }
+      },
+      error: function (result) {
+        alert("Error removing object (1).");
+      }
+    });
+  }
+
+  function drawActions(result)
+  {
+    if (result==null)
+      return;
+    document.getElementById("actionsBody").innerHTML = "";
+    let i = 0;
+
+    for (let action of result) {
+
+      let actionId = encodeURIComponent(btoa(unescape(encodeURIComponent(action["name"]))));
+
+      $("#actionsBody").append(
+        ` <tr>
+              <td id="actionName${i}"></td>
+              <td id="actionDescription${i}"></td>
+              <td align="right">
+                {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/action-add.html?${actionId}" class="btn btn-info btn-sm" role="button">Edit...</a>{{/if}}{{/foreach}}
+                {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="javascript:actionRemove('${actionId}')" class="btn btn-danger btn-sm" role="button">Remove</a>{{/if}}{{/foreach}}
+              </td>
+            </tr>`
+      );
+      $(`#actionName${i}`).text(action["name"]);
+      $(`#actionDescription${i}`).text(action["description"]);
+
+      i++;
+    }
+  }
+
+  function actionRemove(actionId)
+  {
+    let actionName = decodeURIComponent(escape(atob(decodeURIComponent(actionId))));
+    var payloadData = { "method": "DELETE", "resource": "alerts/actions",
+                        "payload" : {
+                          "name" : actionName
+                        }
+                      }
+    auditRequest(payloadData, {
+      success: function (result) {
+        if (result == true)
+        {
+          location.reload();
+        }
+        else
+        {
+          alert("Error removing object (2).");
+        }
+      },
+      error: function (result) {
+        alert("Error removing object (1).");
+      }
+    });
+  }
+
+  function drawRunningActionsStart()
+  {
+    var payloadData = { "method": "GET", "resource": "alerts/actions" }
+    auditRequest(payloadData, {
+      success: function (result) {
+        drawActions(result);
+      },
+      error: function (result) {
+        console.log("ERR");
+      }
+    });
+  }
+
+  function drawIfModified()
+  {
+    var payloadData = { "method": "GET", "resource": "alerts/actions/modified" }
+    auditRequest(payloadData, {
+      success: function (result) {
+        if (result == true)
+        {
+          document.getElementById("saveAlert").style.visibility = "visible";
+          document.getElementById("saveAlert").style.display = "block";
+        }
+        else
+        {
+          document.getElementById("saveAlert").style.visibility = "collapse";
+          document.getElementById("saveAlert").style.display = "none";
+        }
+      },
+      error: function (result) {
+        console.log("ERR");
+      }
+    });
+  }
+
+</script>
+{{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
+{{#render[/includes/layout/inc.footer.html]!}}

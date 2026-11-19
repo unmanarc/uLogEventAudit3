@@ -1,0 +1,11 @@
+[Unit]
+Description=uLogEventAudit3 - WebServer
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/ulogeventaudit3/ul3_web
+ExecStart=/usr/bin/ul3_web
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

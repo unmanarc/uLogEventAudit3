@@ -1,0 +1,11 @@
+[Unit]
+Description=uLogEventAudit3 - Alert
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/ulogeventaudit3/ul3_alert
+ExecStart=/usr/bin/ul3_alert
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

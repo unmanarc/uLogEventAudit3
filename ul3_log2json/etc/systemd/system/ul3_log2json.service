@@ -1,0 +1,11 @@
+[Unit]
+Description=uLogEventAudit3 - RSYSLOG 2 JSON
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/ulogeventaudit3/ul3_log2json
+ExecStart=/usr/bin/ul3_log2json
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
