@@ -5,34 +5,48 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 let captured;
-const context = vm.createContext({window: {csrfToken: 'test-csrf'},
-    $: {ajax: options => { captured = options; return options; }}});
-vm.runInContext(fs.readFileSync(path.join(root, 'uanlz_web/var/www/uauditweb3/assets/js/audit.js'), 'utf8'), context);
-function request(value) {
+let scopes = ['stats', 'control'];
+let sessionReads = 0;
+const context = vm.createContext({
+    document: {querySelectorAll: () => scopes.map(textContent => ({textContent}))},
+    $: {ajax: options => {
+        if (options.url === '/api/v1/session') {
+            sessionReads++;
+            return Promise.resolve({csrfToken: 'csrf-' + sessionReads});
+        }
+        captured = options;
+        return options;
+    }}
+});
+vm.runInContext(fs.readFileSync(path.join(root, 'ul3_web/var/www/ulogeventaudit3/global/assets/js/audit.js'), 'utf8'), context);
+async function request(value, handlers = {}) {
     context.input = value;
-    vm.runInContext('auditRequest(input, {})', context);
+    context.handlers = handlers;
+    await vm.runInContext('auditRequest(input, handlers)', context);
     return captured;
 }
-let options = request({target: 'ALERTS', remoteMethod: 'stats.ReadRunningRules'});
-assert.equal(options.type, 'GET');
-assert.equal(options.url, '/api/v1/alerts/rules');
-assert.equal(options.data, undefined);
-options = request({target: 'ALERTS', remoteMethod: 'stats.ReadRunningAction', payload: {name: 'acción & test'}});
-assert.equal(options.type, 'GET');
-assert.deepEqual(JSON.parse(decodeURIComponent(options.url.split('?')[1])), {name: 'acción & test'});
-assert.equal(options.data, undefined);
-options = request({target: 'ALERTS', remoteMethod: 'control.RemoveRule', payload: {pos: 0}});
-assert.equal(options.type, 'DELETE');
-assert.equal(options.url, '/api/v1/alerts/rules');
-assert.deepEqual(JSON.parse(options.data), {pos: 0});
-assert.equal(options.headers['X-CSRF-Token'], 'test-csrf');
-assert.equal(options.contentType, 'application/json');
-assert.throws(() => request({target: 'ALERTS', remoteMethod: 'control.Unknown'}));
-// Client routes must agree with the server's allowlist.
-const serverRoutes = fs.readFileSync(path.join(root, 'uanlz_web/src/rest_routes.inc'), 'utf8');
-for (const [, verb, resource, target, method] of serverRoutes.matchAll(/Method::(\w+), "([^"]+)", "([^"]+)", "([^"]+)"/g)) {
-    options = request({target, remoteMethod: method});
-    assert.equal(options.type, verb);
-    assert.equal(options.url, '/api/v1/'+resource);
-}
-console.log('PASS: browser GET encoding, JSON mutations, CSRF and all server route mappings');
+(async () => {
+    let options = await request({method: 'GET', resource: 'alerts/rules'});
+    assert.equal(options.type, 'GET');
+    assert.equal(options.url, '/api/v1/alerts/rules');
+    assert.equal(options.data, undefined);
+    options = await request({method: 'GET', resource: 'alerts/actions/item', payload: {name: 'acción & test'}});
+    assert.deepEqual(JSON.parse(decodeURIComponent(options.url.split('?')[1])), {name: 'acción & test'});
+    assert.equal(sessionReads, 0);
+    options = await request({method: 'DELETE', resource: 'alerts/rules', payload: {pos: 0}});
+    assert.deepEqual(JSON.parse(options.data), {pos: 0});
+    assert.equal(options.headers['X-CSRF-Token'], 'csrf-1');
+    assert.equal(options.contentType, 'application/json');
+    options = await request({method: 'POST', resource: 'alerts/rules/save'});
+    assert.equal(options.headers['X-CSRF-Token'], 'csrf-2');
+    await assert.rejects(request({method: 'GET', resource: '../session'}));
+    await assert.rejects(request({method: 'PATCH', resource: 'alerts/rules'}));
+    scopes = ['stats'];
+    let denied = false;
+    captured = null;
+    await request({method: 'POST', resource: 'alerts/rules/save'}, {error: xhr => { denied = xhr.status === 403; }});
+    assert.equal(denied, true);
+    assert.equal(captured, null);
+    assert.equal(sessionReads, 2);
+    console.log('PASS: JSON requests, Unicode query arguments, fresh CSRF after renewal, and scope gating');
+})().catch(error => {console.error(error); process.exitCode = 1;});

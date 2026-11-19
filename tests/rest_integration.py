@@ -11,6 +11,7 @@ import http.client
 import http.server
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import socket
@@ -32,11 +33,11 @@ def free_port():
         return s.getsockname()[1]
 
 
-def token(scopes, app='UAUDITANALYZER', expired=False):
+def token(scopes, app='ULOGEVENTAUDIT3', expired=False, subject='test-user'):
     def b64(value):
         return base64.urlsafe_b64encode(value).rstrip(b'=')
     head = b64(json.dumps({'alg': 'HS256', 'typ': 'JWT'}).encode())
-    body = b64(json.dumps({'sub': 'test-user', 'app': app, 'type': 'access',
+    body = b64(json.dumps({'sub': subject, 'app': app, 'type': 'access',
                           'scopes': scopes, 'jti': 'test-csrf-id', 'iat': int(time.time())-60,
                           'exp': int(time.time()) + (-1 if expired else 3600)}).encode())
     data = head+b'.'+body
@@ -52,7 +53,7 @@ class AppSync(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         assert body['APIKEY'] == 'integration-app-key'
-        assert 'APP=UAUDITANALYZER' in self.path
+        assert 'APP=ULOGEVENTAUDIT3' in self.path
         name = urllib.parse.urlsplit(self.path).path.rsplit('/', 1)[-1]
         self.requests.append((name, body))
         if name == 'getApplicationJWTConfig':
@@ -83,7 +84,7 @@ def main():
     logfiles = []
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), AppSync)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    with tempfile.TemporaryDirectory(prefix='uaudit-rest-') as temp:
+    with tempfile.TemporaryDirectory(prefix='ul3-rest-') as temp:
         tmp = Path(temp)
         try:
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
@@ -94,7 +95,7 @@ def main():
             web_port, rpc_port, alert_port, input_port = [free_port() for _ in range(4)]
             config = f'''
 Logs {{ ShowColors false ShowDate false }}
-Authentication {{ AppName UAUDITANALYZER APIKey integration-app-key }}
+Authentication {{ AppName ULOGEVENTAUDIT3 APIKey integration-app-key }}
 RPCServer {{
     AlertsApiKey integration-alert-key
     Log2JSONApiKey integration-log-key
@@ -111,7 +112,8 @@ WebService {{
         TLS {{ CertFile {tmp}/server.crt KeyFile {tmp}/server.key }}
     }}
     Logs {{ Dir {tmp} File access.log }}
-    ResourcesPath {ROOT}/uanlz_web/var/www/uauditweb3
+    ResourcesPath {ROOT}/ul3_web/var/www/ulogeventaudit3/webroot
+    OverlappedDirectories {{ /assets {{ Path {ROOT}/ul3_web/var/www/ulogeventaudit3/global/assets }} }}
     JWT {{ UseAPISync true }}
     APISync {{ APISyncHost 127.0.0.1 APISyncPort {server.server_port} UseTLS false }}
     API {{ Origins https://localhost:{web_port} }}
@@ -130,7 +132,7 @@ WebService {{
                 processes.append(proc)
                 return proc
 
-            launch('uanlz_web', tmp)
+            launch('ul3_web', tmp)
             context = ssl.create_default_context(cafile=str(tmp/'server.crt'))
 
             def request(path, jwt=None, method='GET', data=None, csrf=None):
@@ -177,23 +179,66 @@ WebService {{
             assert request('/api/v1/not-a-resource', admin)[0] == 404
             assert request('/resources.conf', admin)[0] in (403,404)
             status, page = request('/mods/alerts/rules.html', admin)
-            assert status == 200 and '<!doctype html>' in page and '<%include:' not in page, (status, page[:400])
+            assert status == 200 and '<!doctype html>' in page and '<%include:' not in page and '{{' not in page, (status, page[:400])
+            assert 'Welcome, test-user' in page and 'ruleCmd(' in page
+            assert '>Remove</a>' in page and '/assets/js/jquery.min.js' in page
+            assert '/auth/assets/js/auth.js' in page
+            assert 'cdn.jsdelivr.net' not in page and 'code.jquery.com' not in page
+            for path in ['/mods/alerts/rules.html', '/mods/alerts/rules', '/mods/alerts/']:
+                status, page = request(path, reader)
+                assert status == 200 and '{{' not in page, (path, status, page[:400])
+                assert '>Remove</a>' not in page and '>Add New...</a>' not in page
+            for path in ['/includes/layout/inc.header.html', '/includes/alerts/inc.links.html']:
+                assert request(path, admin)[0] in (403, 404), path
+            for path in ['/mods/alerts/rule-add.html', '/mods/alerts/action-add', '/mods/alerts/input-add.html']:
+                assert request(path, reader)[0] == 403, path
+                status, page = request(path, admin)
+                assert status == 200 and '{{' not in page and '<form>' in page, (path, status)
+            assert request('/mods/alerts/stats.html', token([]))[0] == 403
+            status, page = request('/mods/alerts/rules.html', token(['stats', 'controller']))
+            assert status == 200 and '>Remove</a>' not in page
+            assert request('/mods/alerts/rule-add.html', token(['stats', 'controller']))[0] == 403
+            for path in ['/', '/index.html', '/mods/log2json/eventsph.html']:
+                status, page = request(path, admin)
+                assert status == 200 and '{{' not in page and 'Welcome, test-user' in page, (path, status)
+            for path in ['/index.html', '/assets/js/jquery.min.js', '/mods/alerts/rules.html']:
+                assert request(path)[0] == 302, path
+            for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js']:
+                status, asset = request(path, reader)
+                assert status == 200 and len(asset) > 1000, (path, status)
+            for path in ['/package.json', '/node_modules/jquery/dist/jquery.min.js']:
+                assert request(path, admin)[0] in (403, 404), path
+
+            status, page = request('/index.html', token(['stats'], subject='<img src=x onerror=alert(1)>'))
+            assert status == 200 and '<img src=x' not in page and '&lt;img' in page
+            # Check every rendered inline script, including controls emitted for each scope set.
+            for page_file in (ROOT/'ul3_web/var/www/ulogeventaudit3/webroot/mods').glob('*/*.html'):
+                path = '/'+str(page_file.relative_to(ROOT/'ul3_web/var/www/ulogeventaudit3/webroot'))
+                for jwt in (admin, reader):
+                    status, page = request(path, jwt)
+                    if status == 403:
+                        assert page_file.stem in ('rule-add', 'action-add', 'input-add') and jwt == reader
+                        continue
+                    assert status == 200 and '{{' not in page, (path, status)
+                    scripts = re.findall(r'<script>(.*?)</script>', page, re.S)
+                    if shutil.which('node'):
+                        subprocess.run(['node', '--check'], input='\n'.join(scripts), text=True,
+                                       capture_output=True, check=True)
 
             # Start actual alert and converter backends with empty temporary configurations.
-            for name, key_name, key in [('uanlz_alert', 'AlertsApiKey', 'integration-alert-key'),
-                                        ('uanlz_log2json', 'Log2JSONApiKey', 'integration-log-key')]:
+            for name, key_name, key in [('ul3_alert', 'AlertsApiKey', 'integration-alert-key'),
+                                        ('ul3_log2json', 'Log2JSONApiKey', 'integration-log-key')]:
                 directory = tmp/name
                 directory.mkdir()
                 shutil.copy(tmp/'server.crt', directory/'rpcca.crt')
-                ini = (ROOT/name/'etc/uauditanalyzer3'/name/'config.ini').read_text()
+                ini = (ROOT/name/'etc/ulogeventaudit3'/name/'config.ini').read_text()
                 ini = ini.replace('RemoteAddr=audit.localhost', 'RemoteAddr=localhost')
                 ini = ini.replace('RemotePort=33001', f'RemotePort={rpc_port}')
-                import re
                 ini = re.sub(key_name+'=.*', key_name+'='+key, ini)
                 ini = ini.replace('ToSyslog=true', 'ToSyslog=false')
                 (directory/'config.ini').write_text(ini)
                 (directory/'config.ini').chmod(0o600)
-                if name == 'uanlz_alert':
+                if name == 'ul3_alert':
                     for file in ['rules.json', 'actions.json']:
                         (directory/file).write_text('[]')
                     (directory/'inputs.json').write_text(json.dumps([{'Description':'test input', 'ListenAddr':'127.0.0.1', 'ListenPort':alert_port, 'id':'test-input'}]))
@@ -223,8 +268,8 @@ WebService {{
             status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
                                    {'id': added_input['id']}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            assert len(json.loads((tmp/'uanlz_alert/inputs.json').read_text())) == 1
-            input_file = tmp/'uanlz_alert/inputs.json'
+            assert len(json.loads((tmp/'ul3_alert/inputs.json').read_text())) == 1
+            input_file = tmp/'ul3_alert/inputs.json'
             original_inputs = input_file.read_text()
             status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
                                    {'id': 'test-input'}, 'test-csrf-id')
@@ -242,7 +287,7 @@ WebService {{
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
-                config_file = tmp/'uanlz_alert'/(resource+'.json')
+                config_file = tmp/'ul3_alert'/(resource+'.json')
                 assert json.loads(config_file.read_text()) == []
                 status, body = request('/api/v1/alerts/'+resource+'/config', admin, 'PUT', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
@@ -310,7 +355,7 @@ WebService {{
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
-                assert json.loads((tmp/'uanlz_alert'/ (resource+'.json')).read_text())
+                assert json.loads((tmp/'ul3_alert'/ (resource+'.json')).read_text())
             assert any(name == 'updateAccessControlContext'  for name, _ in AppSync.requests)
             print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, GET parameters, persisted writes and audit-to-action pipeline')
         except Exception:

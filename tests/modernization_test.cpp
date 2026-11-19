@@ -9,8 +9,8 @@
 #include <iostream>
 #include <stdexcept>
 
-using namespace UANLZ::LOG2JSON;
-using namespace UANLZ::LOG2JSON::AuditdEvents;
+using namespace UL3::LOG2JSON;
+using namespace UL3::LOG2JSON::AuditdEvents;
 
 namespace {
 /** @brief Fail the regression test with a diagnostic when an invariant is false. */

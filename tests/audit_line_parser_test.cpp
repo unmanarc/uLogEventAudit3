@@ -5,7 +5,7 @@
 #include <limits>
 #include <stdexcept>
 
-using namespace UANLZ::LOG2JSON::Input;
+using namespace UL3::LOG2JSON::Input;
 
 namespace {
 void require(bool condition, const char *message)
