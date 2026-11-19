@@ -6,7 +6,7 @@
 #include "audit_json.h"
 #include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 
-namespace UANLZ::JSON {
+namespace UL3::JSON {
 
 /**
  * @brief Adapt an application callback to the Mantids30 FastRPC1 method signature.
@@ -20,4 +20,4 @@ Mantids30::Protocol::FastRPC1::Method rpcMethod()
             { return Callback(nullptr, key, input, nullptr, data); },
             nullptr};
 }
-} // namespace UANLZ::JSON
+} // namespace UL3::JSON

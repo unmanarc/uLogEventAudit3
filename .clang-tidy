@@ -67,7 +67,7 @@ Checks: >
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '(^|/)(common|uanlz_alert/src|uanlz_log2json/src|uanlz_web/src|tests)/.*'
+HeaderFilterRegex: '(^|/)(common|ul3_alert/src|ul3_log2json/src|ul3_web/src|tests)/.*'
 
 FormatStyle: file
 

@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-namespace UANLZ::JSON {
+namespace UL3::JSON {
 
 /**
  * @brief Read a JSON configuration array, normalizing legacy null to an empty array.
@@ -96,4 +96,4 @@ inline std::string toStyledString(const boost::json::value &value)
     output += '\n';
     return output;
 }
-} // namespace UANLZ::JSON
+} // namespace UL3::JSON

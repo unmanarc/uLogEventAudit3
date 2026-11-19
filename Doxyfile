@@ -1,6 +1,6 @@
-PROJECT_NAME           = uAuditAnalyzer3
+PROJECT_NAME           = uLogEventAudit3
 OUTPUT_DIRECTORY       = build/doxygen
-INPUT                  = common uanlz_alert/src uanlz_log2json/src uanlz_web/src
+INPUT                  = common ul3_alert/src ul3_log2json/src ul3_web/src
 RECURSIVE              = YES
 FILE_PATTERNS          = *.h *.cpp
 EXCLUDE_PATTERNS       = */config.h
