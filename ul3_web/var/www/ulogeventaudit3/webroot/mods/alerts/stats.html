@@ -1,109 +1,21 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Statistics Dashboard";
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-stats-link').style.color = "white";
     mainview_alerts_stats_start();
 
   }
 </script>
 
-<table width="100%">
-
-    <tr valign=top>
-
-      <td>
-        <h2 class="h6 font-weight-bold text-center mb-4">JSON Queue</h2>
-        <div class="progress mx-auto" data-value='x' id=eventsQueuePercentage0>
-          <span class="progress-left"><span class="progress-bar border-success" id=eventsQueuePercentageCOLOR0></span></span>
-          <span class="progress-right"><span class="progress-bar border-success" id=eventsQueuePercentageCOLOR1></span></span>
-          <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center">
-            <span class="h2 font-weight-bold" id=eventsQueuePercentage1></span> <span><sup class="small">%</sup></span>
-          </div>
-        </div>
-
-        <br>
-        <div class="font-weight-bold text-center mb-4" id=eventsQueueSize>1/x</span>
-
-      </td>
-
-      <td width="75%">
-
-        <h3> Values: </h3><br>
-
-        <table class="table table-hover">
-
-          <thead>
-            <tr>
-              <th>JSON Queue Speed</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>Queue IN - Last Second</td>
-              <td id="queueInLastSec">x</td>
-            </tr>
-            <tr>
-              <td>Queue OUT - Last Second</td>
-              <td id="queueOutLastSec">x</td>
-            </tr>
-            <tr>
-              <td>Last Evaluation Time (In Milliseconds)</td>
-              <td id="lastEvaluationTimeInMS">0.xx</td>
-            </tr>
-          </tbody>
-
-          <thead>
-            <tr>
-              <th>JSON Queue Interpreter</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>Bad Format</td>
-              <td id="badFormatLines">x</td>
-            </tr>
-            <tr>
-              <td>Dropped (Full Queue)</td>
-              <td id="droppedInQueue">x</td>
-            </tr>
-            <tr>
-              <td>Processed JSON Elements</td>
-              <td id="processedLines">x</td>
-            </tr>
-          </tbody>
-
-
-          <thead>
-            <tr>
-              <th>JSON Filter Engine</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>Activated Filters</td>
-              <td id="rulesActivated">x</td>
-            </tr>
-          </tbody>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-  <script>
+<div class="stats-layout"><section class="queue-panel" aria-label="Queue capacity"><h2>JSON event queue</h2>
+        <div class="progress mx-auto" data-value="0" id="eventsQueuePercentage0" role="progressbar" aria-label="Queue usage" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-left"><span class="progress-bar border-success" id="eventsQueuePercentageCOLOR0"></span></span><span class="progress-right"><span class="progress-bar border-success" id="eventsQueuePercentageCOLOR1"></span></span>
+            <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center"><span class="h2" id="eventsQueuePercentage1">—</span><span class="ms-1">%</span></div>
+        </div><div class="queue-count" id="eventsQueueSize">Waiting for data</div><div class="form-text">Queued / capacity</div></section><div><h2 class="panel-title">Processing metrics</h2><table class="table table-hover" aria-label="Processing metrics"><thead><tr><th scope="col">Queue throughput</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Received · last second</td><td class="text-end fw-semibold" id="queueInLastSec">—</td></tr><tr><td>Processed · last second</td><td class="text-end fw-semibold" id="queueOutLastSec">—</td></tr><tr><td>Last evaluation · milliseconds</td><td class="text-end fw-semibold" id="lastEvaluationTimeInMS">—</td></tr></tbody><thead><tr><th scope="col">JSON processing</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Invalid JSON</td><td class="text-end fw-semibold" id="badFormatLines">—</td></tr><tr><td>Dropped · queue full</td><td class="text-end fw-semibold" id="droppedInQueue">—</td></tr><tr><td>Processed JSON elements</td><td class="text-end fw-semibold" id="processedLines">—</td></tr></tbody><thead><tr><th scope="col">Filter engine</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Activated filters</td><td class="text-end fw-semibold" id="rulesActivated">—</td></tr></tbody></table></div></div>
+<script>
 
     function drawFilterStats(filterStats) {
 
@@ -136,9 +48,7 @@
         success: function (result) {
           drawFilterStats(result);
         },
-        error: function (result) {
-          console.log("ERR");
-        }
+        error: commonFunctionError
       });
     }
 

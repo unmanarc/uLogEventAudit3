@@ -1,13 +1,10 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Rule";
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-rules-link').style.color = "white";
     loadActions();
   }
 
@@ -26,7 +23,7 @@
       success: function (result) {
         if (result == null)
         {
-          alert("Error loading rule (2)...");
+          showToast("Error loading rule (2)...", "error");
           return;
         }
 
@@ -64,9 +61,7 @@
         document.getElementById("rulePos").disabled = true;
         checkActions();
       },
-      error: function (result) {
-        alert("Error loading rule...");
-      }
+      error: commonFunctionError
     });
 
     return true;
@@ -83,7 +78,7 @@
         {
 
 
-        document.getElementById("actions").innerHTML = "";
+        document.getElementById("actions").innerHTML = '<option value="" disabled selected>Select an action</option>';
         let i = 0;
 
         for (let action of result) {
@@ -106,14 +101,13 @@
     }
 
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
   }
 
   function checkActions() {
+    document.getElementById("actions").disabled = document.getElementById("bABORT").checked;
     if (document.getElementById("bEXECANDABORT").checked || document.getElementById("bEXEC").checked) {
       document.getElementById("actionOptions").style.visibility = "visible";
       document.getElementById("actionOptions").style.display = "block";
@@ -126,6 +120,7 @@
   }
 
   function addRule(editMode) {
+    if (!document.getElementById("editor-form").reportValidity()) return false;
 
     var action = "EXEC";
 
@@ -176,12 +171,10 @@
         if (result == true)
           document.location = "/mods/alerts/rules.html";
         else {
-          alert("Internal Error Adding new Rule");
+          showToast("Internal Error Adding new Rule", "error");
         }
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
     return true;
@@ -190,62 +183,19 @@
 </script>
 
 
-<form>
-  <div class="form-group">
-    <label for="ruleName"><b>Alert Description / Name:</b></label>
-    <input type="text" class="form-control" value="Alert Name" id="ruleName" placeholder="Enter Alert Name">
-  </div>
-  <div class="form-group">
-    <label><b>Action:</b></label>
-
-    <div class="form-check">
-      <input class="form-check-input" type="radio" name="flexRadioDefault" id="bEXEC" checked
-        onclick="javascript:checkActions();">
-      <label class="form-check-label" for="bEXEC">
-        Execute Action And Continue
-      </label>
-    </div>
-    <div class="form-check">
-      <input class="form-check-input" type="radio" name="flexRadioDefault" id="bEXECANDABORT"
-        onclick="javascript:checkActions();">
-      <label class="form-check-label" for="bEXECANDABORT">
-        Execute Action And Abort Next Rules Evaluation
-      </label>
-    </div>
-    <div class="form-check">
-      <input class="form-check-input" type="radio" name="flexRadioDefault" id="bABORT"
-        onclick="javascript:checkActions();">
-      <label class="form-check-label" for="bABORT">
-        Stop and Abort Next Rules
-      </label>
-    </div>
-  </div>
-
-  <span id="actionOptions">
-    <div class="form-group">
-      <label for="actions"><b>Action Name:</b></label>
-      <select class="form-select" aria-label="Default select example" id="actions" style="min-width: 300px;">
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label for="ruleEvaluationFilter"><b>Evaluation Rule:</b></label>
-      <textarea class="form-control" style="font-family:monospace;" id="ruleEvaluationFilter" rows="10"
-        cols="50">IS_EQUAL("Y","Y")</textarea>
-    </div>
-
-    <div class="form-group">
-      <label for="rulePos"><b>Rule Position Index:</b> </label>
-      <input type="number" class="form-control" id="rulePos" min="0" value="0">
-    </div>
-  </span>
+<form id="editor-form" class="editor-form">
+    <fieldset class="form-section"><legend>Rule details</legend>
+        <div class="form-grid"><div class="form-group"><label for="ruleName">Rule name</label><input type="text" class="form-control" id="ruleName" placeholder="e.g. Failed login alert" required></div><div class="form-group"><label for="rulePos">Position</label><input type="number" class="form-control" id="rulePos" min="0" step="1" value="0" required aria-describedby="position-help"><div class="form-text" id="position-help">Rules run in order, starting at position 0.</div></div></div>
+        <div class="form-group"><label for="ruleEvaluationFilter">Match condition</label><textarea class="form-control" id="ruleEvaluationFilter" rows="5" required aria-describedby="filter-help" spellcheck="false">IS_EQUAL("Y","Y")</textarea><div class="form-text" id="filter-help">A JSON evaluation expression. The default condition matches every event.</div></div>
+    </fieldset>
+    <fieldset class="form-section"><legend>When an event matches</legend>
+        <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bEXEC" checked onchange="checkActions()"><label for="bEXEC">Execute action and continue<small>Run the action, then evaluate the remaining rules.</small></label></div>
+        <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bEXECANDABORT" onchange="checkActions()"><label for="bEXECANDABORT">Execute action and stop<small>Run the action and skip the remaining rules for this event.</small></label></div>
+        <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bABORT" onchange="checkActions()"><label for="bABORT">Stop evaluation<small>Skip the remaining rules without executing an action.</small></label></div>
+        <div id="actionOptions" class="form-group mt-4"><label for="actions">Action to execute</label><select class="form-select" id="actions" required aria-describedby="action-help"></select><div class="form-text" id="action-help">Choose an existing action. <a href="/mods/alerts/action-add.html">Create an action</a> if none are available.</div></div>
+    </fieldset>
+    <p class="form-text">Changes apply to the running configuration. Use Save to disk on the rules page to keep them after a restart.</p>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/rules.html">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit">Add rule</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;">Save changes</button></div>
 </form>
-
-
-<div class="d-flex flex-row-reverse">
-  <button class="btn btn-success btn-sm" id="AddButton"  role="button" onclick="javascript:addRule('add')">Add...</a>
-    <button class="btn btn-success " id="EditButton" role="button" onclick="javascript:addRule('edit')" style="visibility: collapse; display: none;">Edit...</a>
-
-</div>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

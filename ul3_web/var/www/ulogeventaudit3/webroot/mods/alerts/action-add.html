@@ -1,14 +1,11 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Action";
-  argn = 1;
+  let argn = 1;
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-actions-link').style.color = "white";
 
     let actionId = decodeURIComponent(escape(atob(decodeURIComponent(window.location.search.substr(1)))));
 
@@ -29,7 +26,7 @@
       success: function (result) {
         if (result == null)
         {
-          alert("Error loading action (2)...");
+          showToast("Error loading action (2)...", "error");
           return;
         }
 
@@ -41,6 +38,7 @@
 
         document.getElementById("appendNewLineToEachArgv").checked = result['appendNewLineToEachArgv'];
         document.getElementById("actionName").value = result['name'];
+        document.getElementById("actionName").readOnly = true;
         document.getElementById("actionDescription").value = result['description'];
         document.getElementById("actionExecPath").value = result['path'];
         document.getElementById("inputArg0").value = result['args'][0];
@@ -50,15 +48,14 @@
           document.getElementById(`inputArg${i}`).value = result['args'][i];
         }
       },
-      error: function (result) {
-        alert("Error loading action...");
-      }
+      error: commonFunctionError
     });
 
     return true;
   }
 
   function addAction(editMode) {
+    if (!document.getElementById("editor-form").reportValidity()) return false;
 
     let httpMethod;
     if (editMode == "add")
@@ -81,7 +78,7 @@
       }
     }
 
-    for (i = 1; i < argn; i++) {
+    for (let i = 1; i < argn; i++) {
       payloadData["payload"]["args"][i] = $(`#inputArg${i}`).val();
     }
 
@@ -90,12 +87,10 @@
         if (result == true)
           document.location = "/mods/alerts/actions.html";
         else {
-          alert("Internal Error Adding new Action");
+          showToast("Internal Error Adding new Action", "error");
         }
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
     return true;
@@ -104,72 +99,37 @@
   function addNewArgument() {
     $("#arguments").append(
       `    <div class="form-group" id="formArg${argn}">
-             <input type="text" class="form-control" value="" id="inputArg${argn}" style="font-family:monospace;" placeholder="Enter Argument ${argn}">
+             <label for="inputArg${argn}">Argument ${argn}</label><input type="text" class="form-control" value="" id="inputArg${argn}" style="font-family:monospace;" placeholder="Enter Argument ${argn}">
              </div> `
     );
     argn = argn + 1;
+    document.getElementById("remove-argument").disabled = false;
   }
 
   function remLastArgument() {
     if (argn > 1) {
       argn = argn - 1;
       document.getElementById(`formArg${argn}`).remove();
+      document.getElementById("remove-argument").disabled = argn <= 1;
     }
   }
 </script>
 
-<form>
-  <div class="form-group">
-    <label for="actionName"><b>Action Name:</b></label>
-    <input type="text" class="form-control" value="Action Name" id="actionName" placeholder="Enter Name">
-  </div>
-  <div class="form-group">
-    <label for="actionDescription"><b>Action Description:</b></label>
-    <input type="text" class="form-control" value="Action Description" id="actionDescription"
-      placeholder="Enter Description">
-  </div>
-  <div class="form-group">
-    <label for="actionExecPath"><b>Executable Path:</b></label>
-    <input type="text" class="form-control" value="/usr/bin/sendmsg.sh" id="actionExecPath"
-      placeholder="Enter Executable Path">
-  </div>
-  <div class="form-check">
-    <input class="form-check-input" type="checkbox" value="" id="appendNewLineToEachArgv" checked>
-    <label class="form-check-label" for="appendNewLineToEachArgv">
-      Append New Line To Each Program Argument
-    </label>
-  </div>
-
-  <hr>
-
-  <table width=100% align=center>
-    <tr>
-      <td>
-        <label for="actionDescription"><b>Program Arguments:</b></label>
-      </td>
-      <td align="right">
-        <a href="javascript:remLastArgument()" class="btn btn-danger btn-sm" role="button">Remove Last Argument...</a>
-        <a href="javascript:addNewArgument()" class="btn btn-success btn-sm" role="button">Add New Argument...</a>
-        <br><br>
-      </td>
-    </tr>
-
-    <tr>
-      <td colspan="2" id="arguments">
-        <div class="form-group">
-          <input type="text" class="form-control" value="" id="inputArg0" placeholder="Enter Argument 0 (program name)" style="font-family:monospace;">
-        </div>
-
-      </td>
-    </tr>
-  </table>
-
+<form id="editor-form" class="editor-form">
+    <fieldset class="form-section"><legend>Action details</legend>
+        <div class="form-group"><label for="actionName">Name / key</label><input type="text" class="form-control" id="actionName" placeholder="e.g. notify-security" required aria-describedby="name-help"><div class="form-text" id="name-help">The unique name used by rules to reference this action.</div></div>
+        <div class="form-group"><label for="actionDescription">Description</label><input type="text" class="form-control" id="actionDescription" placeholder="e.g. Notify the security team"></div>
+    </fieldset>
+    <fieldset class="form-section"><legend>Program</legend>
+        <div class="form-group"><label for="actionExecPath">Executable path</label><input type="text" class="form-control code-input" id="actionExecPath" placeholder="/usr/bin/sendmsg.sh" required aria-describedby="path-help"><div class="form-text" id="path-help">Absolute path to the program on the alerts server.</div></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="appendNewLineToEachArgv" checked><label class="form-check-label" for="appendNewLineToEachArgv">Append a newline to each program argument</label></div>
+    </fieldset>
+    <fieldset class="form-section"><legend>Program arguments</legend><p class="form-text">Argument 0 is the program name. Add subsequent arguments in the order the program expects.</p>
+        <div id="arguments"><div class="form-group"><label for="inputArg0">Argument 0 · program name</label><input type="text" class="form-control code-input" id="inputArg0" placeholder="e.g. sendmsg.sh"></div></div>
+        <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary" onclick="addNewArgument()">Add argument</button><button type="button" class="btn btn-outline-secondary" id="remove-argument" onclick="remLastArgument()" disabled>Remove last argument</button></div>
+    </fieldset>
+    <p class="form-text">Changes apply to the running configuration. Use Save to disk on the actions page to keep them after a restart.</p>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/actions.html">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit">Add action</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;">Save changes</button></div>
 </form>
-<hr>
-
-<div class="d-flex flex-row-reverse">
-  <button class="btn btn-success " id="AddButton" role="button" onclick="javascript:addAction('add')">Add...</a>
-  <button class="btn btn-success " id="EditButton" role="button" onclick="javascript:addAction('edit')" style="visibility: collapse; display: none;">Edit...</a>
-</div>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

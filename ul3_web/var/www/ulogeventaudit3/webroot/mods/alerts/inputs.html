@@ -1,19 +1,15 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Current Inputs Stats";
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-inputs-link').style.color = "white";
     mainview_alerts_inputs_start();
   }
 </script>
 
-<span id="span-alerts-input-body">
-</span>
+<div id="span-alerts-input-body" data-empty="No inputs reporting activity yet."></div>
 
 <script>
 
@@ -25,13 +21,11 @@
     for (let input of inputStats) {
       $("#span-alerts-input-body").append(
         `
-        <hr>
-        <br>
-        <div class="container">
-        <b>Source Description: </b><span id="span-alerts-input-description-${i}"></span>
+        <div class="source-card">
+        <h2><span id="span-alerts-input-description-${i}"></span></h2>
 
         <table class="table table-striped">
-          <thead><tr><th width=50%>Incoming connection from<br>(IP Address)</th><th>Processed JSON Elements</th><th>Dropped JSON Elements</th></tr></thead>
+          <thead><tr><th width=50%>Source IP address</th><th>Processed JSON Elements</th><th>Dropped JSON Elements</th></tr></thead>
           <tbody id="tbody-alerts-input-${i}"></tbody>
         </table>
         </div>`
@@ -57,9 +51,7 @@
       success: function (result) {
         drawInputStats(result);
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
   }
   function mainview_alerts_inputs_stop() {

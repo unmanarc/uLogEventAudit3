@@ -1,13 +1,10 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts Inputs Configuration";
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-inputsconfig-link').style.color = "white";
     mainview_alerts_inputs_start();
   }
 
@@ -30,12 +27,10 @@
         }
         else
         {
-          alert("Internal error reloading the alerts service");
+          showToast("Internal error reloading the alerts service", "error");
         }
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
   }
@@ -53,22 +48,20 @@
   id="span-alerts-inputsmodified-body" style="visibility: collapse; display: none;">
   <strong>The input configuration has been modified!</strong> <br>
   Please reload the alert service to adopt the new changes.<br>
-  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button class="btn btn-danger btn-sm" role="button" onclick="javascript:reloadAlerts()">Reload...</button>{{/if}}{{/foreach}}
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button class="btn btn-danger btn-sm" role="button" onclick="javascript:reloadAlerts()">Reload service</button>{{/if}}{{/foreach}}
 </div>
 
 
-<div class="d-flex flex-row-reverse">
-  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/input-add.html" class="btn btn-info btn-sm" role="button">Add New Input...</a>{{/if}}{{/foreach}}
+<div class="panel-toolbar"><h2 class="panel-title">Configured listeners</h2>
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/input-add.html" class="btn btn-primary" role="button">Add input</a>{{/if}}{{/foreach}}
 </div>
 
-<hr>
-
-<span id="span-alerts-inputsconfig-body">
-</span>
+<div id="span-alerts-inputsconfig-body" data-empty="No inputs configured. Add a listener to receive JSON events."></div>
 
 <script>
-  function removeInput(localId)
+  async function removeInput(localId)
   {
+    if (!await auditConfirm("Remove this TCP input? Reload the alerts service afterwards to apply the change.")) return;
     let id =  document.getElementById(`span-alerts-inputsconfig-id-${localId}`).value;
     var payloadData = { "method": "DELETE", "resource": "alerts/inputs/config",
                         "payload": {
@@ -81,12 +74,10 @@
           document.location = "/mods/alerts/inputsconfig.html";
         else
         {
-          alert("Internal Error Removing Input");
+          showToast("Internal Error Removing Input", "error");
         }
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
 
@@ -101,15 +92,12 @@
     for (let input of inputs) {
       $("#span-alerts-inputsconfig-body").append(
         `
-        <div class="alert alert-dark alert-dismissible fade show" role="alert">
-          <b>Description: </b><span id="span-alerts-inputsconfig-description-${i}"></span><br>
-          <b>Listen Address: </b><span id="span-alerts-inputsconfig-laddr-${i}"></span><br>
-          <b>Listen Port: </b><span id="span-alerts-inputsconfig-lport-${i}"></span><br>
+        <section class="input-config-card">
+          <h2 id="span-alerts-inputsconfig-description-${i}"></h2>
+          <dl><div><dt>Listen address</dt><dd id="span-alerts-inputsconfig-laddr-${i}"></dd></div><div><dt>TCP port</dt><dd id="span-alerts-inputsconfig-lport-${i}"></dd></div></dl>
           <input type="hidden" id="span-alerts-inputsconfig-id-${i}">
-          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button type="button" class="close" onclick="javascript:removeInput('${i}')" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>{{/if}}{{/foreach}}
-        </div>`
+          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button type="button" class="btn btn-danger btn-sm remove-input" onclick="removeInput('${i}')" aria-label="Remove input">Remove</button>{{/if}}{{/foreach}}
+        </section>`
       );
       $(`#span-alerts-inputsconfig-description-${i}`).text(input["Description"]);
       $(`#span-alerts-inputsconfig-laddr-${i}`).text(input["ListenAddr"]);
@@ -132,9 +120,7 @@
 
         drawInputs(result["inputs"]);
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
   }
   function mainview_alerts_inputs_stop() {

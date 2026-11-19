@@ -1,16 +1,14 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/alerts/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Alerts &#9658; JSON Alerts - Add New Input";
 
   // Default Main View:
   function auditReady() {
-    document.getElementById('mainview-alerts-inputsconfig-link').style.color = "white";
   }
 
   function addInput() {
+    if (!document.getElementById("editor-form").reportValidity()) return false;
     var payloadData = { "method": "POST", "resource": "alerts/inputs/config",
                         "payload": {
                           "Description" : $("#inputDescription").val(),
@@ -24,12 +22,10 @@
           document.location = "/mods/alerts/inputsconfig.html";
         else
         {
-          alert("Internal Error Adding new Input");
+          showToast("Internal Error Adding new Input", "error");
         }
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
 
 
@@ -38,24 +34,16 @@
   }
 
 </script>
-  <form>
-    <div class="form-group">
-      <label for="inputDescription">Description:</label>
-      <input type="text" class="form-control" value="Alert JSON TCP Input" id="inputDescription"
-        placeholder="Enter Input Description">
-    </div>
-    <div class="form-group">
-      <label for="inputAddress">Input Address:</label>
-      <input type="text" class="form-control" value="0.0.0.0" id="inputAddress"
-        placeholder="Enter TCP/IP Listenning address">
-    </div>
-    <div class="form-group">
-      <label for="inputPort">Listen TCP/IP Port (from 1 to 65535): </label>
-      <input type="number" class="form-control" id="inputPort" min="1" max="65535" value="9999">
-    </div>
-  </form>
-  <div class="d-flex flex-row-reverse">
-    <button class="btn btn-success btn-sm" role="button"  onclick="javascript:addInput()">Add...</a>
-  </div>
+  <form id="editor-form" class="editor-form">
+    <fieldset class="form-section"><legend>Input details</legend>
+        <div class="form-group"><label for="inputDescription">Description</label><input type="text" class="form-control" value="Alert JSON TCP Input" id="inputDescription" placeholder="e.g. Production audit events" required aria-describedby="description-help"><div class="form-text" id="description-help">A recognizable name for this listener.</div></div>
+    </fieldset>
+    <fieldset class="form-section"><legend>TCP listener</legend><div class="form-grid">
+        <div class="form-group"><label for="inputAddress">Listen address</label><input type="text" class="form-control code-input" value="0.0.0.0" id="inputAddress" required aria-describedby="address-help"><div class="form-text" id="address-help">Use 0.0.0.0 to listen on all IPv4 interfaces, or specify a local address.</div></div>
+        <div class="form-group"><label for="inputPort">TCP port</label><input type="number" class="form-control" id="inputPort" min="1" max="65535" step="1" value="9999" required aria-describedby="port-help"><div class="form-text" id="port-help">An available port between 1 and 65535.</div></div>
+    </div></fieldset>
+    <div class="alert alert-info">After adding an input, reload the alerts service from Input configuration to apply the change.</div>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/inputsconfig.html">Cancel</a><button class="btn btn-primary" type="submit">Add input</button></div>
+</form>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

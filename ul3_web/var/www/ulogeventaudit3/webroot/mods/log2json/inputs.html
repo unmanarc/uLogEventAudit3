@@ -1,10 +1,7 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/log2json/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Log-&gt;JSON Dissector &#9658; Syslog+Auditd Inputs";
-  document.getElementById('mainview-log2json-inputs-link').style.color = "white";
 
   // Default Main View:
   function auditReady() {
@@ -14,8 +11,7 @@
 
 
 
-<span id="span-log2json-input-body">
-</span>
+<div id="span-log2json-input-body" data-empty="No inputs reporting activity yet."></div>
 
 <script>
 
@@ -26,14 +22,12 @@
 
         for (let input of inputStats) {
             $("#span-log2json-input-body").append(
-                `<hr>
-                <br>
-                <div class="container">
-                    <b>Source Description: </b><span id="span-log2json-input-description-${i}"></span><br>
+                `<div class="source-card">
+                    <h2><span id="span-log2json-input-description-${i}"></span></h2><br>
                     <b>Total Processed Lines: </b><span id="span-log2json-input-proclines-${i}"></span><br>
                     <b>Total Invalid Lines: </b><span id="span-log2json-input-invlines-${i}"></span><br>
                     <table class="table table-striped">
-                        <thead><tr><th width=50%>Incoming connection from<br>(IP Address)</th><th>Processed Lines</th><th>Invalid Lines</th></tr></thead>
+                        <thead><tr><th width=50%>Source IP address</th><th>Processed Lines</th><th>Invalid Lines</th></tr></thead>
                         <tbody id="tbody-log2json-input-${i}"></tbody>
                     </table>
                 </div>`
@@ -62,9 +56,7 @@
             success: function (result) {
                 drawLog2JSONInputStats(result["inputs"]);
             },
-            error: function (result) {
-                console.log("ERR");
-            }
+            error: commonFunctionError
         });
     }
     function mainview_log2json_inputs_stop() {

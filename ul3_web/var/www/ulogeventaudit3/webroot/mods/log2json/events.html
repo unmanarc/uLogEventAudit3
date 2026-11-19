@@ -1,10 +1,7 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
-{{#render[/includes/log2json/inc.links.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-  document.getElementById("apptitle").innerHTML = "Log-&gt;JSON Dissector &#9658; Syslog Incoming Auditd Events";
-  document.getElementById('mainview-log2json-events-link').style.color = "white";
 
   // Default Main View:
   function auditReady() {
@@ -12,68 +9,11 @@
   }
 </script>
 
-<table width="100%">
-    <tr valign=top>
-      <td>
-        <h2 class="h6 font-weight-bold text-center mb-4">Auditd Event Queue</h2>
-        <div class="progress mx-auto" data-value='x' id=log2json-eventsQueuePercentage0>
-          <span class="progress-left"><span class="progress-bar border-success" id=log2json-eventsQueuePercentageCOLOR0></span></span>
-          <span class="progress-right"><span class="progress-bar border-success" id=log2json-eventsQueuePercentageCOLOR1></span></span>
-          <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center">
-            <span class="h2 font-weight-bold" id=log2json-eventsQueuePercentage1></span> <span><sup class="small">%</sup></span>
-          </div>
-        </div>
-
-        <br>
-        <div class="font-weight-bold text-center mb-4" id=log2json-eventsQueueSize>1/x</span>
-
-      </td>
-
-      <td width="75%">
-
-        <h3> Values: </h3><br>
-
-        <table class="table table-hover">
-
-          <thead>
-            <tr>
-              <th>Auditd JSON Queue Speed</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>Events - Last 10 Second</td>
-              <td id="log2json-queueInLast10Sec">x</td>
-            </tr>
-          </tbody>
-
-          <thead>
-            <tr>
-              <th>Auditd JSON Processing</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>Dropped In Queue (Full)</td>
-              <td id="log2json-dropped">x</td>
-            </tr>
-            <tr>
-              <td>Total Processed</td>
-              <td id="log2json-total">x</td>
-            </tr>
-          </tbody>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-
+<div class="stats-layout"><section class="queue-panel" aria-label="Queue capacity"><h2>Auditd event queue</h2>
+        <div class="progress mx-auto" data-value="0" id="log2json-eventsQueuePercentage0" role="progressbar" aria-label="Queue usage" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-left"><span class="progress-bar border-success" id="log2json-eventsQueuePercentageCOLOR0"></span></span><span class="progress-right"><span class="progress-bar border-success" id="log2json-eventsQueuePercentageCOLOR1"></span></span>
+            <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center"><span class="h2" id="log2json-eventsQueuePercentage1">—</span><span class="ms-1">%</span></div>
+        </div><div class="queue-count" id="log2json-eventsQueueSize">Waiting for data</div><div class="form-text">Queued / capacity</div></section><div><h2 class="panel-title">Processing metrics</h2><table class="table table-hover" aria-label="Processing metrics"><thead><tr><th scope="col">Event throughput</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Events · last 10 seconds</td><td class="text-end fw-semibold" id="log2json-queueInLast10Sec">—</td></tr></tbody><thead><tr><th scope="col">Event processing</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Dropped · queue full</td><td class="text-end fw-semibold" id="log2json-dropped">—</td></tr><tr><td>Total processed</td><td class="text-end fw-semibold" id="log2json-total">—</td></tr></tbody></table></div></div>
 <script>
 function drawLog2JSONFilterStats(filterStats) {
 
@@ -98,9 +38,7 @@ $(`#log2json-eventsQueueSize`).text( filterStats["eventsQueue"]["curSize"] + "/"
       success: function (result) {
         drawLog2JSONFilterStats(result["events"]);
       },
-      error: function (result) {
-        console.log("ERR");
-      }
+      error: commonFunctionError
     });
   }
   function mainview_log2json_events_stop() {
