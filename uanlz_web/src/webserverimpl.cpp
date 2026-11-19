@@ -4,6 +4,7 @@
  */
 #include "webserverimpl.h"
 #include "globals.h"
+#include <boost/algorithm/string/predicate.hpp>
 #include <Mantids30/Client/APISync/apisync.h>
 #include <Mantids30/ConfigBuilder/Server_WebRESTFul/config_builder.h>
 #include <config.h>
@@ -91,14 +92,14 @@ bool WebServerImpl::createWebServer()
     const std::string appName = appNameEnvironment
                                     ? appNameEnvironment
                                     : Globals::config.get<std::string>("Authentication.AppName", "UAUDITANALYZER");
-    if (apiKey.empty() || apiKey.find("REPLACEME") == 0 || appName.empty())
+    if (apiKey.empty() || boost::starts_with(apiKey, "REPLACEME") || appName.empty())
     {
         LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Configure UAUDIT_API_KEY for uFastAuthD3 APISync");
         return false;
     }
     std::map<std::string, std::string> templateVariables{{"APIKEY", apiKey}, {"APP", appName}};
     Globals::webServer.reset(ConfigBuilder::Server_WebRESTFul::Builder::createRESTfulEngine(
-        *webConfig, LOG_APP, LOG_RPC, appName, "/var/www/uauditweb",
+        *webConfig, LOG_APP, LOG_RPC, appName, "/var/www/uauditweb3",
         ConfigBuilder::Server_WebRESTFul::REST_ENGINE_MANDATORY_SSL, templateVariables));
     if (!Globals::webServer)
         return false;

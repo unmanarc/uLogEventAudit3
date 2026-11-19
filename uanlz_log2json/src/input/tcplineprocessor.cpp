@@ -11,6 +11,7 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/constants.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::Input;
@@ -255,15 +256,15 @@ bool TcpLineProcessor::extractAuditdHeader(const std::string &line, int inputMod
     boost::split(tokens, headerText, boost::is_any_of(" "), boost::token_compress_on);
     for (const auto &token : tokens)
     {
-        if (token.find("node=") != std::string::npos)
+        if (boost::starts_with(token, "node="))
         {
             auditdHeader.node = token.substr(5);
         }
-        else if (token.find("type=") != std::string::npos)
+        else if (boost::starts_with(token, "type="))
         {
             auditdHeader.type = token.substr(5);
         }
-        else if (token.find("msg=audit(") != std::string::npos && token.back() == ')')
+        else if (boost::starts_with(token, "msg=audit(") && boost::ends_with(token, ")"))
         {
             size_t position = token.find('(');
             size_t millisecondsStart = token.find('.', position + 1);

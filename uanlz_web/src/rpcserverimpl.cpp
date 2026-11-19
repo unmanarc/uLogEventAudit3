@@ -4,6 +4,7 @@
  */
 #include "rpcserverimpl.h"
 #include "globals.h"
+#include <boost/algorithm/string/predicate.hpp>
 #include <Mantids30/Network/Sockets/socket_tls.h>
 using namespace Mantids30;
 using namespace UANLZ::WEB;
@@ -31,8 +32,8 @@ bool RpcServerImpl::createRpcListener()
     const auto &config = Globals::config;
     const auto alertsKey = config.get<std::string>("RPCServer.AlertsApiKey", "");
     const auto converterKey = config.get<std::string>("RPCServer.Log2JSONApiKey", "");
-    if (alertsKey.empty() || converterKey.empty() || alertsKey == converterKey || alertsKey.find("REPLACEME") == 0 ||
-        converterKey.find("REPLACEME") == 0)
+    if (alertsKey.empty() || converterKey.empty() || alertsKey == converterKey || boost::starts_with(alertsKey, "REPLACEME") ||
+        boost::starts_with(converterKey, "REPLACEME"))
     {
         LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Configure distinct RPC service API keys");
         return false;

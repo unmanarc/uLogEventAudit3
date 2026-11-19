@@ -122,7 +122,7 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
 
     if (classTypeName == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) &&
         variableValue.size() < 250 && variableValue.size() % 2 == 0 &&
-        variableValue.find_first_not_of("0123456789abcdefABCDEF") == string::npos)
+        boost::all(variableValue, boost::is_any_of("0123456789abcdefABCDEF")))
     {
         string family, ipAddress, path;
         unsigned short port = 0;
