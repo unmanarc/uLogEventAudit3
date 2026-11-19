@@ -52,17 +52,23 @@ APIReturn forward(void *context, const RESTful::RequestContext &request, Session
     const auto &route = *static_cast<Route *>(context);
     // JWT authentication identifies the session; mutations also bind to its CSRF token.
     if (route.verb != Method::GET && (request.jwtToken->getJwtId().empty() || request.clientRequest->headers.getOptionValueStringByName("X-CSRF-Token") != request.jwtToken->getJwtId()))
-        return APIReturn(Status::Code::S_403_FORBIDDEN, "invalid_csrf_token", "Refresh the audit session and try again");
+    {
+        return {Status::Code::S_403_FORBIDDEN, "invalid_csrf_token", "Refresh the audit session and try again"};
+    }
     if (!request.inputJSON->is_null() && !request.inputJSON->is_object() && !request.inputJSON->is_array())
-        return APIReturn(Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected a JSON object or array");
+    {
+        return {Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected a JSON object or array"};
+    }
     if (!Globals::fastRpc->checkConnectionKey(route.target))
-        return APIReturn(Status::Code::S_503_SERVICE_UNAVAILABLE, "service_unavailable", "Audit service is disconnected");
+    {
+        return {Status::Code::S_503_SERVICE_UNAVAILABLE, "service_unavailable", "Audit service is disconnected"};
+    }
     boost::json::value rpcError;
     auto result = Globals::fastRpc->runRemoteRPCMethod(route.target, route.method, *request.inputJSON, &rpcError, false);
     if (!DataFormat::JSON::ASBOOL(rpcError, "succeed", false))
     {
         LOG_APP->log2(__func__, request.jwtToken->getSubject(), client.ipAddress, Runtime::Logs::ERROR, "Backend call failed: %s", route.method);
-        return APIReturn(Status::Code::S_502_BAD_GATEWAY, "backend_error", "Audit service could not complete the request");
+        return {Status::Code::S_502_BAD_GATEWAY, "backend_error", "Audit service could not complete the request"};
     }
     APIReturn response(result);
     response.httpExtraHeaders["Cache-Control"] = "no-store";
@@ -95,7 +101,9 @@ bool WebServerImpl::createWebServer()
                                                                                             ConfigBuilder::Server_WebRESTFul::REST_ENGINE_MANDATORY_SSL,
                                                                                             templateVariables));
     if (!Globals::webServer)
+    {
         return false;
+    }
     Client::APISync::APISyncParameters syncParameters;
     syncParameters.loadFromInfoTree(webConfig->get_child("APISync"));
     auto syncResult = Client::APISync::updateAccessControlContext(

@@ -13,13 +13,19 @@ void RpcServerImpl::onRpcConnected(void *, const std::shared_ptr<Network::Socket
     bool keyRead = false;
     const auto apiKey = socket->readStringEx<uint16_t>(&keyRead, 4096);
     if (!keyRead || apiKey.empty())
+    {
         return;
+    }
     const auto &config = Globals::config;
     std::string serviceName;
     if (apiKey == config.get<std::string>("RPCServer.AlertsApiKey"))
+    {
         serviceName = "ALERTS";
+    }
     else if (apiKey == config.get<std::string>("RPCServer.Log2JSONApiKey"))
+    {
         serviceName = "LOG2JSON";
+    }
     else
     {
         LOG_APP->log1(__func__, socket->getRemotePairStr(), Runtime::Logs::WARNING, "Rejected service API key");

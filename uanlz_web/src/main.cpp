@@ -43,7 +43,9 @@ public:
         auto initialLog = ConfigBuilder::Runtime_Logs::Builder::createInitLog();
         auto config = Config::Loader::loadSecureApplicationConfig(initialLog.get(), configDirectory.c_str(), "webserver.conf");
         if (!config)
+        {
             return false;
+        }
         Globals::config = *config;
         LOG_APP = ConfigBuilder::Runtime_Logs::Builder::createAppLog(*config);
         LOG_RPC = ConfigBuilder::Runtime_Logs::Builder::createRPCLog(*config);
@@ -72,9 +74,13 @@ public:
     {
         Globals::webServer.reset();
         if (Globals::fastRpc)
+        {
             Globals::fastRpc->stop();
+        }
         if (Globals::rpcListener)
+        {
             Globals::rpcListener->stop();
+        }
     }
 };
 /**
