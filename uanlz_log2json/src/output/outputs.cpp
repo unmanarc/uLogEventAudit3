@@ -14,7 +14,7 @@ std::mutex Outputs::registryMutex;
 
 Outputs::Outputs() {}
 
-json Outputs::getStats()
+boost::json::array Outputs::getStats()
 {
     boost::json::array outputStats;
     std::lock_guard<std::mutex> lock(registryMutex);
@@ -44,7 +44,7 @@ void Outputs::startThreads()
     }
 }
 
-void Outputs::dispatchEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
+void Outputs::dispatchEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
     std::lock_guard<std::mutex> lock(registryMutex);
     for (const auto &output : outputs)

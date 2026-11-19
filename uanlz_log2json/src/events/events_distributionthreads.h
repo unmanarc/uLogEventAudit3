@@ -22,7 +22,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    static json getStats();
+    static boost::json::object getStats();
 
     /**
      * @brief Set the maximum number of events admitted by the Mantids30 queue.

@@ -22,7 +22,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    static json getStats();
+    static boost::json::array getStats();
     /**
      * @brief Load and register the configured TCP input or output definitions.
      * @param file Path of the INI configuration file.

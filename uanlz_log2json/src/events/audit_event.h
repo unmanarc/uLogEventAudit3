@@ -110,7 +110,7 @@ public:
     /**
      * @brief Serialize parsed auditd data using the existing event JSON schema.
      */
-    json getJson();
+    boost::json::object getJson();
 
 private:
     // eventType -> ClassEvent

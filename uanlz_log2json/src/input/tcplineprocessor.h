@@ -36,7 +36,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    json getStats();
+    boost::json::object getStats();
 
 protected:
     /**

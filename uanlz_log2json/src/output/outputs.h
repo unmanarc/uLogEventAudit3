@@ -25,7 +25,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    static json getStats();
+    static boost::json::array getStats();
     /**
      * @brief Load and register the configured TCP input or output definitions.
      * @param file Path of the INI configuration file.
@@ -40,7 +40,7 @@ public:
      * @param eventJson Serialized event copied to the output queues.
      * @param eventId Event identity as seconds, milliseconds and a 64-bit serial number.
      */
-    static void dispatchEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId);
+    static void dispatchEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId);
 
 private:
     static std::list<std::unique_ptr<OutputBase>> outputs;

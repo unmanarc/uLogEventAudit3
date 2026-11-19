@@ -52,7 +52,7 @@ public:
     /**
      * @brief Serialize record fields, reconstructing argv and cmdline for EXECVE records.
      */
-    json getJson();
+    boost::json::object getJson();
 
 private:
     /**

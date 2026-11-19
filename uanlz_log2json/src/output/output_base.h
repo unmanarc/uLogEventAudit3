@@ -31,13 +31,13 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    virtual json getStats() = 0;
+    virtual boost::json::object getStats() = 0;
     /**
      * @brief Copy an event into the Mantids30 output queue or count a rejected enqueue.
      * @param eventJson Serialized event copied to the output queues.
      * @param eventId Event identity as seconds, milliseconds and a 64-bit serial number.
      */
-    virtual void logAuditEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId) = 0;
+    virtual void logAuditEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId) = 0;
     /**
      * @brief Launch the service-lifetime TCP output worker.
      * @note Workers use the existing service-lifetime shutdown model.

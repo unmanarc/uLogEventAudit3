@@ -28,7 +28,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    static json getStats();
+    static boost::json::array getStats();
 
     /**
      * @brief Run the periodic host expiration loop for the lifetime of the service.

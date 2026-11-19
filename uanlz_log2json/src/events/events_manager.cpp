@@ -28,7 +28,7 @@ void runGarbageCollector()
 
 EventsManager::EventsManager() {}
 
-json EventsManager::getStats()
+boost::json::array EventsManager::getStats()
 {
     boost::json::array hostStats;
     for (const auto &[hostId, hostState] : snapshotHosts())

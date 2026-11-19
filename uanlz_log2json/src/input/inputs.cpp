@@ -11,7 +11,7 @@ std::mutex Inputs::registryMutex;
 
 Inputs::Inputs() {}
 
-json Inputs::getStats()
+boost::json::array Inputs::getStats()
 {
     boost::json::array inputStats;
 

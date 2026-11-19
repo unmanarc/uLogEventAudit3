@@ -38,7 +38,7 @@ TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory
 
 TcpLineProcessor::~TcpLineProcessor() {}
 
-json TcpLineProcessor::getStats()
+boost::json::object TcpLineProcessor::getStats()
 {
     boost::json::object connectionStats{{"ip", remoteIp}, {"processedLinesCount", (uint64_t) processedLinesCount}, {"invalidLinesCount", (uint64_t) invalidLinesCount}};
     return connectionStats;

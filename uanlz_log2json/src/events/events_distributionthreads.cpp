@@ -41,7 +41,7 @@ void runEventDistribution(int workerId)
         if (event)
         {
             event->process();
-            json eventJson = event->getJson();
+            boost::json::object eventJson = event->getJson();
 
             Output::Outputs::dispatchEvent(eventJson, event->getEventId());
 
@@ -75,7 +75,7 @@ void runDistributionCounters()
 
 EventDistribution::EventDistribution() {}
 
-json EventDistribution::getStats()
+boost::json::object EventDistribution::getStats()
 {
     boost::json::object distributionStats{{"eventsQueue",
                                            boost::json::object{{"maxItems", (uint64_t) eventsQueue.getMaxItems()}, {"curSize", (uint64_t) eventsQueue.size()}, {"dropped", (uint64_t) eventsDropped}}},

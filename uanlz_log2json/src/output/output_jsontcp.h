@@ -38,7 +38,7 @@ public:
      * @param eventJson Serialized event copied to the output queues.
      * @param eventId Event identity as seconds, milliseconds and a 64-bit serial number.
      */
-    void logAuditEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId) override;
+    void logAuditEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId) override;
     /**
      * @brief Launch the service-lifetime TCP output worker.
      * @note Workers use the existing service-lifetime shutdown model.
@@ -52,7 +52,7 @@ public:
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */
-    json getStats() override;
+    boost::json::object getStats() override;
 
 private:
     /**
@@ -61,7 +61,7 @@ private:
      */
     bool reconnect();
 
-    Mantids30::Core::Threads::Safe::Queue<json> pendingEvents;
+    Mantids30::Core::Threads::Safe::Queue<boost::json::object> pendingEvents;
 
     std::string server;
     uint16_t port;

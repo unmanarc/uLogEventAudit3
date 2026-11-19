@@ -51,9 +51,9 @@ bool JsonTcpOutput::loadConfig(const std::string &file)
     return true;
 }
 
-void JsonTcpOutput::logAuditEvent(const json &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
+void JsonTcpOutput::logAuditEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
-    auto eventValue = std::make_unique<json>(eventJson);
+    auto eventValue = std::make_unique<boost::json::object>(eventJson);
     // push, if not report and go.
     if (!pendingEvents.push(eventValue.get(), pushTimeoutMs))
     {
@@ -84,7 +84,7 @@ void JsonTcpOutput::process()
     for (;;)
     {
         // Take one JSON value from the queue...
-        auto eventValue = std::unique_ptr<json>(pendingEvents.pop());
+        auto eventValue = std::unique_ptr<boost::json::object>(pendingEvents.pop());
         if (eventValue)
         {
             const auto payload = transmissionMode == 0 ? Mantids30::DataFormat::JSON::toString(*eventValue) + "\n" : UANLZ::JSON::toStyledString(*eventValue);
@@ -101,7 +101,7 @@ void JsonTcpOutput::process()
     }
 }
 
-json JsonTcpOutput::getStats()
+boost::json::object JsonTcpOutput::getStats()
 {
     std::string server = config.get<std::string>("Host", "127.0.0.1");
     uint16_t port = config.get<uint16_t>("Port", 18200);

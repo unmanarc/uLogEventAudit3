@@ -73,7 +73,7 @@ void AuditClass::setClassTypeName(const string &value)
     classTypeName = value;
 }
 
-json AuditClass::getJson()
+boost::json::object AuditClass::getJson()
 {
     if (classTypeName == "EXECVE")
     {

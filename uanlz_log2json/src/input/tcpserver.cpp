@@ -99,7 +99,7 @@ void TcpServer::startListener()
     acceptor->startInBackground();
 }
 
-json TcpServer::getStats()
+boost::json::object TcpServer::getStats()
 {
     boost::json::array clients;
     std::lock_guard<std::mutex> lock(registryMutex);

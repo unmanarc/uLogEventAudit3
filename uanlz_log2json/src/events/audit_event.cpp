@@ -105,7 +105,7 @@ AuditClass *AuditEvent::getFirstClassRecord(const string &groupName)
     return nullptr;
 }
 
-json AuditEvent::getJson()
+boost::json::object AuditEvent::getJson()
 {
     time_t unixTime = std::get<0>(eventId);
     std::tm localTime{};
