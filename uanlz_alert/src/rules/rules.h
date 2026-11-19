@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/rules/rules.
  */
-#ifndef RULEACTION_H
-#define RULEACTION_H
+#pragma once
 
 #include <vector>
 #include <memory>
@@ -17,11 +16,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <audit_json.h>
 
-namespace UANLZ
-{
-namespace JSONALERT
-{
-namespace Filters
+namespace UANLZ::JSONALERT::Filters
 {
 
 /** @brief Select whether a matching rule executes an action or stops further rule evaluation. */
@@ -376,8 +371,4 @@ private:
     static bool rulesModified, actionsModified;
 };
 
-} // namespace Filters
-} // namespace JSONALERT
-} // namespace UANLZ
-
-#endif // RULEACTION_H
+} // namespace UANLZ::JSONALERT::Filters

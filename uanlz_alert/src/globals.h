@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/globals.
  */
-#ifndef GLOBALS_H
-#define GLOBALS_H
+#pragma once
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <Mantids30/Runtime/Logs/applog.h>
@@ -15,9 +14,7 @@
 
 #define LOG_APP Globals::getAppLog()
 
-namespace UANLZ
-{
-namespace JSONALERT
+namespace UANLZ::JSONALERT
 {
 
 /** @brief Hold the configuration, logs and shared resources used by this service. */
@@ -51,6 +48,4 @@ private:
     static boost::property_tree::ptree mainConfig;
     static std::unique_ptr<Mantids30::Runtime::Logs::AppLog> appLog;
 };
-} // namespace JSONALERT
-} // namespace UANLZ
-#endif // GLOBALS_H
+} // namespace UANLZ::JSONALERT

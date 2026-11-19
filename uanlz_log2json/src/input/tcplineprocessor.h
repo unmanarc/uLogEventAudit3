@@ -2,18 +2,13 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/input/tcplineprocessor.
  */
-#ifndef LINERECEPTOR_H
-#define LINERECEPTOR_H
+#pragma once
 
 #include <audit_json.h>
 #include <Mantids30/Protocol/LineRecv/linerecv.h>
 #include <atomic>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Input
+namespace UANLZ::LOG2JSON::Input
 {
 
 class TcpServer;
@@ -116,8 +111,4 @@ private:
     std::string remoteIp;
 };
 
-} // namespace Input
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // LINERECEPTOR_H
+} // namespace UANLZ::LOG2JSON::Input

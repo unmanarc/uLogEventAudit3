@@ -2,19 +2,14 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/input/tcplineprocessor.
  */
-#ifndef LINERECEPTOR_H
-#define LINERECEPTOR_H
+#pragma once
 
 #include <audit_json.h>
 #include <Mantids30/Protocol/LineRecv/linerecv.h>
 #include <thread>
 #include <atomic>
 
-namespace UANLZ
-{
-namespace JSONALERT
-{
-namespace Input
+namespace UANLZ::JSONALERT::Input
 {
 
 class TcpServer;
@@ -61,8 +56,4 @@ private:
     std::string remoteIp;
 };
 
-} // namespace Input
-} // namespace JSONALERT
-} // namespace UANLZ
-
-#endif // LINERECEPTOR_H
+} // namespace UANLZ::JSONALERT::Input

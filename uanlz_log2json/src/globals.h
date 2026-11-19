@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/globals.
  */
-#ifndef GLOBALS_H
-#define GLOBALS_H
+#pragma once
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <Mantids30/Runtime/Logs/applog.h>
@@ -13,9 +12,7 @@
 
 #define LOG_APP Globals::getAppLog()
 
-namespace UANLZ
-{
-namespace LOG2JSON
+namespace UANLZ::LOG2JSON
 {
 
 /** @brief Hold the configuration, logs and shared resources used by this service. */
@@ -55,7 +52,4 @@ private:
     static std::unique_ptr<Mantids30::Runtime::Logs::AppLog> appLog;
 };
 
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // GLOBALS_H
+} // namespace UANLZ::LOG2JSON

@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/input/tcpserver.
  */
-#ifndef RECEPTORTCPSERVER_H
-#define RECEPTORTCPSERVER_H
+#pragma once
 
 #include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include "tcplineprocessor.h"
@@ -12,11 +11,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <mutex>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Input
+namespace UANLZ::LOG2JSON::Input
 {
 
 /** @brief Accept TCP clients through Mantids30 and expose borrowed parser statistics. */
@@ -86,8 +81,4 @@ private:
     std::set<TcpLineProcessor *> clientProcessors;
 };
 
-} // namespace Input
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // RECEPTORTCPSERVER_H
+} // namespace UANLZ::LOG2JSON::Input

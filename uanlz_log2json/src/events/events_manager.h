@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/events_manager.
  */
-#ifndef EVENTSMANAGER_H
-#define EVENTSMANAGER_H
+#pragma once
 
 #include "audit_host.h"
 
@@ -11,11 +10,7 @@
 #include <atomic>
 #include <map>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Route incoming records to shared host buffers without holding the registry lock during processing. */
@@ -67,8 +62,4 @@ private:
     static std::mutex hostsMutex;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // EVENTSMANAGER_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/audit_class.
  */
-#ifndef SUBEVENT_CONTAINER_H
-#define SUBEVENT_CONTAINER_H
+#pragma once
 
 #include "audit_var.h"
 
@@ -12,11 +11,7 @@
 #include <map>
 #include <set>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Own one auditd record type and its parsed fields. */
@@ -89,8 +84,4 @@ private:
     std::map<std::string, AuditVariable> variablesByName;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // SUBEVENT_CONTAINER_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

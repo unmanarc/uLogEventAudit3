@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/output/outputs.
  */
-#ifndef OUTPUTS_H
-#define OUTPUTS_H
+#pragma once
 
 #include <string>
 #include <list>
@@ -12,11 +11,7 @@
 
 #include "../output/output_base.h"
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Output
+namespace UANLZ::LOG2JSON::Output
 {
 
 /** @brief Own the configured destinations receiving each reconstructed audit event. */
@@ -53,7 +48,4 @@ private:
     static std::mutex registryMutex;
 };
 
-} // namespace Output
-} // namespace LOG2JSON
-} // namespace UANLZ
-#endif // OUTPUTS_H
+} // namespace UANLZ::LOG2JSON::Output

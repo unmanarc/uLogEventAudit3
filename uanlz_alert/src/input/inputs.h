@@ -2,19 +2,14 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/input/inputs.
  */
-#ifndef INPUTS_H
-#define INPUTS_H
+#pragma once
 
 #include <mutex>
 #include <memory>
 #include <list>
 #include "tcpserver.h"
 
-namespace UANLZ
-{
-namespace JSONALERT
-{
-namespace Input
+namespace UANLZ::JSONALERT::Input
 {
 
 /** @brief Own the configured TCP input servers for this service. */
@@ -83,8 +78,4 @@ private:
     static bool modified;
 };
 
-} // namespace Input
-} // namespace JSONALERT
-} // namespace UANLZ
-
-#endif // INPUTS_H
+} // namespace UANLZ::JSONALERT::Input

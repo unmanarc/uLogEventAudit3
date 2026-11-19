@@ -2,14 +2,11 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/rpcimpl.
  */
-#ifndef RPCIMPL_H
-#define RPCIMPL_H
+#pragma once
 
 #include <audit_json.h>
 
-namespace UANLZ
-{
-namespace LOG2JSON
+namespace UANLZ::LOG2JSON
 {
 
 /** @brief Register backend RPC operations and maintain the outbound TLS connection to the web service. */
@@ -45,7 +42,4 @@ private:
     static json statInputs(void *, const std::string &, const json &, void *, const std::string &);
 };
 
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // RPCIMPL_H
+} // namespace UANLZ::LOG2JSON

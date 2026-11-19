@@ -2,19 +2,14 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/events_distributionthreads.
  */
-#ifndef OUTPUT_DISTRIBUTIONTHREADS_H
-#define OUTPUT_DISTRIBUTIONTHREADS_H
+#pragma once
 
 #include <Mantids30/Core/Threads/safe_queue.h>
 #include <memory>
 
 #include "../events/audit_event.h"
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 /** @brief Distribute owned audit events through the Mantids30 queue to output workers. */
 class EventDistribution
@@ -71,8 +66,4 @@ private:
     static uint32_t pushTimeoutMs;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // OUTPUT_DISTRIBUTIONTHREADS_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

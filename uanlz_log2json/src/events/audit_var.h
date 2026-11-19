@@ -2,17 +2,12 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/audit_var.
  */
-#ifndef VARCONTENT_H
-#define VARCONTENT_H
+#pragma once
 
 #include <string>
 #include <cstdint>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Own a decoded auditd field and its printable representation. */
@@ -83,8 +78,4 @@ private:
     std::string rawValue;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // VARCONTENT_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

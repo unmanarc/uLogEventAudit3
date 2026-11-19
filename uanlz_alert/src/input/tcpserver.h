@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/input/tcpserver.
  */
-#ifndef RECEPTORTCPSERVER_H
-#define RECEPTORTCPSERVER_H
+#pragma once
 
 #include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include "tcplineprocessor.h"
@@ -12,11 +11,7 @@
 #include <mutex>
 #include <set>
 
-namespace UANLZ
-{
-namespace JSONALERT
-{
-namespace Input
+namespace UANLZ::JSONALERT::Input
 {
 
 /** @brief Accept TCP clients through Mantids30 and expose borrowed parser statistics. */
@@ -75,8 +70,4 @@ private:
     std::set<TcpLineProcessor *> clientProcessors;
 };
 
-} // namespace Input
-} // namespace JSONALERT
-} // namespace UANLZ
-
-#endif // RECEPTORTCPSERVER_H
+} // namespace UANLZ::JSONALERT::Input

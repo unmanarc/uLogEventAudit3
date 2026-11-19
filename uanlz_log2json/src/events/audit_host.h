@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/audit_host.
  */
-#ifndef HOSTEVENTSCONTAINER_H
-#define HOSTEVENTSCONTAINER_H
+#pragma once
 
 #include <string>
 #include <mutex>
@@ -13,11 +12,7 @@
 
 #include "audit_event.h"
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Synchronize incomplete events for one source and enqueue completed or expired events. */
@@ -75,8 +70,4 @@ private:
     std::atomic<uint64_t> droppedEventsCount, processedEventsCount;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // HOSTEVENTSCONTAINER_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

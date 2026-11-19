@@ -2,17 +2,12 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/output/output_base.
  */
-#ifndef OUTPUT_BASE_H
-#define OUTPUT_BASE_H
+#pragma once
 
 #include "../events/audit_event.h"
 #include <audit_json.h>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Output
+namespace UANLZ::LOG2JSON::Output
 {
 
 /** @brief Define the contract for asynchronous audit event destinations. */
@@ -62,7 +57,4 @@ protected:
     std::string description;
 };
 
-} // namespace Output
-} // namespace LOG2JSON
-} // namespace UANLZ
-#endif // OUTPUT_BASE_H
+} // namespace UANLZ::LOG2JSON::Output

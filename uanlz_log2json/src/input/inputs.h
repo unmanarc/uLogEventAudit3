@@ -2,19 +2,14 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/input/inputs.
  */
-#ifndef INPUTS_H
-#define INPUTS_H
+#pragma once
 
 #include <mutex>
 #include <memory>
 #include <list>
 #include "../input/tcpserver.h"
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Input
+namespace UANLZ::LOG2JSON::Input
 {
 
 /** @brief Own the configured TCP input servers for this service. */
@@ -44,8 +39,4 @@ private:
     static std::mutex registryMutex;
 };
 
-} // namespace Input
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // INPUTS_H
+} // namespace UANLZ::LOG2JSON::Input

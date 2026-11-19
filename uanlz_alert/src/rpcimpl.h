@@ -2,14 +2,11 @@
  * @file
  * @brief Declarations and contracts for uanlz_alert/src/rpcimpl.
  */
-#ifndef RPCIMPL_H
-#define RPCIMPL_H
+#pragma once
 
 #include <audit_json.h>
 
-namespace UANLZ
-{
-namespace JSONALERT
+namespace UANLZ::JSONALERT
 {
 
 /** @brief Register backend RPC operations and maintain the outbound TLS connection to the web service. */
@@ -166,7 +163,4 @@ private:
     static json controlActionsReload(void *, const std::string &, const json &, void *, const std::string &);
 };
 
-} // namespace JSONALERT
-} // namespace UANLZ
-
-#endif // RPCIMPL_H
+} // namespace UANLZ::JSONALERT

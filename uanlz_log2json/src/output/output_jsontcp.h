@@ -2,8 +2,7 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/output/output_jsontcp.
  */
-#ifndef OUTPUT_JSONTCP_H
-#define OUTPUT_JSONTCP_H
+#pragma once
 
 #include "output_base.h"
 #include <Mantids30/Network/Sockets/socket_tcp.h>
@@ -13,11 +12,7 @@
 #include <audit_json.h>
 #include <boost/property_tree/ptree.hpp>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace Output
+namespace UANLZ::LOG2JSON::Output
 {
 
 /** @brief Queue JSON events with Mantids30 and retry delivery over a TCP connection. */
@@ -78,7 +73,4 @@ private:
     boost::property_tree::ptree config;
 };
 
-} // namespace Output
-} // namespace LOG2JSON
-} // namespace UANLZ
-#endif // OUTPUT_JSONTCP_H
+} // namespace UANLZ::LOG2JSON::Output

@@ -2,18 +2,13 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/events/audit_event.
  */
-#ifndef EVENT_CONTAINER_H
-#define EVENT_CONTAINER_H
+#pragma once
 
 #include <list>
 #include <chrono>
 #include "audit_class.h"
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Composite event-source identity used as the host registry key. */
@@ -132,8 +127,4 @@ private:
     std::chrono::steady_clock::time_point creationTime;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // EVENT_CONTAINER_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents

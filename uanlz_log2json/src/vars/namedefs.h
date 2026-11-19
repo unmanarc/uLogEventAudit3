@@ -2,17 +2,12 @@
  * @file
  * @brief Declarations and contracts for uanlz_log2json/src/vars/namedefs.
  */
-#ifndef VARNAMEDEFINITIONS_H
-#define VARNAMEDEFINITIONS_H
+#pragma once
 
 #include <set>
 #include <string>
 
-namespace UANLZ
-{
-namespace LOG2JSON
-{
-namespace AuditdEvents
+namespace UANLZ::LOG2JSON::AuditdEvents
 {
 
 /** @brief Keep the auditd text-field and terminal-record classification tables. */
@@ -45,8 +40,4 @@ private:
     static std::set<std::string> terminalEventTypes;
 };
 
-} // namespace AuditdEvents
-} // namespace LOG2JSON
-} // namespace UANLZ
-
-#endif // VARNAMEDEFINITIONS_H
+} // namespace UANLZ::LOG2JSON::AuditdEvents
