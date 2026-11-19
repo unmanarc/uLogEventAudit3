@@ -165,13 +165,12 @@ void Rules::setEvaluationQueueMaxSize(const size_t &queueCapacity)
 
 bool Rules::enqueueLine(const string &inputText)
 {
-    auto queuedLine = std::make_unique<std::string>(inputText);
-    if (!evaluationQueue.push(queuedLine.get(), queuePushTimeoutMs))
+    auto queuedLine = std::make_shared<std::string>(inputText);
+    if (!evaluationQueue.push(queuedLine, queuePushTimeoutMs))
     {
         droppedInQueue++;
         return false;
     }
-    static_cast<void>(queuedLine.release()); // Mantids30 owns the successfully queued item.
     queueInThisPeriod++;
     queuedLinesCount++;
     return true;
@@ -333,7 +332,7 @@ void Rules::runEvaluationWorker(const uint32_t &workerId)
     boost::json::value eventValue;
     for (;;)
     {
-        auto queuedLine = std::unique_ptr<std::string>(evaluationQueue.pop(queuePopTimeoutMs));
+        auto queuedLine = evaluationQueue.pop(queuePopTimeoutMs);
         if (queuedLine)
         {
             queueOutThisPeriod++;

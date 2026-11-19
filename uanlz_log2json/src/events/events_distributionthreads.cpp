@@ -110,21 +110,17 @@ void EventDistribution::startDistributionThreads(const size_t &threads)
 
 bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditEvent> event)
 {
-    bool queued = eventsQueue.push(event.get(), pushTimeoutMs);
-    if (queued)
-    {
-        static_cast<void>(event.release()); // Ownership transfers to Mantids30 only on success.
-    }
-    else
+    bool queued = eventsQueue.push(std::shared_ptr<AuditEvent>(std::move(event)), pushTimeoutMs);
+    if (!queued)
     {
         eventsDropped++;
     }
     return queued;
 }
 
-std::unique_ptr<AuditEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
+std::shared_ptr<AuditEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
 {
-    return std::unique_ptr<AuditEvent>(eventsQueue.pop(popTimeoutMs));
+    return eventsQueue.pop(popTimeoutMs);
 }
 
 void EventDistribution::incrementProcessedEvents()

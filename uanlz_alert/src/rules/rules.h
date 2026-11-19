@@ -104,7 +104,7 @@ public:
      */
     static void setQueuePopTimeoutMs(const uint64_t &value);
     /**
-     * @brief Copy a JSON line into Mantids30, transferring ownership only after a successful push.
+     * @brief Copy a JSON line into Mantids30 using shared ownership for queued lines.
      * @param inputText Incoming JSON line to copy into the evaluation queue.
      * @return True if the line was queued; false if the queue rejected it.
      */

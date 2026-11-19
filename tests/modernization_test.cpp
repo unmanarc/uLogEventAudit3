@@ -42,22 +42,27 @@ void queueOwnership()
     {
         Mantids30::Core::Threads::Safe::Queue<Tracked> queue;
         queue.setMaxItems(1);
-        auto first = std::make_unique<Tracked>(alive);
-        require(queue.push(first.get(), 0), "first push");
-        static_cast<void>(first.release());
+        require(!queue.push(nullptr, 0), "null item must be rejected");
+        auto first = std::make_shared<Tracked>(alive);
+        require(queue.push(first, 0), "first push");
+        std::weak_ptr<Tracked> firstObserver = first;
+        first.reset();
+        require(!firstObserver.expired(), "queue retains shared ownership");
         {
-            auto rejected = std::make_unique<Tracked>(alive);
-            require(!queue.push(rejected.get(), 0), "full queue must reject");
+            auto rejected = std::make_shared<Tracked>(alive);
+            require(!queue.push(rejected, 0), "full queue must reject");
+            require(rejected.use_count() == 1, "rejection retains caller ownership only");
         }
         require(alive == 1, "rejected item must be destroyed");
-        auto item = std::unique_ptr<Tracked>(queue.pop(0));
+        auto item = queue.pop(0);
         require(item && queue.size() == 0 && alive == 1, "pop transfers ownership");
         require(!queue.pop(0), "empty queue returns no item");
         item.reset();
         require(alive == 0, "popped item destroyed by owner");
-        auto pending = std::make_unique<Tracked>(alive);
-        require(queue.push(pending.get(), 0), "pending item");
-        static_cast<void>(pending.release());
+        require(firstObserver.expired(), "last consumer releases popped item");
+        auto pending = std::make_shared<Tracked>(alive);
+        require(queue.push(pending, 0), "pending item");
+        pending.reset();
     }
     require(alive == 0, "Mantids30 queue destroys pending items");
 }

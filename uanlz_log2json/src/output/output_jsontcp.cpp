@@ -54,16 +54,12 @@ bool JsonTcpOutput::loadConfig(const std::string &file)
 
 void JsonTcpOutput::logAuditEvent(const boost::json::object &eventJson, const std::tuple<time_t, uint32_t, uint64_t> &eventId)
 {
-    auto eventValue = std::make_unique<boost::json::object>(eventJson);
+    auto eventValue = std::make_shared<boost::json::object>(eventJson);
     // push, if not report and go.
-    if (!pendingEvents.push(eventValue.get(), pushTimeoutMs))
+    if (!pendingEvents.push(eventValue, pushTimeoutMs))
     {
         LOG_APP->log0(__func__, Mantids30::Runtime::Logs::WARNING, "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId), get<1>(eventId), get<2>(eventId));
         dropped++;
-    }
-    else
-    {
-        static_cast<void>(eventValue.release()); // Mantids30 owns the successfully queued item.
     }
 }
 
@@ -87,7 +83,7 @@ void JsonTcpOutput::process()
     for (;;)
     {
         // Take one JSON value from the queue...
-        auto eventValue = std::unique_ptr<boost::json::object>(pendingEvents.pop());
+        auto eventValue = pendingEvents.pop();
         if (eventValue)
         {
             const auto payload = transmissionMode == 0 ? Mantids30::DataFormat::JSON::toString(*eventValue) + "\n" : UANLZ::JSON::toStyledString(*eventValue);

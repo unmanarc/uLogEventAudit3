@@ -43,11 +43,11 @@ public:
      */
     static bool pushAuditEvent(std::unique_ptr<AuditEvent> event);
     /**
-     * @brief Wait for a queued event and adopt its ownership from Mantids30.
+     * @brief Wait for a queued event and receive its shared ownership from Mantids30.
      * @param popTimeoutMs Maximum wait in milliseconds for a queued event.
-     * @return Unique owner of the popped event, or nullptr on timeout.
+     * @return Shared owner of the popped event, or nullptr on timeout.
      */
-    static std::unique_ptr<AuditEvent> popAuditEvent(const uint32_t &popTimeoutMs);
+    static std::shared_ptr<AuditEvent> popAuditEvent(const uint32_t &popTimeoutMs);
 
     /**
      * @brief Count one event delivered to the configured outputs.
