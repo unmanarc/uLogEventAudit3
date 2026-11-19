@@ -31,6 +31,18 @@ Only the `ulogeventaudit3` tree is installed. `node_modules` and npm tooling sta
 outside the document root. CMake checks that required vendor files exist.
 Source maps and vendor licenses are included locally as well.
 
+The console uses a light header for logo contrast, a navy sidebar and teal
+accents from the existing SVG brand. `console.css` defines the responsive theme;
+`console.js` owns page titles, active navigation, the mobile menu, table search,
+request status and removal dialogs. These are plain local assets: no extra
+dependencies or asset build are needed when editing the application UI.
+
+Statistics have an explicit Refresh button and show the last successful update;
+they do not poll automatically. Lists distinguish loading, empty and failed
+requests. Editor forms use native validation and keyboard submission, with
+write controls disabled while saving. Rule/action changes still need Save to
+disk; input changes still need a service reload, as explained in the UI.
+
 Pages compose partials using `{{#render[/includes/…]!}}`. Session identity uses
 `print_htmlescaped`, and permissions use exact scope comparisons. Write controls
 are omitted for readers. Keep JSONExprEval atomic expressions free of spaces,
