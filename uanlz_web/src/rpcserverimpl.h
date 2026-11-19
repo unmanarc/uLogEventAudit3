@@ -4,8 +4,7 @@
  */
 #pragma once
 #include <Mantids30/Network/Sockets/socket_stream.h>
-namespace UANLZ::WEB
-{
+namespace UANLZ::WEB {
 /** @brief Authenticate internal TLS clients and attach them to Mantids30 FastRPC1. */
 class RpcServerImpl
 {

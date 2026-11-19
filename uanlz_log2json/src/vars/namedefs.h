@@ -7,8 +7,7 @@
 #include <set>
 #include <string>
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 
 /** @brief Keep the auditd text-field and terminal-record classification tables. */
 class NameDefs

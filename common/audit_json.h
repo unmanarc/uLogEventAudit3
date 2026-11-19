@@ -11,8 +11,7 @@
 
 using json = boost::json::value;
 
-namespace UANLZ::JSON
-{
+namespace UANLZ::JSON {
 
 /**
  * @brief Read a JSON configuration array, normalizing legacy null to an empty array.

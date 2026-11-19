@@ -4,20 +4,19 @@
  */
 #pragma once
 
-#include <vector>
 #include <memory>
-#include <string>
 #include <mutex>
+#include <string>
+#include <vector>
 
+#include <Mantids30/Core/Threads/safe_queue.h>
 #include <Mantids30/Scripting/JSONExprEval/jsoneval.h>
 #include <shared_mutex>
-#include <Mantids30/Core/Threads/safe_queue.h>
 
-#include <boost/property_tree/ptree.hpp>
 #include <audit_json.h>
+#include <boost/property_tree/ptree.hpp>
 
-namespace UANLZ::JSONALERT::Filters
-{
+namespace UANLZ::JSONALERT::Filters {
 
 /** @brief Select whether a matching rule executes an action or stops further rule evaluation. */
 enum RuleAction
@@ -49,19 +48,13 @@ struct Action
      * @brief Store the executable name or path for this action.
      * @param fileName Executable name or path to store.
      */
-    void setFileName(const std::string &fileName)
-    {
-        file = fileName;
-    }
+    void setFileName(const std::string &fileName) { file = fileName; }
 
     /**
      * @brief Store action arguments, including the configured argv[0].
      * @param arguments Action argument vector, including the configured argv[0].
      */
-    void setArguments(const std::vector<std::string> &arguments)
-    {
-        this->arguments = arguments;
-    }
+    void setArguments(const std::vector<std::string> &arguments) { this->arguments = arguments; }
 
     std::string file;
     std::vector<std::string> arguments;
@@ -311,8 +304,7 @@ private:
      * @param arguments Action argument vector, including the configured argv[0].
      * @param values Parsed event used for expression evaluation and JSON-path substitutions.
      */
-    static void executeAction(const std::string &ruleName, const char *file, std::vector<std::string> arguments,
-                              const json &values);
+    static void executeAction(const std::string &ruleName, const char *file, std::vector<std::string> arguments, const json &values);
     /**
      * @brief Expand action placeholders in every argument except the configured argv[0].
      * @param arguments Action argument vector, including the configured argv[0].
@@ -333,8 +325,7 @@ private:
      * @param ruleName Rule name used for logging and rule-name placeholders.
      * @param values Parsed event used for expression evaluation and JSON-path substitutions.
      */
-    static std::string resolvePlaceholder(const std::string &placeholder, const std::string &ruleName,
-                                          const json &values);
+    static std::string resolvePlaceholder(const std::string &placeholder, const std::string &ruleName, const json &values);
 
     /**
      * @brief Destroy all running rules while the caller holds the exclusive rules lock.

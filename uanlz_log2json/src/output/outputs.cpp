@@ -27,7 +27,6 @@ json Outputs::getStats()
 
 void Outputs::loadConfig(const std::string &file)
 {
-
     auto output = std::make_unique<JsonTcpOutput>();
     if (!output->loadConfig(file))
         return;

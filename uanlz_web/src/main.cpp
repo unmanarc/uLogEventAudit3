@@ -28,11 +28,8 @@ public:
         globalArguments->softwareLicense = "GPLv3";
         globalArguments->softwareDescription = PROJECT_DESCRIPTION;
         globalArguments->addAuthor({"Aarón Mizrachi", "aaron@unmanarc.com"});
-        globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH),
-                                    "stable");
-        globalArguments->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory",
-                                              "/etc/uauditanalyzer3/uanlz_web",
-                                              Core::Memory::Abstract::Var::Type::STRING);
+        globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "stable");
+        globalArguments->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory", "/etc/uauditanalyzer3/uanlz_web", Core::Memory::Abstract::Var::Type::STRING);
     }
     /**
      * @brief Load service configuration and initialize resources before worker startup.
@@ -42,11 +39,9 @@ public:
     bool _config(int, char *[], Arguments::GlobalArguments *globalArguments) override
     {
         Network::Sockets::Socket_TLS::prepareTLS();
-        auto configDirectory =
-            std::filesystem::absolute(globalArguments->getCommandLineOptionValue("config-dir")->toString());
+        auto configDirectory = std::filesystem::absolute(globalArguments->getCommandLineOptionValue("config-dir")->toString());
         auto initialLog = ConfigBuilder::Runtime_Logs::Builder::createInitLog();
-        auto config =
-            Config::Loader::loadSecureApplicationConfig(initialLog.get(), configDirectory.c_str(), "webserver.conf");
+        auto config = Config::Loader::loadSecureApplicationConfig(initialLog.get(), configDirectory.c_str(), "webserver.conf");
         if (!config)
             return false;
         Globals::config = *config;

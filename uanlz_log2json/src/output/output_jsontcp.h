@@ -5,15 +5,14 @@
 #pragma once
 
 #include "output_base.h"
-#include <Mantids30/Network/Sockets/socket_tcp.h>
 #include <Mantids30/Core/Threads/safe_queue.h>
+#include <Mantids30/Network/Sockets/socket_tcp.h>
 #include <memory>
 
 #include <audit_json.h>
 #include <boost/property_tree/ptree.hpp>
 
-namespace UANLZ::LOG2JSON::Output
-{
+namespace UANLZ::LOG2JSON::Output {
 
 /** @brief Queue JSON events with Mantids30 and retry delivery over a TCP connection. */
 class JsonTcpOutput : public OutputBase

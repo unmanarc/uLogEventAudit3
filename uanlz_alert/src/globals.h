@@ -4,18 +4,17 @@
  */
 #pragma once
 
-#include <boost/property_tree/ini_parser.hpp>
 #include <Mantids30/Runtime/Logs/applog.h>
-#include <mutex>
-#include <memory>
+#include <boost/property_tree/ini_parser.hpp>
 #include <list>
+#include <memory>
+#include <mutex>
 
 // #define APPLOGS UANLZ::JSONALERT::Globals::getAppLog()
 
 #define LOG_APP Globals::getAppLog()
 
-namespace UANLZ::JSONALERT
-{
+namespace UANLZ::JSONALERT {
 
 /** @brief Hold the configuration, logs and shared resources used by this service. */
 class Globals

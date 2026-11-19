@@ -4,12 +4,11 @@
  */
 #pragma once
 
-#include <list>
-#include <chrono>
 #include "audit_class.h"
+#include <chrono>
+#include <list>
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 
 /** @brief Composite event-source identity used as the host registry key. */
 struct AuditHostId
@@ -22,20 +21,14 @@ struct AuditHostId
      * @param other Host identity to compare with this one.
      * @return True when both identity fields match.
      */
-    bool operator==(const AuditHostId &other) const
-    {
-        return hostname == other.hostname && ipAddress == other.ipAddress;
-    }
+    bool operator==(const AuditHostId &other) const { return hostname == other.hostname && ipAddress == other.ipAddress; }
 
     /**
      * @brief Order hosts by hostname and then by source address for map keys.
      * @param other Host identity to compare with this one.
      * @return True when this host sorts before the other host.
      */
-    bool operator<(const AuditHostId &other) const
-    {
-        return hostname < other.hostname || (hostname == other.hostname && ipAddress < other.ipAddress);
-    }
+    bool operator<(const AuditHostId &other) const { return hostname < other.hostname || (hostname == other.hostname && ipAddress < other.ipAddress); }
 };
 
 /** @brief Own auditd records sharing one timestamp and serial number. */

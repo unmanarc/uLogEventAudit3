@@ -4,15 +4,14 @@
  */
 #pragma once
 
-#include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include "tcplineprocessor.h"
+#include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include <atomic>
 #include <boost/property_tree/ptree.hpp>
 #include <mutex>
 #include <set>
 
-namespace UANLZ::JSONALERT::Input
-{
+namespace UANLZ::JSONALERT::Input {
 
 /** @brief Accept TCP clients through Mantids30 and expose borrowed parser statistics. */
 class TcpServer
@@ -60,8 +59,7 @@ public:
     uint16_t getListenPort() const;
 
 private:
-    std::shared_ptr<Mantids30::Network::Sockets::Acceptors::MultiThreaded> acceptor =
-        std::make_shared<Mantids30::Network::Sockets::Acceptors::MultiThreaded>();
+    std::shared_ptr<Mantids30::Network::Sockets::Acceptors::MultiThreaded> acceptor = std::make_shared<Mantids30::Network::Sockets::Acceptors::MultiThreaded>();
     boost::property_tree::ptree config;
     std::string listenAddress, description;
     uint16_t listenPort;

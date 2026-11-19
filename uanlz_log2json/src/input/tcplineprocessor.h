@@ -4,12 +4,11 @@
  */
 #pragma once
 
-#include <audit_json.h>
 #include <Mantids30/Protocol/LineRecv/linerecv.h>
 #include <atomic>
+#include <audit_json.h>
 
-namespace UANLZ::LOG2JSON::Input
-{
+namespace UANLZ::LOG2JSON::Input {
 
 class TcpServer;
 
@@ -22,8 +21,7 @@ public:
      * @param socket Shared stream owned jointly with the Mantids30 connection machinery.
      * @param server Owning input server, which must outlive this parser.
      */
-    TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket,
-                     TcpServer &server);
+    TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket, TcpServer &server);
     /**
      * @brief Release the resources owned by this TcpLineProcessor instance.
      */
@@ -62,10 +60,7 @@ private:
         /**
          * @brief Return the audit timestamp, milliseconds and 64-bit serial number.
          */
-        std::tuple<time_t, uint32_t, uint64_t> getEventId()
-        {
-            return std::make_tuple(eventSeconds, eventMilliseconds, eventId);
-        }
+        std::tuple<time_t, uint32_t, uint64_t> getEventId() { return std::make_tuple(eventSeconds, eventMilliseconds, eventId); }
 
         time_t eventSeconds;
         uint32_t eventMilliseconds;

@@ -11,8 +11,7 @@
 #include <map>
 #include <set>
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 
 /** @brief Own one auditd record type and its parsed fields. */
 class AuditClass

@@ -4,15 +4,14 @@
  */
 #pragma once
 
-#include <string>
 #include <list>
-#include <mutex>
 #include <memory>
+#include <mutex>
+#include <string>
 
 #include "../output/output_base.h"
 
-namespace UANLZ::LOG2JSON::Output
-{
+namespace UANLZ::LOG2JSON::Output {
 
 /** @brief Own the configured destinations receiving each reconstructed audit event. */
 class Outputs

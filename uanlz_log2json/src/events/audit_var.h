@@ -4,11 +4,10 @@
  */
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 
 /** @brief Own a decoded auditd field and its printable representation. */
 class AuditVariable

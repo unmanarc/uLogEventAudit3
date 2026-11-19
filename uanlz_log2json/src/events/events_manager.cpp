@@ -33,14 +33,12 @@ json EventsManager::getStats()
     boost::json::array hostStats;
     for (const auto &[hostId, hostState] : snapshotHosts())
     {
-        boost::json::object hostJson{
-            {"host", hostId.hostname},
-            {"ip", hostId.ipAddress},
-            {"events", boost::json::object{
-                {"pending", (uint64_t)hostState->getPendingEventsCount()},
-                {"processed", (uint64_t)hostState->getProcessedEventsCount()},
-                {"dropped", (uint64_t)hostState->getDroppedEventsCount()}
-            }}};
+        boost::json::object hostJson{{"host", hostId.hostname},
+                                     {"ip", hostId.ipAddress},
+                                     {"events",
+                                      boost::json::object{{"pending", (uint64_t) hostState->getPendingEventsCount()},
+                                                          {"processed", (uint64_t) hostState->getProcessedEventsCount()},
+                                                          {"dropped", (uint64_t) hostState->getDroppedEventsCount()}}}};
         hostStats.emplace_back(std::move(hostJson));
     }
     return hostStats;
@@ -64,9 +62,7 @@ void EventsManager::startGarbageCollector()
     std::thread(runGarbageCollector).detach();
 }
 
-void EventsManager::insertClassContents(const AuditHostId &hostId,
-                                        const std::tuple<time_t, uint32_t, uint64_t> &eventId,
-                                        const std::string &eventType, std::string recordData)
+void EventsManager::insertClassContents(const AuditHostId &hostId, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData)
 {
     std::shared_ptr<AuditHost> hostState;
     {

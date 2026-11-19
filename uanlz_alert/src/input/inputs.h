@@ -4,13 +4,12 @@
  */
 #pragma once
 
-#include <mutex>
-#include <memory>
-#include <list>
 #include "tcpserver.h"
+#include <list>
+#include <memory>
+#include <mutex>
 
-namespace UANLZ::JSONALERT::Input
-{
+namespace UANLZ::JSONALERT::Input {
 
 /** @brief Own the configured TCP input servers for this service. */
 class Inputs

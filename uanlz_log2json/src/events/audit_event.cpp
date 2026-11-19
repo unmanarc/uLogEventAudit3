@@ -116,18 +116,16 @@ json AuditEvent::getJson()
     while (ends_with(formattedTimestamp, "\n"))
         formattedTimestamp.pop_back();
 
-    std::string auditId =
-        to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
+    std::string auditId = to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
 
-    boost::json::object info{
-        {"source", "auditd"},
-        {"parserVersion", 1},
-        {"unixTime", (int64_t)unixTime},
-        {"msecs", std::get<1>(eventId)},
-        {"id", (uint64_t)std::get<2>(eventId)},
-        {"host", hostId.hostname},
-        {"ip", hostId.ipAddress},
-        {"time", formattedTimestamp}};
+    boost::json::object info{{"source", "auditd"},
+                             {"parserVersion", 1},
+                             {"unixTime", (int64_t) unixTime},
+                             {"msecs", std::get<1>(eventId)},
+                             {"id", (uint64_t) std::get<2>(eventId)},
+                             {"host", hostId.hostname},
+                             {"ip", hostId.ipAddress},
+                             {"time", formattedTimestamp}};
     boost::json::object records;
 
     std::set<string> classes = getClassNames();
@@ -151,9 +149,7 @@ json AuditEvent::getJson()
         if (!entries.empty())
             records.emplace(className, std::move(entries));
     }
-    boost::json::object eventJson{
-        {"AUDITD", boost::json::object{{"id", auditId}}},
-        {"INFO", std::move(info)}};
+    boost::json::object eventJson{{"AUDITD", boost::json::object{{"id", auditId}}}, {"INFO", std::move(info)}};
     for (auto &record : records)
     {
         eventJson.erase(record.key());

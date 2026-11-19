@@ -7,8 +7,8 @@
 #include <Mantids30/Network/Sockets/socket_tcp.h>
 #include <Mantids30/Network/Sockets/socket_tls.h>
 
-#include "rpcimpl.h"
 #include "globals.h"
+#include "rpcimpl.h"
 #include <config.h>
 
 #include "rules/rules.h"
@@ -17,9 +17,9 @@
 
 #include <sys/types.h>
 
+#include <dirent.h>
 #include <pwd.h>
 #include <signal.h>
-#include <dirent.h>
 #include <unistd.h>
 
 #include <inttypes.h>
@@ -51,8 +51,7 @@ public:
 
         std::thread(RpcImpl::runRpcClient).detach();
 
-        LOG_APP->log0(__func__, Logs::INFO, (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(),
-                      getpid());
+        LOG_APP->log0(__func__, Logs::INFO, (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(), getpid());
         return 0;
     }
 
@@ -70,7 +69,10 @@ public:
         globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "a");
         globalArguments->softwareDescription = PROJECT_DESCRIPTION;
 
-        globalArguments->addCommandLineOption("Service Options", 'c', "config-dir", "Configuration directory",
+        globalArguments->addCommandLineOption("Service Options",
+                                              'c',
+                                              "config-dir",
+                                              "Configuration directory",
                                               "/etc/uauditanalyzer3/" + globalArguments->getDaemonName(),
                                               Mantids30::Core::Memory::Abstract::Var::Type::STRING);
     }
@@ -95,8 +97,7 @@ public:
         initLog.userFieldMinWidth = 1;
 
         // start program.
-        initLog.log(__func__, "", "", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32, __DATE__,
-                    __TIME__, getpid());
+        initLog.log(__func__, "", "", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32, __DATE__, __TIME__, getpid());
         initLog.log0(__func__, Logs::INFO, "Using config dir: %s", configDirectory.c_str());
         initLog.log0(__func__, Logs::INFO, "Loading configuration: %s", (configDirectory + "/config.ini").c_str());
 
@@ -120,8 +121,7 @@ public:
 
             if (filePermissions != 0600)
             {
-                initLog.log0(__func__, Logs::WARNING,
-                             "config.ini file permissions are not 0600 and API key may be exposed, changing...");
+                initLog.log0(__func__, Logs::WARNING, "config.ini file permissions are not 0600 and API key may be exposed, changing...");
 
                 if (chmod((configDirectory + "/config.ini").c_str(), 0600))
                 {
@@ -134,8 +134,7 @@ public:
         }
         else
         {
-            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration: %s",
-                         (configDirectory + "/config.ini").c_str());
+            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration: %s", (configDirectory + "/config.ini").c_str());
             return false;
         }
 
@@ -153,14 +152,11 @@ public:
 
         Input::Inputs::setConfigFilePath(Globals::getMainConfig()->get<std::string>("Input.InputsPath", "inputs.json"));
         Filters::Rules::setRulesFilePath(Globals::getMainConfig()->get<std::string>("Filters.RulesPath", "rules.json"));
-        Filters::Rules::setActionsFilePath(
-            Globals::getMainConfig()->get<std::string>("Filters.ActionsPath", "actions.json"));
+        Filters::Rules::setActionsFilePath(Globals::getMainConfig()->get<std::string>("Filters.ActionsPath", "actions.json"));
 
         Filters::Rules::setEvaluationQueueMaxSize(Globals::getMainConfig()->get<size_t>("Filters.QueueSize", 100000));
-        Filters::Rules::setQueuePushTimeoutMs(
-            Globals::getMainConfig()->get<uint64_t>("Filters.QueueMaxPushWaitTimeInMS", 0));
-        Filters::Rules::setQueuePopTimeoutMs(
-            Globals::getMainConfig()->get<uint64_t>("Filters.ThreadMaxPopTimeInMS", 10000));
+        Filters::Rules::setQueuePushTimeoutMs(Globals::getMainConfig()->get<uint64_t>("Filters.QueueMaxPushWaitTimeInMS", 0));
+        Filters::Rules::setQueuePopTimeoutMs(Globals::getMainConfig()->get<uint64_t>("Filters.ThreadMaxPopTimeInMS", 10000));
         Filters::Rules::reloadActions();
         Filters::Rules::reloadRules();
         Filters::Rules::startEvaluationThreads(Globals::getMainConfig()->get<uint32_t>("Filters.Threads", 16));

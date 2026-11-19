@@ -38,8 +38,7 @@ void processClientConnection(void *context, const std::shared_ptr<Socket_Stream>
     string threadName = "IN_" + remoteAddress;
     pthread_setname_np(pthread_self(), threadName.c_str());
 
-    LOG_APP->log1(__func__, remoteAddress, Logs::INFO, "Receiving %sJSONTCP Incoming connection...",
-                  secure ? "secure " : "");
+    LOG_APP->log1(__func__, remoteAddress, Logs::INFO, "Receiving %sJSONTCP Incoming connection...", secure ? "secure " : "");
 
     server->addClient(&lineProcessor);
     struct ClientRegistration
@@ -47,16 +46,12 @@ void processClientConnection(void *context, const std::shared_ptr<Socket_Stream>
         TcpServer &server;
         TcpLineProcessor &processor;
         /** @brief Remove the borrowed parser before its callback scope ends. */
-        ~ClientRegistration()
-        {
-            server.removeClient(&processor);
-        }
+        ~ClientRegistration() { server.removeClient(&processor); }
     } registration{*server, lineProcessor};
 
     Parser::ParseResult parseResult;
     lineProcessor.parseObject(&parseResult);
-    LOG_APP->log1(__func__, remoteAddress, parseResult == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING,
-                  "Incoming connection finished (parser status %d).", static_cast<int>(parseResult));
+    LOG_APP->log1(__func__, remoteAddress, parseResult == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING, "Incoming connection finished (parser status %d).", static_cast<int>(parseResult));
 }
 
 TcpServer::TcpServer() {}
@@ -67,8 +62,7 @@ bool TcpServer::loadConfig(const json &configValue)
     listenPort = Mantids30::DataFormat::JSON::ASUINT(configValue, "ListenPort", 0);
     description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
-    LOG_APP->log0(__func__, Logs::INFO, "Configuring JSON input '%s' @%s:%" PRIu16, description.c_str(),
-                  listenAddress.c_str(), listenPort);
+    LOG_APP->log0(__func__, Logs::INFO, "Configuring JSON input '%s' @%s:%" PRIu16, description.c_str(), listenAddress.c_str(), listenPort);
 
     return true;
 }
@@ -79,13 +73,11 @@ void TcpServer::startListener()
 
     if (!listenerSocket->listenOn(listenPort, listenAddress.c_str(), true))
     {
-        LOG_APP->log0(__func__, Logs::ERROR, "Error creating JSON TCP listener @%s:%" PRIu16, listenAddress.c_str(),
-                      listenPort);
+        LOG_APP->log0(__func__, Logs::ERROR, "Error creating JSON TCP listener @%s:%" PRIu16, listenAddress.c_str(), listenPort);
         return;
     }
 
-    LOG_APP->log0(__func__, Logs::WARNING, "JSON TCP Listener listener running @%s:%" PRIu16 "...",
-                  listenAddress.c_str(), listenerSocket->getLocalPort());
+    LOG_APP->log0(__func__, Logs::WARNING, "JSON TCP Listener listener running @%s:%" PRIu16 "...", listenAddress.c_str(), listenerSocket->getLocalPort());
 
     // STREAM MANAGER:
     acceptor->addAcceptorSocket(listenerSocket);

@@ -4,13 +4,12 @@
  */
 #pragma once
 
-#include <mutex>
-#include <memory>
-#include <list>
 #include "../input/tcpserver.h"
+#include <list>
+#include <memory>
+#include <mutex>
 
-namespace UANLZ::LOG2JSON::Input
-{
+namespace UANLZ::LOG2JSON::Input {
 
 /** @brief Own the configured TCP input servers for this service. */
 class Inputs

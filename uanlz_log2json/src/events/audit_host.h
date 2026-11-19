@@ -4,16 +4,15 @@
  */
 #pragma once
 
-#include <string>
-#include <mutex>
-#include <map>
 #include <atomic>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <string>
 
 #include "audit_event.h"
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 
 /** @brief Synchronize incomplete events for one source and enqueue completed or expired events. */
 class AuditHost
@@ -34,8 +33,7 @@ public:
      * @param eventType Auditd record type used to detect event completion.
      * @param recordData Owned record text to append or move into the event.
      */
-    void insertClassContents(const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType,
-                             std::string recordData);
+    void insertClassContents(const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData);
 
     /**
      * @brief Set the host identity when the buffer has no hostname yet.

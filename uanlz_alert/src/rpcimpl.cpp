@@ -23,8 +23,7 @@ void RpcImpl::runRpcClient()
 {
     uint16_t remotePort = Globals::getMainConfig()->get<uint16_t>("RPCConnector.RemotePort", 33001);
     std::string remoteAddress = Globals::getMainConfig()->get<std::string>("RPCConnector.RemoteAddr", "127.0.0.1");
-    std::string rpcApiKey =
-        Globals::getMainConfig()->get<std::string>("RPCConnector.AlertsApiKey", "REPLACEME_XABCXAPIX_ALERT");
+    std::string rpcApiKey = Globals::getMainConfig()->get<std::string>("RPCConnector.AlertsApiKey", "REPLACEME_XABCXAPIX_ALERT");
 
     Mantids30::Protocol::FastRPC1 fastRpc;
 
@@ -64,11 +63,9 @@ void RpcImpl::runRpcClient()
     {
         auto rpcSocket = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
 
-        if (!rpcSocket->tlsKeys.loadCAFromPEMFile(
-                Globals::getMainConfig()->get<std::string>("RPCConnector.CAFile", "rpcca.crt").c_str()))
+        if (!rpcSocket->tlsKeys.loadCAFromPEMFile(Globals::getMainConfig()->get<std::string>("RPCConnector.CAFile", "rpcca.crt").c_str()))
         {
-            LOG_APP->log0(__func__, Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s",
-                          remoteAddress.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
+            LOG_APP->log0(__func__, Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddress.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
             _exit(-3);
         }
 
@@ -82,15 +79,13 @@ void RpcImpl::runRpcClient()
         }
         else
         {
-            LOG_APP->log0(__func__, Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s",
-                          remoteAddress.c_str(), remotePort, rpcSocket->getLastError().c_str());
+            LOG_APP->log0(__func__, Logs::ERROR, "Error connecting to remote API Server @%s:%" PRIu16 ": %s", remoteAddress.c_str(), remotePort, rpcSocket->getLastError().c_str());
             sleep(3);
         }
     }
 }
 
-json RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *,
-                                          const std::string &)
+json RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(configValue);
 }
@@ -147,14 +142,12 @@ json RpcImpl::controlEditAction(void *, const std::string &, const json &configV
 
 json RpcImpl::controlEditRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::editRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF),
-                                    Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
+    return Filters::Rules::editRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
 json RpcImpl::controlAddRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::addRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF),
-                                   Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
+    return Filters::Rules::addRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
 json RpcImpl::controlRuleUp(void *, const std::string &, const json &configValue, void *, const std::string &)
@@ -167,8 +160,7 @@ json RpcImpl::controlRuleDown(void *, const std::string &, const json &configVal
     return Filters::Rules::moveRuleDown(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-json RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *,
-                                            const std::string &)
+json RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(configValue);
 }
@@ -190,8 +182,7 @@ json RpcImpl::statReadRunningActions(void *, const std::string &, const json &, 
 
 json RpcImpl::statReadRunningAction(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningAction(
-        std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
+    return Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
 json RpcImpl::controlRemoveInput(void *, const std::string &, const json &configValue, void *, const std::string &)
@@ -206,9 +197,7 @@ json RpcImpl::controlAddInput(void *, const std::string &, const json &configVal
 
 json RpcImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
 {
-    boost::json::object response{
-        {"modified", Input::Inputs::getModified()},
-        {"inputs", Input::Inputs::readInputs()}};
+    boost::json::object response{{"modified", Input::Inputs::getModified()}, {"inputs", Input::Inputs::readInputs()}};
     return response;
 }
 

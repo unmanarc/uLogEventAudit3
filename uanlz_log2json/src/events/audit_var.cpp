@@ -117,11 +117,9 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
     if (variableValue.empty())
         return setValid(false);
 
-    if (variableValue.size() > 2 &&
-        ((starts_with(variableValue, "'") && ends_with(variableValue, "'")) ||
-         (starts_with(variableValue, "\"") && ends_with(variableValue, "\"")) ||
-         (starts_with(variableValue, "(") && ends_with(variableValue, ")")) ||
-         (starts_with(variableValue, "{") && ends_with(variableValue, "}"))))
+    if (variableValue.size() > 2
+        && ((starts_with(variableValue, "'") && ends_with(variableValue, "'")) || (starts_with(variableValue, "\"") && ends_with(variableValue, "\""))
+            || (starts_with(variableValue, "(") && ends_with(variableValue, ")")) || (starts_with(variableValue, "{") && ends_with(variableValue, "}"))))
     {
         rawValue = variableValue.substr(1, variableValue.size() - 2);
 

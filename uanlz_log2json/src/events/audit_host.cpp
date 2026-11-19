@@ -10,8 +10,7 @@
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-namespace
-{
+namespace {
 /**
  * @brief Format an event identity for diagnostics without changing its JSON representation.
  * @param event Event supplying seconds, milliseconds and serial number.
@@ -24,13 +23,14 @@ string formatEventId(const AuditEvent &event)
 }
 } // namespace
 
-AuditHost::AuditHost() : droppedEventsCount(0), processedEventsCount(0)
+AuditHost::AuditHost()
+    : droppedEventsCount(0)
+    , processedEventsCount(0)
 {
     enforceMaxAge = Globals::getMainConfig()->get<bool>("GC.EnforceMaxAge", true);
 }
 
-void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eventId, const string &eventType,
-                                    string recordData)
+void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eventId, const string &eventType, string recordData)
 {
     unique_lock<mutex> lock(eventsMutex);
     auto position = auditEvents.find(eventId);
@@ -51,8 +51,7 @@ void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eve
         const auto eventLabel = formatEventId(*event);
         if (!EventDistribution::pushAuditEvent(std::move(event)))
         {
-            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...",
-                          eventLabel.c_str());
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...", eventLabel.c_str());
             ++droppedEventsCount;
         }
         else
@@ -95,8 +94,7 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
                 eventLabels += ",";
             eventLabels += formatEventId(*event);
         }
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queueing uncompleted events for host='%s' (%s)...",
-                      hostname.c_str(), eventLabels.c_str());
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queueing uncompleted events for host='%s' (%s)...", hostname.c_str(), eventLabels.c_str());
     }
 
     // Expired events are already detached, so queue waits hold no host lock.
@@ -105,8 +103,7 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
         const auto eventLabel = formatEventId(*event);
         if (!EventDistribution::pushAuditEvent(std::move(event)))
         {
-            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...",
-                          eventLabel.c_str());
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...", eventLabel.c_str());
             ++droppedEventsCount;
         }
         else

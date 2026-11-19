@@ -7,8 +7,7 @@
 #include "../events/audit_event.h"
 #include <audit_json.h>
 
-namespace UANLZ::LOG2JSON::Output
-{
+namespace UANLZ::LOG2JSON::Output {
 
 /** @brief Define the contract for asynchronous audit event destinations. */
 class OutputBase

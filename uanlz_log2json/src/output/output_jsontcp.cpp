@@ -5,8 +5,8 @@
 #include "output_jsontcp.h"
 #include "../globals.h"
 #include <boost/algorithm/string/replace.hpp>
-#include <thread>
 #include <inttypes.h>
+#include <thread>
 
 using namespace UANLZ::LOG2JSON::Output;
 using namespace std;
@@ -24,7 +24,8 @@ void runTcpOutput(JsonTcpOutput *output)
     output->process();
 }
 
-JsonTcpOutput::JsonTcpOutput() : OutputBase()
+JsonTcpOutput::JsonTcpOutput()
+    : OutputBase()
 {
     connection = std::make_unique<Mantids30::Network::Sockets::Socket_TCP>();
 }
@@ -37,8 +38,7 @@ bool JsonTcpOutput::loadConfig(const std::string &file)
         boost::property_tree::ini_parser::read_ini(file.c_str(), config);
     else
     {
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR,
-                      "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
         return false;
     }
 
@@ -57,9 +57,7 @@ void JsonTcpOutput::logAuditEvent(const json &eventJson, const std::tuple<time_t
     // push, if not report and go.
     if (!pendingEvents.push(eventValue.get(), pushTimeoutMs))
     {
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::WARNING,
-                      "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...",
-                      get<0>(eventId), get<1>(eventId), get<2>(eventId));
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::WARNING, "Output_JSONTCP Queue full, Event %" PRIu64 ".%" PRIu32 ":%" PRIu64 " Dropped...", get<0>(eventId), get<1>(eventId), get<2>(eventId));
         dropped++;
     }
     else
@@ -89,8 +87,7 @@ void JsonTcpOutput::process()
         auto eventValue = std::unique_ptr<json>(pendingEvents.pop());
         if (eventValue)
         {
-            const auto payload = transmissionMode == 0 ? Mantids30::DataFormat::JSON::toString(*eventValue) + "\n"
-                                                       : UANLZ::JSON::toStyledString(*eventValue);
+            const auto payload = transmissionMode == 0 ? Mantids30::DataFormat::JSON::toString(*eventValue) + "\n" : UANLZ::JSON::toStyledString(*eventValue);
             // Keep the same serialized payload across reconnection attempts.
             while (!connection->writeString(payload))
             {
@@ -109,15 +106,13 @@ json JsonTcpOutput::getStats()
     std::string server = config.get<std::string>("Host", "127.0.0.1");
     uint16_t port = config.get<uint16_t>("Port", 18200);
 
-    boost::json::object outputStats{
-        {"id", server + ":" + to_string(port)},
-        {"queue", boost::json::object{
-            {"size", (uint64_t)pendingEvents.size()},
-            {"maxItems", (uint64_t)pendingEvents.getMaxItems()},
-            {"dropped", (uint64_t)dropped},
-            {"processed", (uint64_t)processed}
-        }},
-        {"connected", (bool)connected}};
+    boost::json::object outputStats{{"id", server + ":" + to_string(port)},
+                                    {"queue",
+                                     boost::json::object{{"size", (uint64_t) pendingEvents.size()},
+                                                         {"maxItems", (uint64_t) pendingEvents.getMaxItems()},
+                                                         {"dropped", (uint64_t) dropped},
+                                                         {"processed", (uint64_t) processed}}},
+                                    {"connected", (bool) connected}};
 
     return outputStats;
 }
@@ -130,16 +125,14 @@ bool JsonTcpOutput::reconnect()
     {
         std::string msg = connection->getLastError();
         boost::replace_all(msg, "\n", ",");
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "JSONTCP connection error to %s:%" PRIu16 ": %s",
-                      server.c_str(), port, msg.c_str());
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "JSONTCP connection error to %s:%" PRIu16 ": %s", server.c_str(), port, msg.c_str());
         connected = false;
         sleep(config.get<uint32_t>("ReconnectSleepTimeInSecs", 3));
         return false;
     }
     else
     {
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::INFO, "JSONTCP connected to %s:%" PRIu16, server.c_str(),
-                      port);
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::INFO, "JSONTCP connected to %s:%" PRIu16, server.c_str(), port);
         connected = true;
         return true;
     }

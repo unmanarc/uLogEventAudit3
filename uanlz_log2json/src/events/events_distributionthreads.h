@@ -9,8 +9,7 @@
 
 #include "../events/audit_event.h"
 
-namespace UANLZ::LOG2JSON::AuditdEvents
-{
+namespace UANLZ::LOG2JSON::AuditdEvents {
 /** @brief Distribute owned audit events through the Mantids30 queue to output workers. */
 class EventDistribution
 {
@@ -60,8 +59,7 @@ public:
     static void publishIntervalCounters();
 
 private:
-    static std::atomic<uint64_t> eventsProcessed, eventsProcessedLastTenSeconds, eventsProcessedThisPeriod,
-        eventsDropped;
+    static std::atomic<uint64_t> eventsProcessed, eventsProcessedLastTenSeconds, eventsProcessedThisPeriod, eventsDropped;
     static Mantids30::Core::Threads::Safe::Queue<AuditEvent> eventsQueue;
     static uint32_t pushTimeoutMs;
 };

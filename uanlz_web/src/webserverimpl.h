@@ -3,8 +3,7 @@
  * @brief Declarations and contracts for uanlz_web/src/webserverimpl.
  */
 #pragma once
-namespace UANLZ::WEB
-{
+namespace UANLZ::WEB {
 /** @brief Create the authenticated REST console and its fixed backend route mappings. */
 class WebServerImpl
 {

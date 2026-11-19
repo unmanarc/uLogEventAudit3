@@ -6,8 +6,7 @@
 
 #include <audit_json.h>
 
-namespace UANLZ::LOG2JSON
-{
+namespace UANLZ::LOG2JSON {
 
 /** @brief Register backend RPC operations and maintain the outbound TLS connection to the web service. */
 class RpcImpl

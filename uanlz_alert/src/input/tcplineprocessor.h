@@ -4,13 +4,12 @@
  */
 #pragma once
 
-#include <audit_json.h>
 #include <Mantids30/Protocol/LineRecv/linerecv.h>
-#include <thread>
 #include <atomic>
+#include <audit_json.h>
+#include <thread>
 
-namespace UANLZ::JSONALERT::Input
-{
+namespace UANLZ::JSONALERT::Input {
 
 class TcpServer;
 
@@ -23,8 +22,7 @@ public:
      * @param socket Shared stream owned jointly with the Mantids30 connection machinery.
      * @param server Owning input server, which must outlive this parser.
      */
-    TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket,
-                     TcpServer &server);
+    TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket, TcpServer &server);
     /**
      * @brief Release the resources owned by this TcpLineProcessor instance.
      */

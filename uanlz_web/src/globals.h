@@ -3,14 +3,13 @@
  * @brief Declarations and contracts for uanlz_web/src/globals.
  */
 #pragma once
+#include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
+#include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 #include <Mantids30/Runtime/Logs/applog.h>
 #include <Mantids30/Runtime/Logs/rpclog.h>
-#include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 #include <Mantids30/Server/WebRESTFul/engine.h>
-#include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include <boost/property_tree/ptree.hpp>
-namespace UANLZ::WEB
-{
+namespace UANLZ::WEB {
 /** @brief Hold the configuration, logs and shared resources used by this service. */
 struct Globals
 {

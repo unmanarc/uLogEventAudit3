@@ -3,23 +3,23 @@
  * @brief Implementation for uanlz_alert/src/rules/rules.
  */
 #include "rules.h"
-#include <shared_mutex>
 #include <Mantids30/Core/Helpers/random.h>
+#include <shared_mutex>
 
-#include <boost/property_tree/ini_parser.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/optional.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 #include "../globals.h"
 
 #include <dirent.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
-#include <string>
 #include <cerrno>
+#include <string>
 #include <system_error>
 #include <thread>
 
@@ -75,8 +75,7 @@ void executeProcess(const std::string &ruleName, const char *file, std::vector<s
     if (pid == -1)
     {
         const auto error = std::error_code(errno, std::generic_category()).message();
-        LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to launch '%s': %s", ruleName.c_str(), file,
-                      error.c_str());
+        LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to launch '%s': %s", ruleName.c_str(), file, error.c_str());
     }
     else if (pid == 0)
     {
@@ -90,17 +89,16 @@ void executeProcess(const std::string &ruleName, const char *file, std::vector<s
         do
         {
             result = waitpid(pid, &status, 0);
-        } while (result == -1 && errno == EINTR);
+        }
+        while (result == -1 && errno == EINTR);
         if (result == -1)
         {
             const auto error = std::error_code(errno, std::generic_category()).message();
-            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to wait for '%s': %s", ruleName.c_str(), file,
-                          error.c_str());
+            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to wait for '%s': %s", ruleName.c_str(), file, error.c_str());
         }
         else if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
         {
-            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': execution of '%s' failed (wait status %d).",
-                          ruleName.c_str(), file, status);
+            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': execution of '%s' failed (wait status %d).", ruleName.c_str(), file, status);
         }
     }
 }
@@ -118,19 +116,15 @@ Rules::~Rules()
 
 json Rules::getStats()
 {
-    boost::json::object evaluationStats{
-        {"queue", boost::json::object{
-            {"count", (uint64_t)evaluationQueue.size()},
-            {"max", (uint64_t)evaluationQueue.getMaxItems()}
-        }},
-        {"queuedLinesCount", (uint64_t)queuedLinesCount},
-        {"droppedInQueue", (uint64_t)droppedInQueue},
-        {"badFormatLines", (uint64_t)badFormatLines},
-        {"processedLines", (uint64_t)processedLines},
-        {"rulesActivated", (uint64_t)rulesActivated},
-        {"queueInLastSec", (uint64_t)queueInLastSecond},
-        {"queueOutLastSec", (uint64_t)queueOutLastSecond},
-        {"lastEvaluationTimeInMS", (double)evaluationTimeMs}};
+    boost::json::object evaluationStats{{"queue", boost::json::object{{"count", (uint64_t) evaluationQueue.size()}, {"max", (uint64_t) evaluationQueue.getMaxItems()}}},
+                                        {"queuedLinesCount", (uint64_t) queuedLinesCount},
+                                        {"droppedInQueue", (uint64_t) droppedInQueue},
+                                        {"badFormatLines", (uint64_t) badFormatLines},
+                                        {"processedLines", (uint64_t) processedLines},
+                                        {"rulesActivated", (uint64_t) rulesActivated},
+                                        {"queueInLastSec", (uint64_t) queueInLastSecond},
+                                        {"queueOutLastSec", (uint64_t) queueOutLastSecond},
+                                        {"lastEvaluationTimeInMS", (double) evaluationTimeMs}};
 
     return evaluationStats;
 }
@@ -225,22 +219,18 @@ bool Rules::evaluate(const json &values)
     {
         if (rule->expression->evaluate(values))
         {
-
             activated = true;
 
             if (rule->ruleAction == RULE_ACTION_EXEC || rule->ruleAction == RULE_ACTION_EXECANDABORT)
             {
                 if (actions.find(rule->actionId) == actions.end())
                 {
-                    LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s' activated, but action '%s' not found",
-                                  rule->name.c_str(), rule->actionId.c_str());
+                    LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s' activated, but action '%s' not found", rule->name.c_str(), rule->actionId.c_str());
                 }
                 else
                 {
-                    LOG_APP->log0(__func__, Logs::DEBUG, "Rule '%s' activated, executing action '%s'",
-                                  rule->name.c_str(), rule->actionId.c_str());
-                    executeAction(rule->name, actions.at(rule->actionId)->file.c_str(),
-                                  actions.at(rule->actionId)->arguments, values);
+                    LOG_APP->log0(__func__, Logs::DEBUG, "Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
+                    executeAction(rule->name, actions.at(rule->actionId)->file.c_str(), actions.at(rule->actionId)->arguments, values);
                     if (rule->ruleAction == RULE_ACTION_EXECANDABORT)
                         break;
                 }
@@ -381,8 +371,7 @@ void Rules::runQueueCounters()
     }
 }
 
-void Rules::executeAction(const std::string &ruleName, const char *file, std::vector<string> arguments,
-                          const json &values)
+void Rules::executeAction(const std::string &ruleName, const char *file, std::vector<string> arguments, const json &values)
 {
     expandArguments(arguments, ruleName, values);
     executeProcess(ruleName, file, arguments);
@@ -410,14 +399,12 @@ void Rules::expandArgument(string &argument, const std::string &ruleName, const 
 
     boost::regex placeholderPattern("(?<STATIC_TEXT>\\%[^\\%]*\\%)");
     boost::match_results<string::const_iterator> placeholderMatch;
-    for (string::const_iterator start = argument.begin(), end = argument.end();
-         boost::regex_search(start, end, placeholderMatch, placeholderPattern, flags);
+    for (string::const_iterator start = argument.begin(), end = argument.end(); boost::regex_search(start, end, placeholderMatch, placeholderPattern, flags);
          start = argument.begin(), end = argument.end())
     {
         std::string placeholderName = string(placeholderMatch[1].first, placeholderMatch[1].second).substr(1);
         placeholderName.pop_back();
-        boost::replace_all(argument, string(placeholderMatch[1].first, placeholderMatch[1].second),
-                           makePlaceholderTag(tagPrefix, tagIndex));
+        boost::replace_all(argument, string(placeholderMatch[1].first, placeholderMatch[1].second), makePlaceholderTag(tagPrefix, tagIndex));
         placeholderNames[makePlaceholderTag(tagPrefix, tagIndex++)] = placeholderName;
     }
     for (const auto &replacement : placeholderNames)
@@ -465,14 +452,12 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
         {
             return ruleName;
         }
-        LOG_APP->log0(__func__, Logs::DEBUG, "Invalid Argument Variable '%s' on rule '%s'", placeholder.c_str(),
-                      ruleName.c_str());
+        LOG_APP->log0(__func__, Logs::DEBUG, "Invalid Argument Variable '%s' on rule '%s'", placeholder.c_str(), ruleName.c_str());
         return "INVALID_VARGUMENT_VARIABLE";
     }
     else
     {
-        LOG_APP->log0(__func__, Logs::DEBUG, "Invalid Argument Variable '%s' on rule '%s'", placeholder.c_str(),
-                      ruleName.c_str());
+        LOG_APP->log0(__func__, Logs::DEBUG, "Invalid Argument Variable '%s' on rule '%s'", placeholder.c_str(), ruleName.c_str());
         return "INVALID_VARGUMENT_VARIABLE";
     }
 }
@@ -505,8 +490,7 @@ bool Rules::addRuleUnlocked(uint32_t position, const json &configValue, bool rep
 
     if (!rule->expression->isCompiled())
     {
-        LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s': 'Filter' compilation failed with '%s'.", name.c_str(),
-                      rule->expression->getLastCompilerError().c_str());
+        LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s': 'Filter' compilation failed with '%s'.", name.c_str(), rule->expression->getLastCompilerError().c_str());
         return false;
     }
 
@@ -517,8 +501,7 @@ bool Rules::addRuleUnlocked(uint32_t position, const json &configValue, bool rep
 
         if (actions.find(rule->actionId) == actions.end())
         {
-            LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s': 'Filter' referenced unexistent action '%s'.", name.c_str(),
-                          rule->actionId.c_str());
+            LOG_APP->log0(__func__, Logs::ERROR, "Rule '%s': 'Filter' referenced unexistent action '%s'.", name.c_str(), rule->actionId.c_str());
             return false;
         }
     }
@@ -563,8 +546,7 @@ bool Rules::addActionUnlocked(const json &configValue, bool replace)
     {
         if (actions.find(actionName) == actions.end())
         {
-            LOG_APP->log0(__func__, Logs::WARNING, "Action '%s': name not found during replacement.",
-                          actionName.c_str());
+            LOG_APP->log0(__func__, Logs::WARNING, "Action '%s': name not found during replacement.", actionName.c_str());
             return false;
         }
     }

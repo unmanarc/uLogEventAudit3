@@ -7,23 +7,23 @@
 #include <Mantids30/Network/Sockets/socket_tcp.h>
 #include <Mantids30/Network/Sockets/socket_tls.h>
 
-#include "rpcimpl.h"
 #include "globals.h"
+#include "rpcimpl.h"
 #include <config.h>
 
 #include "vars/namedefs.h"
 
 #include "events/events_distributionthreads.h"
 #include "events/events_manager.h"
-#include "output/outputs.h"
 #include "input/inputs.h"
+#include "output/outputs.h"
 
 #include <sys/types.h>
 
-#include <pwd.h>
-#include <signal.h>
 #include <filesystem>
+#include <pwd.h>
 #include <set>
+#include <signal.h>
 #include <unistd.h>
 
 #include <inttypes.h>
@@ -53,17 +53,14 @@ public:
         std::string configDirectory = globalArguments->getCommandLineOptionValue("config-dir")->toString();
 
         // start program.
-        LOG_APP->log(__func__, "", "", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32, __DATE__,
-                     __TIME__, getpid());
+        LOG_APP->log(__func__, "", "", Logs::INFO, 2048, "Starting... (Build date %s %s), PID: %" PRIi32, __DATE__, __TIME__, getpid());
         LOG_APP->log0(__func__, Logs::INFO, "Using config dir: %s", configDirectory.c_str());
 
         // Start modules here...
         AuditdEvents::EventsManager::startGarbageCollector();
 
-        AuditdEvents::EventDistribution::startDistributionThreads(
-            Globals::getMainConfig()->get<size_t>("Processor.Threads", 8));
-        AuditdEvents::EventDistribution::setQueueSize(
-            Globals::getMainConfig()->get<size_t>("Processor.QueueSize", 1000));
+        AuditdEvents::EventDistribution::startDistributionThreads(Globals::getMainConfig()->get<size_t>("Processor.Threads", 8));
+        AuditdEvents::EventDistribution::setQueueSize(Globals::getMainConfig()->get<size_t>("Processor.QueueSize", 1000));
 
         // Start output threads...
         Output::Outputs::startThreads();
@@ -73,8 +70,7 @@ public:
 
         std::thread(RpcImpl::runRpcClient).detach();
 
-        LOG_APP->log0(__func__, Logs::INFO, (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(),
-                      getpid());
+        LOG_APP->log0(__func__, Logs::INFO, (globalArguments->getDaemonName() + " initialized with PID: %d").c_str(), getpid());
         return 0;
     }
 
@@ -93,7 +89,10 @@ public:
         globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "a");
         globalArguments->softwareDescription = PROJECT_DESCRIPTION;
 
-        globalArguments->addCommandLineOption("Service Options", 'c', "config-dir", "Configuration directory",
+        globalArguments->addCommandLineOption("Service Options",
+                                              'c',
+                                              "config-dir",
+                                              "Configuration directory",
                                               "/etc/uauditanalyzer3/" + globalArguments->getDaemonName(),
                                               Mantids30::Core::Memory::Abstract::Var::Type::STRING);
     }
@@ -141,8 +140,7 @@ public:
 
             if (filePermissions != 0600)
             {
-                initLog.log0(__func__, Logs::WARNING,
-                             "config.ini file permissions are not 0600 and API key may be exposed, changing...");
+                initLog.log0(__func__, Logs::WARNING, "config.ini file permissions are not 0600 and API key may be exposed, changing...");
 
                 if (chmod((configDirectory + "/config.ini").c_str(), 0600))
                 {
@@ -156,8 +154,7 @@ public:
         }
         else
         {
-            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration: %s",
-                         (configDirectory + "/config.ini").c_str());
+            initLog.log0(__func__, Logs::CRITICAL, "Missing configuration: %s", (configDirectory + "/config.ini").c_str());
             return false;
         }
 
@@ -188,8 +185,7 @@ public:
             }
             if (error)
             {
-                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(),
-                              error.message().c_str());
+                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(), error.message().c_str());
                 return false;
             }
             for (const auto &file : files)

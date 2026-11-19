@@ -6,8 +6,7 @@
 
 #include <audit_json.h>
 
-namespace UANLZ::JSONALERT
-{
+namespace UANLZ::JSONALERT {
 
 /** @brief Register backend RPC operations and maintain the outbound TLS connection to the web service. */
 class RpcImpl
@@ -28,8 +27,7 @@ private:
      * @brief Persist and reload rule definitions supplied in the RPC request.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      */
-    static json controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *,
-                                            const std::string &);
+    static json controlWriteRulesFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &);
     /**
      * @brief Return persisted rule definitions through RPC.
      */
@@ -62,14 +60,12 @@ private:
      * @brief Persist the currently running rule definitions.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      */
-    static json controlSaveRunningRules(void *, const std::string &, const json &configValue, void *,
-                                        const std::string &);
+    static json controlSaveRunningRules(void *, const std::string &, const json &configValue, void *, const std::string &);
     /**
      * @brief Persist the currently running action definitions.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      */
-    static json controlSaveRunningActions(void *, const std::string &, const json &configValue, void *,
-                                          const std::string &);
+    static json controlSaveRunningActions(void *, const std::string &, const json &configValue, void *, const std::string &);
 
     /**
      * @brief Add the named action supplied in the RPC request.
@@ -107,8 +103,7 @@ private:
      * @brief Persist and reload the supplied action definitions.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      */
-    static json controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *,
-                                              const std::string &);
+    static json controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *, const std::string &);
     /**
      * @brief Return whether the running actions have unsaved changes.
      */

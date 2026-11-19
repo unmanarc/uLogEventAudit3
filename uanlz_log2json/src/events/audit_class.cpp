@@ -6,13 +6,13 @@
 
 #include "../globals.h"
 
-#include <sys/un.h>
 #include <algorithm>
+#include <arpa/inet.h>
 #include <array>
 #include <cstddef>
 #include <cstring>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
 
 #include <boost/regex.hpp>
 
@@ -50,19 +50,14 @@ bool AuditClass::parseVariables()
     boost::match_flag_type flags = boost::match_default;
 
     // Auditd quotes literal text and leaves encoded/numeric fields unquoted.
-    for (string::const_iterator start = rawInput.begin(), end = rawInput.end();
-         boost::regex_search(start, end, variableMatch, quotedVariablePattern, flags); start = variableMatch[0].second)
+    for (string::const_iterator start = rawInput.begin(), end = rawInput.end(); boost::regex_search(start, end, variableMatch, quotedVariablePattern, flags); start = variableMatch[0].second)
     {
-        parseVariable(string(variableMatch[1].first, variableMatch[1].second),
-                      string(variableMatch[2].first, variableMatch[2].second));
+        parseVariable(string(variableMatch[1].first, variableMatch[1].second), string(variableMatch[2].first, variableMatch[2].second));
     }
 
-    for (string::const_iterator start = rawInput.begin(), end = rawInput.end();
-         boost::regex_search(start, end, variableMatch, unquotedVariablePattern, flags);
-         start = variableMatch[0].second)
+    for (string::const_iterator start = rawInput.begin(), end = rawInput.end(); boost::regex_search(start, end, variableMatch, unquotedVariablePattern, flags); start = variableMatch[0].second)
     {
-        parseVariable(string(variableMatch[1].first, variableMatch[1].second),
-                      string(variableMatch[2].first, variableMatch[2].second));
+        parseVariable(string(variableMatch[1].first, variableMatch[1].second), string(variableMatch[2].first, variableMatch[2].second));
     }
 
     return mergeSplitVariables();
@@ -89,17 +84,13 @@ json AuditClass::getJson()
             for (uint32_t index = 0; index < argc->second.asUint32() && index < 65536; index++)
             {
                 const auto argument = variablesByName.find("a" + to_string(index));
-                const std::string displayValue = argument != variablesByName.end()
-                    ? argument->second.getDisplayValue() : "__UAA_PARSER_NOT_FOUND__";
+                const std::string displayValue = argument != variablesByName.end() ? argument->second.getDisplayValue() : "__UAA_PARSER_NOT_FOUND__";
                 arguments.emplace_back(displayValue);
                 commandLine += displayValue + " ";
             }
             if (!commandLine.empty())
                 commandLine.pop_back();
-            return boost::json::object{
-                {"argc", argc->second.getDisplayValue()},
-                {"argv", std::move(arguments)},
-                {"cmdline", commandLine}};
+            return boost::json::object{{"argc", argc->second.getDisplayValue()}, {"argv", std::move(arguments)}, {"cmdline", commandLine}};
         }
     }
 
@@ -113,16 +104,13 @@ json AuditClass::getJson()
 
 void AuditClass::parseVariable(const string &variableName, const string &variableValue)
 {
-
     if (!variablesByName[variableName].parse(classTypeName, variableName, variableValue))
     {
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'",
-                      variableName.c_str(), variableValue.c_str());
+        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'", variableName.c_str(), variableValue.c_str());
     }
 
-    if (classTypeName == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) &&
-        variableValue.size() < 250 && variableValue.size() % 2 == 0 &&
-        boost::all(variableValue, boost::is_any_of("0123456789abcdefABCDEF")))
+    if (classTypeName == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) && variableValue.size() < 250 && variableValue.size() % 2 == 0
+        && boost::all(variableValue, boost::is_any_of("0123456789abcdefABCDEF")))
     {
         string family, ipAddress, path;
         unsigned short port = 0;
@@ -196,17 +184,14 @@ bool AuditClass::mergeSplitVariables()
     set<string> splitVariableNames = getSplitVariableNames();
     for (const auto &variableName : splitVariableNames)
     {
-
         string firstChunkName = getChunkVariableName(variableName, 0);
         variablesByName[variableName].append(variablesByName[firstChunkName]);
         variablesByName.erase(firstChunkName);
 
         size_t chunkIndex = 1;
-        for (std::string chunkName = getChunkVariableName(variableName, chunkIndex++);
-             variablesByName.find(chunkName) != variablesByName.end();
+        for (std::string chunkName = getChunkVariableName(variableName, chunkIndex++); variablesByName.find(chunkName) != variablesByName.end();
              chunkName = getChunkVariableName(variableName, chunkIndex++))
         {
-
             variablesByName[variableName].append(variablesByName[chunkName]);
             variablesByName.erase(chunkName);
         }
@@ -216,8 +201,7 @@ bool AuditClass::mergeSplitVariables()
     {
         if (ends_with(variable.first, "]"))
         {
-            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Orphan variable '%s' can't be reconstructed",
-                          variable.first.c_str());
+            LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Orphan variable '%s' can't be reconstructed", variable.first.c_str());
         }
     }
 

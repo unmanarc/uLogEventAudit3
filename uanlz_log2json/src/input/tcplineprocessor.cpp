@@ -5,13 +5,13 @@
 #include "tcplineprocessor.h"
 #include "tcpserver.h"
 
-#include "../globals.h"
 #include "../events/events_manager.h"
+#include "../globals.h"
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/constants.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::Input;
@@ -26,11 +26,10 @@ dev=fd:00 mode=0100755 ouid=0 ogid=0 rdev=00:00 obj=system_u:object_r:bin_t:s0 o
 cap_fi=0000000000000000 cap_fe=0 cap_fver=0
 */
 
-TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket,
-                                   TcpServer &server)
-    : LineRecv(socket), server(server)
+TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory::Streams::StreamableObject> &socket, TcpServer &server)
+    : LineRecv(socket)
+    , server(server)
 {
-
     processedLinesCount = 0;
     invalidLinesCount = 0;
 
@@ -41,10 +40,7 @@ TcpLineProcessor::~TcpLineProcessor() {}
 
 json TcpLineProcessor::getStats()
 {
-    boost::json::object connectionStats{
-        {"ip", remoteIp},
-        {"processedLinesCount", (uint64_t)processedLinesCount},
-        {"invalidLinesCount", (uint64_t)invalidLinesCount}};
+    boost::json::object connectionStats{{"ip", remoteIp}, {"processedLinesCount", (uint64_t) processedLinesCount}, {"invalidLinesCount", (uint64_t) invalidLinesCount}};
     return connectionStats;
 }
 
@@ -99,10 +95,10 @@ bool TcpLineProcessor::processParsedLine(const string &line)
 
         server.incrementProcessedLines();
         processedLinesCount++;
-        AuditdEvents::EventsManager::insertClassContents(
-            {auditdHeader.node.empty() ? syslogData.hostName : auditdHeader.node,
-             sourceIp.empty() ? remoteIp : sourceIp},
-            auditdHeader.getEventId(), auditdHeader.type, line.substr(readPosition));
+        AuditdEvents::EventsManager::insertClassContents({auditdHeader.node.empty() ? syslogData.hostName : auditdHeader.node, sourceIp.empty() ? remoteIp : sourceIp},
+                                                         auditdHeader.getEventId(),
+                                                         auditdHeader.type,
+                                                         line.substr(readPosition));
     }
 
     return true;
@@ -115,8 +111,7 @@ void TcpLineProcessor::addInvalidLine(const std::string &line)
     LOG_APP->log1(__func__, remoteIp, Mantids30::Runtime::Logs::WARNING, "Incoming invalid line: %s", line.c_str());
 }
 
-bool TcpLineProcessor::extractIpAddress(const std::string &line, int inputMode, size_t &readPosition,
-                                        std::string &sourceIp)
+bool TcpLineProcessor::extractIpAddress(const std::string &line, int inputMode, size_t &readPosition, std::string &sourceIp)
 {
     // Calculate the IP value and displace the read position
     // The IP came in this format: <PRIVALUE><IP ADDR>
@@ -173,8 +168,7 @@ bool TcpLineProcessor::extractIpAddress(const std::string &line, int inputMode, 
     return true;
 }
 
-bool TcpLineProcessor::extractSyslogData(const std::string &line, int inputMode, size_t &readPosition,
-                                         SyslogData &syslogData)
+bool TcpLineProcessor::extractSyslogData(const std::string &line, int inputMode, size_t &readPosition, SyslogData &syslogData)
 {
     // Skip the first 16 characters (date part)
     readPosition += 16;
@@ -215,8 +209,7 @@ bool TcpLineProcessor::extractSyslogData(const std::string &line, int inputMode,
     return true;
 }
 
-bool TcpLineProcessor::extractAuditdHeader(const std::string &line, int inputMode, size_t &readPosition,
-                                           AuditdHeader &auditdHeader)
+bool TcpLineProcessor::extractAuditdHeader(const std::string &line, int inputMode, size_t &readPosition, AuditdHeader &auditdHeader)
 {
     std::string headerText;
     size_t position = readPosition;
@@ -270,8 +263,7 @@ bool TcpLineProcessor::extractAuditdHeader(const std::string &line, int inputMod
             size_t millisecondsStart = token.find('.', position + 1);
             size_t serialStart = token.find(':', millisecondsStart + 1);
 
-            if (position == std::string::npos || millisecondsStart == std::string::npos ||
-                serialStart == std::string::npos)
+            if (position == std::string::npos || millisecondsStart == std::string::npos || serialStart == std::string::npos)
             {
                 addInvalidLine(line);
                 return false;
@@ -284,12 +276,9 @@ bool TcpLineProcessor::extractAuditdHeader(const std::string &line, int inputMod
                 return false;
             }
 
-            auditdHeader.eventSeconds =
-                strtol(token.substr(position + 1, millisecondsStart - position - 1).c_str(), nullptr, 10);
-            auditdHeader.eventMilliseconds =
-                strtoul(token.substr(millisecondsStart + 1, serialStart - millisecondsStart - 1).c_str(), nullptr, 10);
-            auditdHeader.eventId =
-                strtoull(token.substr(serialStart + 1, token.size() - serialStart - 2).c_str(), nullptr, 10);
+            auditdHeader.eventSeconds = strtol(token.substr(position + 1, millisecondsStart - position - 1).c_str(), nullptr, 10);
+            auditdHeader.eventMilliseconds = strtoul(token.substr(millisecondsStart + 1, serialStart - millisecondsStart - 1).c_str(), nullptr, 10);
+            auditdHeader.eventId = strtoull(token.substr(serialStart + 1, token.size() - serialStart - 2).c_str(), nullptr, 10);
         }
     }
 

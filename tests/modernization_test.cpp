@@ -1,9 +1,9 @@
-#include <Mantids30/Core/Threads/safe_queue.h>
-#include <memory>
 #include "events/audit_event.h"
 #include "events/audit_var.h"
 #include "globals.h"
 #include "vars/namedefs.h"
+#include <Mantids30/Core/Threads/safe_queue.h>
+#include <memory>
 
 #include <cstring>
 #include <iostream>
@@ -12,8 +12,7 @@
 using namespace UANLZ::LOG2JSON;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
 
-namespace
-{
+namespace {
 /** @brief Fail the regression test with a diagnostic when an invariant is false. */
 void require(bool condition, const char *message)
 {
@@ -24,15 +23,13 @@ void require(bool condition, const char *message)
 struct Tracked
 {
     /** @brief Count one live object for queue ownership assertions. */
-    explicit Tracked(int &alive) : alive(alive)
+    explicit Tracked(int &alive)
+        : alive(alive)
     {
         ++alive;
     }
     /** @brief Count destruction when ownership leaves the queue or consumer. */
-    ~Tracked()
-    {
-        --alive;
-    }
+    ~Tracked() { --alive; }
     int &alive;
 };
 
@@ -78,14 +75,11 @@ void auditVariables()
     require(copy.getRawValueSize() == 4 && copy.getDisplayValue() == "AB  ", "independent value copy");
     require(head.parse("CWD", "cwd", "\"/tmp\""), "repeated parse");
     require(head.getDisplayValue() == "/tmp", "repeated parse replaces data");
-    require(head.parse("EXECVE", "a0[12]", "6563686F") && head.getDisplayValue() == "echo",
-            "indexed EXECVE argument decoded");
-    require(head.parse("EXECVE", "a0_len", "42") && head.getDisplayValue() == "42",
-            "EXECVE length metadata stays numeric text");
+    require(head.parse("EXECVE", "a0[12]", "6563686F") && head.getDisplayValue() == "echo", "indexed EXECVE argument decoded");
+    require(head.parse("EXECVE", "a0_len", "42") && head.getDisplayValue() == "42", "EXECVE length metadata stays numeric text");
     for (const auto *quoted : {"'text'", "\"text\"", "(text)", "{text}"})
     {
-        require(head.parse("CWD", "cwd", quoted) && head.getDisplayValue() == "text",
-                "matching wrappers removed");
+        require(head.parse("CWD", "cwd", quoted) && head.getDisplayValue() == "text", "matching wrappers removed");
     }
     require(!head.parse("EXECVE", "a0", std::string("41\0G", 4)), "embedded NUL is not hexadecimal");
     require(!head.parse("EXECVE", "a0", "ABC"), "odd hex rejected");
@@ -107,21 +101,17 @@ void eventReconstruction()
     require(value.is_object(), "event JSON object");
     const auto &object = *value.if_object();
     const auto &args = object.at("EXECVE").as_array().at(0).if_object()->at("argv").as_array();
-    require(args.size() == 2 && args[0].as_string() == "echo" && args[1].as_string() == "hello",
-            "split arguments and merged records reconstructed");
+    require(args.size() == 2 && args[0].as_string() == "echo" && args[1].as_string() == "hello", "split arguments and merged records reconstructed");
     require(object.at("PATH").as_array().size() == 2, "PATH records remain separate");
     require(object.at("INFO").if_object()->at("id").as_uint64() == 9007199254740993ULL, "64-bit event ID preserved");
-    require(event.getFirstClassRecord("EXECVE") != nullptr && event.getFirstClassRecord("missing") == nullptr,
-            "borrowed class lookup");
+    require(event.getFirstClassRecord("EXECVE") != nullptr && event.getFirstClassRecord("missing") == nullptr, "borrowed class lookup");
     require(event.getClassRecords("PATH").size() == 2, "borrowed multi-class lookup");
     require(event.process() && event.getJson() == value, "reprocessing does not append old chunks");
     require(!Mantids30::DataFormat::JSON::HAS_MEMBER(object.at("INFO"), "key"), "absent event key omitted");
     event.insertClassContents("SYSCALL", "key=\"test-key\"");
     require(event.process(), "process keyed event");
     const auto keyedEvent = event.getJson();
-    require(Mantids30::DataFormat::JSON::ASSTRING(
-                Mantids30::DataFormat::JSON::MEMBER_OR_NULL(keyedEvent, "INFO"), "key", "") == "test-key",
-            "record key propagated to event info");
+    require(Mantids30::DataFormat::JSON::ASSTRING(Mantids30::DataFormat::JSON::MEMBER_OR_NULL(keyedEvent, "INFO"), "key", "") == "test-key", "record key propagated to event info");
 }
 
 /** @brief Check valid and truncated socket-address records without unaligned accesses. */
@@ -132,9 +122,7 @@ void socketAddresses()
     record.setRawInput("saddr=020000507F0000010000000000000000");
     require(record.parseVariables(), "IPv4 address record");
     auto value = record.getJson();
-    require(value.if_object()->at("ipaddr").as_string() == "127.0.0.1" &&
-                value.if_object()->at("port").as_string() == "80",
-            "IPv4 decoding");
+    require(value.if_object()->at("ipaddr").as_string() == "127.0.0.1" && value.if_object()->at("port").as_string() == "80", "IPv4 decoding");
     for (const auto *input : {"saddr=0", "saddr=0200", "saddr=0200005", "saddr=GGGG"})
     {
         record.setRawInput(input);
@@ -152,8 +140,7 @@ int main()
 {
     try
     {
-        Globals::setAppLog(
-            std::make_unique<Mantids30::Runtime::Logs::AppLog>(Mantids30::Runtime::Logs::Mode::STANDARD));
+        Globals::setAppLog(std::make_unique<Mantids30::Runtime::Logs::AppLog>(Mantids30::Runtime::Logs::Mode::STANDARD));
         NameDefs::init();
         queueOwnership();
         auditVariables();

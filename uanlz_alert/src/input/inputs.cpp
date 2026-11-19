@@ -3,8 +3,8 @@
  * @brief Implementation for uanlz_alert/src/input/inputs.
  */
 #include "inputs.h"
-#include <fstream>
 #include <Mantids30/Core/Helpers/random.h>
+#include <fstream>
 #include <inttypes.h>
 
 #include "../globals.h"
@@ -43,8 +43,7 @@ json Inputs::readInputs(bool *readOk)
         // Create empty JSON for unexistent file:
         boost::json::array r;
 
-        LOG_APP->log0(__func__, Logs::INFO, "Inputs file '%s' not found, creating an empty file.",
-                      configFilePath.c_str());
+        LOG_APP->log0(__func__, Logs::INFO, "Inputs file '%s' not found, creating an empty file.", configFilePath.c_str());
 
         std::ofstream configFile(configFilePath, std::ifstream::binary);
         if (!configFile.is_open())
@@ -113,9 +112,7 @@ bool Inputs::addInput(json configValue)
     listenPort = Mantids30::DataFormat::JSON::ASUINT(configValue, "ListenPort", 0);
     description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
-    LOG_APP->log0(__func__, Logs::INFO, "Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16,
-                  inputId.c_str(), description.c_str(),
-                  listenAddress.c_str(), listenPort);
+    LOG_APP->log0(__func__, Logs::INFO, "Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16, inputId.c_str(), description.c_str(), listenAddress.c_str(), listenPort);
 
     updatedInputs.emplace_back(std::move(inputConfig));
     // Read array:
@@ -137,24 +134,24 @@ bool Inputs::removeInput(const std::string &inputId)
     // Read array:
     for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
-        if (std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "id", "")) !=
-            inputId)
+        if (std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "id", "")) != inputId)
             updatedInputs.emplace_back(configuredInputs.as_array()[inputIndex]);
         else
         {
             std::string listenAddress, description;
             uint16_t listenPort;
 
-            listenAddress = std::string(
-                Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "ListenAddr", ""));
+            listenAddress = std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "ListenAddr", ""));
             listenPort = Mantids30::DataFormat::JSON::ASUINT(configuredInputs.as_array()[inputIndex], "ListenPort", 0);
-            description = std::string(
-                Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "Description", ""));
+            description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "Description", ""));
 
-            LOG_APP->log0(__func__, Logs::INFO,
+            LOG_APP->log0(__func__,
+                          Logs::INFO,
                           "Removing JSON input '%s' from config file: Description: '%s' / @%s:%" PRIu16,
                           Mantids30::DataFormat::JSON::ASCSTRING(configuredInputs.as_array()[inputIndex], "id", ""),
-                          description.c_str(), listenAddress.c_str(), listenPort);
+                          description.c_str(),
+                          listenAddress.c_str(),
+                          listenPort);
         }
     }
 
