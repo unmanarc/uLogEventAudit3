@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
 let captured;
 const context = vm.createContext({window: {csrfToken: 'test-csrf'},
     $: {ajax: options => { captured = options; return options; }}});
-vm.runInContext(fs.readFileSync(path.join(root, 'uanlz_web/var/www/uauditweb/assets/js/audit.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(root, 'uanlz_web/var/www/uauditweb3/assets/js/audit.js'), 'utf8'), context);
 function request(value) {
     context.input = value;
     vm.runInContext('auditRequest(input, {})', context);

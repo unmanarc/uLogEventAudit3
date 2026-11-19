@@ -13,6 +13,6 @@ audit_target(uanlz_log2json
     Mantids30_DataFormat_JSON
     Mantids30_Protocol_LineRecv)
 install(TARGETS uanlz_log2json RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY etc/uauditanalyzer DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
+install(DIRECTORY etc/uauditanalyzer3 DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
     FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
 install(FILES etc/systemd/system/uanlz_log2json.service DESTINATION lib/systemd/system)

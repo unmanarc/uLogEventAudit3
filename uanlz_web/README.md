@@ -4,7 +4,7 @@ HTTPS console built with libMantids30 `Server::WebRESTFul::Engine`, using
 uFastAuthD3 for login, JWT validation and APISync scopes/roles. It monitors the
 converter and configures the alert engine over internal TLS/FastRPC1 links.
 
-Configuration is `/etc/uauditanalyzer/uanlz_web/webserver.conf` in Boost INFO
+Configuration is `/etc/uauditanalyzer3/uanlz_web/webserver.conf` in Boost INFO
 format. The supplied sample defines the HTTPS listener, APISync, `/auth` proxy,
 login portal, origins, TLS certificates and service API keys.
 

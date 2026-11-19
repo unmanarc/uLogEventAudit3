@@ -31,7 +31,7 @@ public:
         globalArguments->setVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH),
                                     "stable");
         globalArguments->addCommandLineOption("Service", 'c', "config-dir", "Configuration directory",
-                                              "/etc/uauditanalyzer/uanlz_web",
+                                              "/etc/uauditanalyzer3/uanlz_web",
                                               Core::Memory::Abstract::Var::Type::STRING);
     }
     /**

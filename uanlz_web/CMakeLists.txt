@@ -16,7 +16,7 @@ audit_target(uanlz_web
     Mantids30_ConfigBuilder_Runtime_Logs
     Mantids30_Client_APISync)
 install(TARGETS uanlz_web RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY etc/uauditanalyzer DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
+install(DIRECTORY etc/uauditanalyzer3 DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
     FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
 install(FILES etc/systemd/system/uanlz_web.service DESTINATION lib/systemd/system)
-install(DIRECTORY var/www/uauditweb DESTINATION /var/www)
+install(DIRECTORY var/www/uauditweb3 DESTINATION /var/www)

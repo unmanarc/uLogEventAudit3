@@ -3,7 +3,7 @@ Description=Unmanarc's Auditd Analyzer Framework - Alert
 
 [Service]
 Type=simple
-WorkingDirectory=/etc/uauditanalyzer/uanlz_alert
+WorkingDirectory=/etc/uauditanalyzer3/uanlz_alert
 ExecStart=/usr/bin/uanlz_alert
 Restart=always
 

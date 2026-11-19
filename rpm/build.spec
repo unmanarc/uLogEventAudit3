@@ -76,15 +76,15 @@ ln -s . s390x-redhat-linux-gnu
 %cmake_install
 %endif
 mkdir -vp $RPM_BUILD_ROOT/var/www
-cp -a uanlz_web/var/www/uauditweb $RPM_BUILD_ROOT/var/www
-mkdir -vp $RPM_BUILD_ROOT/etc/uauditanalyzer
-cp -a uanlz_web/etc/uauditanalyzer/uanlz_web $RPM_BUILD_ROOT/etc/uauditanalyzer/
-cp -a uanlz_log2json/etc/uauditanalyzer/uanlz_log2json $RPM_BUILD_ROOT/etc/uauditanalyzer/
-cp -a uanlz_alert/etc/uauditanalyzer/uanlz_alert $RPM_BUILD_ROOT/etc/uauditanalyzer/
-chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_web/snakeoil.key
-chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_alert/*.json
-chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/*/*.ini
-chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer/uanlz_web/webserver.conf
+cp -a uanlz_web/var/www/uauditweb3 $RPM_BUILD_ROOT/var/www
+mkdir -vp $RPM_BUILD_ROOT/etc/uauditanalyzer3
+cp -a uanlz_web/etc/uauditanalyzer3/uanlz_web $RPM_BUILD_ROOT/etc/uauditanalyzer3/
+cp -a uanlz_log2json/etc/uauditanalyzer3/uanlz_log2json $RPM_BUILD_ROOT/etc/uauditanalyzer3/
+cp -a uanlz_alert/etc/uauditanalyzer3/uanlz_alert $RPM_BUILD_ROOT/etc/uauditanalyzer3/
+chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer3/uanlz_web/snakeoil.key
+chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer3/uanlz_alert/*.json
+chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer3/*/*.ini
+chmod 600 $RPM_BUILD_ROOT/etc/uauditanalyzer3/uanlz_web/webserver.conf
 mkdir -vp $RPM_BUILD_ROOT/usr/lib/systemd/system
 cp uanlz_web/etc/systemd/system/uanlz_web.service $RPM_BUILD_ROOT/usr/lib/systemd/system/
 cp uanlz_log2json/etc/systemd/system/uanlz_log2json.service $RPM_BUILD_ROOT/usr/lib/systemd/system/
@@ -95,9 +95,9 @@ chmod 644 $RPM_BUILD_ROOT/usr/lib/systemd/system/*.service
 %{_bindir}/uanlz_alert
 %{_bindir}/uanlz_log2json
 %{_bindir}/uanlz_web
-%dir /etc/uauditanalyzer
-%config(noreplace) /etc/uauditanalyzer/*
-/var/www/uauditweb/*
+%dir /etc/uauditanalyzer3
+%config(noreplace) /etc/uauditanalyzer3/*
+/var/www/uauditweb3/*
 /usr/lib/systemd/system/uanlz_alert.service
 /usr/lib/systemd/system/uanlz_web.service
 /usr/lib/systemd/system/uanlz_log2json.service

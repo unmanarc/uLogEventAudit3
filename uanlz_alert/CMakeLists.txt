@@ -14,6 +14,6 @@ audit_target(uanlz_alert
     Mantids30_Protocol_LineRecv
     Mantids30_Scripting_JSONExprEval)
 install(TARGETS uanlz_alert RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY etc/uauditanalyzer DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
+install(DIRECTORY etc/uauditanalyzer3 DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
     FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
 install(FILES etc/systemd/system/uanlz_alert.service DESTINATION lib/systemd/system)

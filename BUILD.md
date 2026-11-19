@@ -23,8 +23,8 @@ To review installation without changing the system:
 DESTDIR="$PWD/build/stage" cmake --install build/mantids30
 ```
 
-The web resources install into `/var/www/uauditweb`; configuration goes into
-`/etc/uauditanalyzer` with the options above. Service unit files install into
+The web resources install into `/var/www/uauditweb3`; configuration goes into
+`/etc/uauditanalyzer3` with the options above. Service unit files install into
 `lib/systemd/system` under the configured prefix.
 Configure credentials, certificates, origins and login URLs before enabling
 services; see [MIGRATION.md](MIGRATION.md).

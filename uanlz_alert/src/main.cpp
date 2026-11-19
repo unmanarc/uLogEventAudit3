@@ -71,7 +71,7 @@ public:
         globalArguments->softwareDescription = PROJECT_DESCRIPTION;
 
         globalArguments->addCommandLineOption("Service Options", 'c', "config-dir", "Configuration directory",
-                                              "/etc/uauditanalyzer/" + globalArguments->getDaemonName(),
+                                              "/etc/uauditanalyzer3/" + globalArguments->getDaemonName(),
                                               Mantids30::Core::Memory::Abstract::Var::Type::STRING);
     }
 

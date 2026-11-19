@@ -64,7 +64,7 @@ This configuration is designed to add the fromhost-ip property/variable to the r
 
 ### Receptors Configuration
 
-The configuration files (**/etc/uauditanalyzer/uanlz_log2json/receptors.d/*.ini**) define the receptors responsible for receiving and processing incoming RSYSLOG TCP streams. Each `.ini` file corresponds to a separate receptor, allowing administrators to configure multiple listeners with different settings.
+The configuration files (**/etc/uauditanalyzer3/uanlz_log2json/receptors.d/*.ini**) define the receptors responsible for receiving and processing incoming RSYSLOG TCP streams. Each `.ini` file corresponds to a separate receptor, allowing administrators to configure multiple listeners with different settings.
 
 #### Example Receptor Configuration File:
 ```ini
@@ -86,7 +86,7 @@ ipv6 = false                   # Disable IPv6 support for IPv4 only environments
 
 ### Dispatchers Configuration
 
-The configuration files (**/etc/uauditanalyzer/uanlz_log2json/dispatchers.d/*.ini**) define the dispatchers responsible for sending a JSON TCP streams. Each `.ini` file corresponds to a separate dispatcher, allowing administrators to configure multiple senders with different settings.
+The configuration files (**/etc/uauditanalyzer3/uanlz_log2json/dispatchers.d/*.ini**) define the dispatchers responsible for sending a JSON TCP streams. Each `.ini` file corresponds to a separate dispatcher, allowing administrators to configure multiple senders with different settings.
 
 #### Example Dispatcher Configuration File:
 ```ini
@@ -134,8 +134,8 @@ QueuePushTimeoutInMS=0
 ### Integration Steps:
 
 1. **Configure log2json:**
-   Edit the file located at **/etc/uauditanalyzer/uanlz_log2json/config.ini** and set the following parameters under the `[RPCConnector]` section:
-   - **AlertsApiKey**: change this for the same PSK in **/etc/uauditanalyzer/uanlz_web/config.ini**
+   Edit the file located at **/etc/uauditanalyzer3/uanlz_log2json/config.ini** and set the following parameters under the `[RPCConnector]` section:
+   - **AlertsApiKey**: change this for the same PSK in **/etc/uauditanalyzer3/uanlz_web/config.ini**
 
 2. **Enable and restart Services:**
    Apply the configuration changes and enable the required services:

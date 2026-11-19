@@ -26,7 +26,7 @@ The filtering functionality in uanlz_alert leverages **JSONPath** integrated wit
 
 ### Inputs Configuration
 
-The configuration **/etc/uauditanalyzer/uanlz_alert/inputs.json** define the receptors responsible for receiving and processing incoming JSON lines to be processed. 
+The configuration **/etc/uauditanalyzer3/uanlz_alert/inputs.json** define the receptors responsible for receiving and processing incoming JSON lines to be processed.
 
 #### Example input Configuration File:
 ```json
@@ -55,7 +55,7 @@ The configuration **/etc/uauditanalyzer/uanlz_alert/inputs.json** define the rec
 
 ### Actions Configuration
 
-Actions are defined in the file **/etc/uauditanalyzer/uanlz_alert/actions.json** and can be triggered when specific filtering criteria are met. These actions allow for executing external programs or scripts, which receive arguments derived from JSON Path expressions, rule names, binary data, or other variables present in the processed JSON objects.
+Actions are defined in the file **/etc/uauditanalyzer3/uanlz_alert/actions.json** and can be triggered when specific filtering criteria are met. These actions allow for executing external programs or scripts, which receive arguments derived from JSON Path expressions, rule names, binary data, or other variables present in the processed JSON objects.
 
 For example, an action might execute a program that sends an email alert using parameters extracted via JSONPath (e.g., `$.message`) along with contextual information like the triggering rule's name. The configuration specifies how each action should behave and what inputs it requires to perform its task.
 
@@ -109,8 +109,8 @@ This syntax allows dynamic insertion of metadata and event details into action a
 ### Integration Steps:
 
 1. **Configure Alerts:**
-   Edit the file located at **/etc/uauditanalyzer/uanlz_alert/config.ini** and set the following parameters under the `[RPCConnector]` section:
-   - **AlertsApiKey**: change this for the same PSK in **/etc/uauditanalyzer/uanlz_web/config.ini**
+   Edit the file located at **/etc/uauditanalyzer3/uanlz_alert/config.ini** and set the following parameters under the `[RPCConnector]` section:
+   - **AlertsApiKey**: change this for the same PSK in **/etc/uauditanalyzer3/uanlz_web/config.ini**
 
 2. **Enable and restart Services:**
    Apply the configuration changes and enable the required services:

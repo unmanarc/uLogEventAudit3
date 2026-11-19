@@ -111,7 +111,7 @@ WebService {{
         TLS {{ CertFile {tmp}/server.crt KeyFile {tmp}/server.key }}
     }}
     Logs {{ Dir {tmp} File access.log }}
-    ResourcesPath {ROOT}/uanlz_web/var/www/uauditweb
+    ResourcesPath {ROOT}/uanlz_web/var/www/uauditweb3
     JWT {{ UseAPISync true }}
     APISync {{ APISyncHost 127.0.0.1 APISyncPort {server.server_port} UseTLS false }}
     API {{ Origins https://localhost:{web_port} }}
@@ -185,7 +185,7 @@ WebService {{
                 directory = tmp/name
                 directory.mkdir()
                 shutil.copy(tmp/'server.crt', directory/'rpcca.crt')
-                ini = (ROOT/name/'etc/uauditanalyzer'/name/'config.ini').read_text()
+                ini = (ROOT/name/'etc/uauditanalyzer3'/name/'config.ini').read_text()
                 ini = ini.replace('RemoteAddr=audit.localhost', 'RemoteAddr=localhost')
                 ini = ini.replace('RemotePort=33001', f'RemotePort={rpc_port}')
                 import re
