@@ -4,8 +4,8 @@
  */
 #include "inputs.h"
 #include <Mantids30/Core/Helpers/random.h>
+#include <cinttypes>
 #include <fstream>
-#include <inttypes.h>
 
 #include "../globals.h"
 
@@ -17,13 +17,13 @@ std::mutex Inputs::registryMutex;
 std::string Inputs::configFilePath;
 bool Inputs::modified = false;
 
-Inputs::Inputs() {}
+Inputs::Inputs() = default;
 
 boost::json::array Inputs::getStats()
 {
     boost::json::array inputStats;
 
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (const auto &inputServer : tcpServers)
     {
         inputStats.emplace_back(inputServer->getStats());
@@ -36,7 +36,9 @@ boost::json::value Inputs::readInputs(bool *readOk)
 {
     boost::json::value configuredInputs;
     if (readOk)
+    {
         *readOk = false;
+    }
 
     if (access(configFilePath.c_str(), R_OK))
     {
@@ -47,7 +49,9 @@ boost::json::value Inputs::readInputs(bool *readOk)
 
         std::ofstream configFile(configFilePath, std::ifstream::binary);
         if (!configFile.is_open())
+        {
             return false;
+        }
         configFile << r;
         configFile.close();
     }
@@ -58,15 +62,21 @@ boost::json::value Inputs::readInputs(bool *readOk)
     if (!configFile.is_open())
     {
         if (readOk)
+        {
             *readOk = false;
+        }
         return configuredInputs;
     }
 
     if (!UANLZ::JSON::readConfigArray(configFile, configuredInputs))
+    {
         return {};
+    }
 
     if (readOk)
+    {
         *readOk = true;
+    }
 
     return configuredInputs;
 }
@@ -74,13 +84,19 @@ boost::json::value Inputs::readInputs(bool *readOk)
 bool Inputs::writeInputs(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
+    {
         return false;
+    }
     if (readInputs() == configValue)
+    {
         return true;
+    }
 
     std::ofstream configFile(configFilePath, std::ifstream::binary);
     if (!configFile.is_open())
+    {
         return false;
+    }
     configFile << configValue;
     configFile.close();
     modified = true;
@@ -93,16 +109,22 @@ bool Inputs::addInput(boost::json::value configValue)
     boost::json::value configuredInputs = readInputs(&readOk);
     boost::json::array updatedInputs;
     if (!readOk)
+    {
         return false;
+    }
 
     if (!configValue.is_object())
+    {
         return false;
+    }
     const std::string inputId = Mantids30::Core::Helpers::Random::createRandomString(8);
     boost::json::object inputConfig{{"id", inputId}};
     for (const auto &member : *configValue.if_object())
     {
         if (member.key() != "id")
+        {
             inputConfig.emplace(member.key(), member.value());
+        }
     }
 
     std::string listenAddress, description;
@@ -130,12 +152,16 @@ bool Inputs::removeInput(const std::string &inputId)
     boost::json::value configuredInputs = readInputs(&readOk);
     boost::json::array updatedInputs;
     if (!readOk)
+    {
         return false;
+    }
     // Read array:
     for (u_int32_t inputIndex = 0; inputIndex < configuredInputs.as_array().size(); inputIndex++)
     {
         if (std::string(Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "id", "")) != inputId)
+        {
             updatedInputs.emplace_back(configuredInputs.as_array()[inputIndex]);
+        }
         else
         {
             std::string listenAddress, description;
@@ -175,8 +201,10 @@ bool Inputs::loadConfig()
     {
         auto inputServer = std::make_unique<TcpServer>();
         if (!inputServer->loadConfig(configuredInputs.as_array()[inputIndex]))
+        {
             continue;
-        std::lock_guard<std::mutex> lock(registryMutex);
+        }
+        std::scoped_lock lock(registryMutex);
         tcpServers.push_back(std::move(inputServer));
     }
     return true;
@@ -184,7 +212,7 @@ bool Inputs::loadConfig()
 
 void Inputs::startThreads()
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (const auto &inputServer : tcpServers)
     {
         inputServer->startListener();

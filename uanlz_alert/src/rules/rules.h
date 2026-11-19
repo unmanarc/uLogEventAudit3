@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -19,7 +20,7 @@
 namespace UANLZ::JSONALERT::Filters {
 
 /** @brief Select whether a matching rule executes an action or stops further rule evaluation. */
-enum RuleAction
+enum RuleAction : std::uint8_t
 {
     RULE_ACTION_EXEC,
     RULE_ACTION_ABORT,

@@ -48,7 +48,7 @@ protected:
     bool processParsedLine(const std::string &line) override;
 
 private:
-    std::atomic<uint64_t> processedLinesCount, droppedElements;
+    std::atomic<uint64_t> processedLinesCount{}, droppedElements{};
 
     TcpServer &server;
     std::string remoteIp;

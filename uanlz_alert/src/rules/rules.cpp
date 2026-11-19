@@ -66,7 +66,9 @@ void executeProcess(const std::string &ruleName, const char *file, std::vector<s
     std::vector<char *> argv;
     argv.reserve(arguments.size() + 1);
     for (auto &argument : arguments)
+    {
         argv.push_back(argument.data());
+    }
     argv.push_back(nullptr);
 
     const pid_t pid = fork();
@@ -101,7 +103,7 @@ void executeProcess(const std::string &ruleName, const char *file, std::vector<s
     }
 }
 
-Rules::Rules() {}
+Rules::Rules() = default;
 
 Rules::~Rules()
 {
@@ -130,7 +132,9 @@ boost::json::object Rules::getStats()
 bool Rules::startEvaluationThreads(const uint32_t &threadsCount)
 {
     if (threadsCount == 0)
+    {
         return false;
+    }
 
     queuedLinesCount = 0;
     droppedInQueue = 0;
@@ -167,7 +171,7 @@ bool Rules::enqueueLine(const string &inputText)
         droppedInQueue++;
         return false;
     }
-    queuedLine.release(); // Mantids30 owns the successfully queued item.
+    static_cast<void>(queuedLine.release()); // Mantids30 owns the successfully queued item.
     queueInThisPeriod++;
     queuedLinesCount++;
     return true;
@@ -230,7 +234,9 @@ bool Rules::evaluate(const boost::json::value &values)
                     LOG_APP->log0(__func__, Logs::DEBUG, "Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
                     executeAction(rule->name, actions.at(rule->actionId)->file.c_str(), actions.at(rule->actionId)->arguments, values);
                     if (rule->ruleAction == RULE_ACTION_EXECANDABORT)
+                    {
                         break;
+                    }
                 }
             }
             else if (rule->ruleAction == RULE_ACTION_ABORT)
@@ -260,9 +266,13 @@ bool Rules::moveRuleUp(uint32_t position)
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
 
     if (position >= rules.size())
+    {
         return false;
+    }
     if (position == 0)
+    {
         return true;
+    }
 
     std::swap(rules[position - 1], rules[position]);
 
@@ -275,9 +285,13 @@ bool Rules::moveRuleDown(uint32_t position)
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
 
     if (position >= rules.size())
+    {
         return false;
+    }
     if (position == (rules.size() - 1))
+    {
         return true;
+    }
 
     std::swap(rules[position + 1], rules[position]);
 
@@ -381,7 +395,9 @@ void Rules::expandArguments(std::vector<string> &arguments, const std::string &r
     for (std::string &argument : arguments)
     {
         if (index != 0)
+        {
             expandArgument(argument, ruleName, values);
+        }
         index++;
     }
 }
@@ -391,8 +407,7 @@ void Rules::expandArgument(string &argument, const std::string &ruleName, const 
     static const boost::regex placeholderPattern(R"(%([^%]*)%)");
     std::string expanded;
     auto start = argument.cbegin();
-    for (boost::sregex_iterator placeholder(argument.begin(), argument.end(), placeholderPattern), end;
-         placeholder != end; ++placeholder)
+    for (boost::sregex_iterator placeholder(argument.begin(), argument.end(), placeholderPattern), end; placeholder != end; ++placeholder)
     {
         expanded.append(start, (*placeholder)[0].first);
         expanded += resolvePlaceholder((*placeholder)[1].str(), ruleName, values);
@@ -405,8 +420,9 @@ void Rules::expandArgument(string &argument, const std::string &ruleName, const 
 string Rules::resolvePlaceholder(const string &placeholder, const string &ruleName, const boost::json::value &values)
 {
     if (placeholder.empty())
+    {
         return "%";
-
+    }
     else if (placeholder == "N")
     {
         return "\n";
@@ -505,9 +521,13 @@ bool Rules::addRuleUnlocked(uint32_t position, const boost::json::value &configV
     if (!replace)
     {
         if (position >= rules.size())
+        {
             rules.push_back(std::move(rule));
+        }
         else
+        {
             rules.insert(rules.begin() + position, std::move(rule));
+        }
     }
     else
     {
@@ -551,7 +571,9 @@ bool Rules::addActionUnlocked(const boost::json::value &configValue, bool replac
         // Use the same newline placeholder as user-defined action arguments.
         std::string argument = std::string(Mantids30::DataFormat::JSON::ASSTRING_D(arg, ""));
         if (Mantids30::DataFormat::JSON::ASBOOL(configValue, "appendNewLineToEachArgv", false))
+        {
             argument += "%N%";
+        }
         arguments.push_back(argument);
     }
     action->setArguments(arguments);
@@ -565,7 +587,9 @@ bool Rules::addActionUnlocked(const boost::json::value &configValue, bool replac
 bool Rules::removeRuleUnlocked(const uint32_t &position)
 {
     if (position >= rules.size())
+    {
         return false;
+    }
 
     rules.erase(rules.begin() + position);
 
@@ -577,7 +601,9 @@ bool Rules::removeRuleUnlocked(const uint32_t &position)
 bool Rules::removeActionUnlocked(const string &actionName)
 {
     if (actions.find(actionName) == actions.end())
+    {
         return false;
+    }
 
     actions.erase(actionName);
     actionsModified = true;
@@ -601,7 +627,9 @@ boost::json::array Rules::getCurrentRunningActions()
     boost::json::array result;
 
     for (const auto &action : actions)
+    {
         result.emplace_back(action.second->originalConfig);
+    }
 
     return result;
 }
@@ -612,7 +640,9 @@ boost::json::value Rules::getCurrentRunningAction(const string &actionName)
     boost::json::value result;
 
     if (actions.find(actionName) == actions.end())
+    {
         return result;
+    }
 
     return actions.at(actionName)->originalConfig;
 }
@@ -623,7 +653,9 @@ boost::json::value Rules::getCurrentRunningRule(const uint32_t &position)
     boost::json::value result;
 
     if (position >= rules.size())
+    {
         return result;
+    }
 
     return rules[position]->originalConfig;
 }
@@ -635,7 +667,9 @@ boost::json::array Rules::getCurrentRunningRules()
     boost::json::array result;
 
     for (const auto &rule : rules)
+    {
         result.emplace_back(rule->originalConfig);
+    }
 
     return result;
 }
@@ -673,7 +707,9 @@ void Rules::setQueuePopTimeoutMs(const uint64_t &value)
 bool Rules::writeRulesFileConfig(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
+    {
         return false;
+    }
     if (readRulesFileConfig() == configValue)
     {
         rulesModified = false;
@@ -682,7 +718,9 @@ bool Rules::writeRulesFileConfig(const boost::json::value &configValue)
 
     std::ofstream configFile(rulesFilePath, std::ifstream::binary);
     if (!configFile.is_open())
+    {
         return false;
+    }
     configFile << configValue;
     configFile.close();
 
@@ -695,7 +733,9 @@ bool Rules::writeRulesFileConfig(const boost::json::value &configValue)
 bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
 {
     if (!configValue.is_array())
+    {
         return false;
+    }
     if (readActionsFileConfig() == configValue)
     {
         actionsModified = false;
@@ -704,7 +744,9 @@ bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
 
     std::ofstream configFile(actionsFilePath, std::ifstream::binary);
     if (!configFile.is_open())
+    {
         return false;
+    }
     configFile << configValue;
     configFile.close();
 
@@ -718,9 +760,13 @@ boost::json::value Rules::readRulesFileConfig()
     boost::json::value root;
     std::ifstream configFile(rulesFilePath, std::ifstream::binary);
     if (!configFile.is_open())
+    {
         return root;
+    }
     if (!UANLZ::JSON::readConfigArray(configFile, root))
+    {
         return {};
+    }
     return root;
 }
 
@@ -729,9 +775,13 @@ boost::json::value Rules::readActionsFileConfig()
     boost::json::value root;
     std::ifstream configFile(actionsFilePath, std::ifstream::binary);
     if (!configFile.is_open())
+    {
         return root;
+    }
     if (!UANLZ::JSON::readConfigArray(configFile, root))
+    {
         return {};
+    }
     return root;
 }
 

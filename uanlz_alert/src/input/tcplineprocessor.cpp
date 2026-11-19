@@ -22,7 +22,7 @@ TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory
     setMaxLineSize(1024 * 1024); // 1Mb per line
 }
 
-TcpLineProcessor::~TcpLineProcessor() {}
+TcpLineProcessor::~TcpLineProcessor() = default;
 
 boost::json::object TcpLineProcessor::getStats()
 {
@@ -33,11 +33,15 @@ boost::json::object TcpLineProcessor::getStats()
 bool TcpLineProcessor::processParsedLine(const string &line)
 {
     if (line.empty())
+    {
         return true;
+    }
     processedLinesCount++;
 
     if (!Filters::Rules::enqueueLine(line))
+    {
         droppedElements++;
+    }
     return true;
 }
 

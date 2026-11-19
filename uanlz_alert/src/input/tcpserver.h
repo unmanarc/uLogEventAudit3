@@ -52,17 +52,17 @@ public:
     /**
      * @brief Return the configured local bind address.
      */
-    std::string getListenAddress() const;
+    [[nodiscard]] std::string getListenAddress() const;
     /**
      * @brief Return the configured local TCP port.
      */
-    uint16_t getListenPort() const;
+    [[nodiscard]] uint16_t getListenPort() const;
 
 private:
     std::shared_ptr<Mantids30::Network::Sockets::Acceptors::MultiThreaded> acceptor = std::make_shared<Mantids30::Network::Sockets::Acceptors::MultiThreaded>();
     boost::property_tree::ptree config;
     std::string listenAddress, description;
-    uint16_t listenPort;
+    uint16_t listenPort{};
 
     std::mutex registryMutex;
     std::set<TcpLineProcessor *> clientProcessors;

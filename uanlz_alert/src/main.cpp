@@ -17,12 +17,12 @@
 
 #include <sys/types.h>
 
+#include <csignal>
 #include <dirent.h>
 #include <pwd.h>
-#include <signal.h>
 #include <unistd.h>
 
-#include <inttypes.h>
+#include <cinttypes>
 #include <sys/stat.h>
 
 using namespace UANLZ::JSONALERT;
@@ -113,11 +113,15 @@ public:
 
         if (!access((configDirectory + "/config.ini").c_str(), R_OK))
         {
-            struct stat fileStatus;
+            struct stat fileStatus{};
             // Check file properties...
-            stat((configDirectory + "/config.ini").c_str(), &fileStatus);
+            if (stat((configDirectory + "/config.ini").c_str(), &fileStatus) != 0)
+            {
+                initLog.log0(__func__, Logs::CRITICAL, "Unable to read configuration file properties");
+                return false;
+            }
 
-            int filePermissions = fileStatus.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+            const mode_t filePermissions = fileStatus.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
 
             if (filePermissions != 0600)
             {
@@ -130,7 +134,7 @@ public:
                 }
                 initLog.log0(__func__, Logs::INFO, "config.ini file permissions changed to 0600");
             }
-            boost::property_tree::ini_parser::read_ini((configDirectory + "/config.ini").c_str(), mainConfig);
+            boost::property_tree::ini_parser::read_ini(configDirectory + "/config.ini", mainConfig);
         }
         else
         {
@@ -141,7 +145,9 @@ public:
         *(Globals::getMainConfig()) = mainConfig;
 
         if (mainConfig.get<bool>("Logs.ToSyslog", true))
+        {
             logMode |= Logs::Mode::SYSLOG;
+        }
         Globals::setAppLog(std::make_unique<Logs::AppLog>(logMode));
         LOG_APP->enableEmptyFieldLogging = true;
         LOG_APP->enableColorLogging = mainConfig.get<bool>("Logs.ShowColors", true);

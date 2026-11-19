@@ -10,7 +10,7 @@
 #include <Mantids30/Network/Sockets/socket_tcp.h>
 
 #include <boost/property_tree/ini_parser.hpp>
-#include <inttypes.h>
+#include <cinttypes>
 
 using namespace std;
 using namespace UANLZ::JSONALERT;
@@ -54,7 +54,7 @@ void processClientConnection(void *context, const std::shared_ptr<Socket_Stream>
     LOG_APP->log1(__func__, remoteAddress, parseResult == Parser::ParseResult::SUCCEED ? Logs::INFO : Logs::WARNING, "Incoming connection finished (parser status %d).", static_cast<int>(parseResult));
 }
 
-TcpServer::TcpServer() {}
+TcpServer::TcpServer() = default;
 
 bool TcpServer::loadConfig(const boost::json::value &configValue)
 {
@@ -89,7 +89,7 @@ void TcpServer::startListener()
 boost::json::object TcpServer::getStats()
 {
     boost::json::array clients;
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (auto client : clientProcessors)
     {
         clients.emplace_back(client->getStats());
@@ -103,13 +103,13 @@ boost::json::object TcpServer::getStats()
 
 void TcpServer::addClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     clientProcessors.insert(clientProcessor);
 }
 
 void TcpServer::removeClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     clientProcessors.erase(clientProcessor);
 }
 
