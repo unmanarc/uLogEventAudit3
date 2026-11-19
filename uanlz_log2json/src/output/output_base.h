@@ -50,7 +50,7 @@ public:
     /**
      * @brief Return the configured human-readable destination description.
      */
-    std::string getDescription() const;
+    [[nodiscard]] std::string getDescription() const;
 
 protected:
     std::string description;

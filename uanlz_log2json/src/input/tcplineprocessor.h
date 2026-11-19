@@ -53,7 +53,7 @@ private:
      */
     void addInvalidLine(const std::string &line);
 
-    std::atomic<uint64_t> processedLinesCount, invalidLinesCount;
+    std::atomic<uint64_t> processedLinesCount{}, invalidLinesCount{};
 
     TcpServer &server;
     std::string remoteIp;

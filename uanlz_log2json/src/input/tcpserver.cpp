@@ -11,7 +11,7 @@
 #include <Mantids30/Network/Sockets/socket_tcp.h>
 
 #include <boost/property_tree/ini_parser.hpp>
-#include <inttypes.h>
+#include <cinttypes>
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::Input;
@@ -66,7 +66,9 @@ TcpServer::TcpServer()
 bool TcpServer::loadConfig(const string &file)
 {
     if (!access(file.c_str(), R_OK))
-        boost::property_tree::ini_parser::read_ini(file.c_str(), config);
+    {
+        boost::property_tree::ini_parser::read_ini(file, config);
+    }
     else
     {
         LOG_APP->log0(__func__, Logs::WARNING, "Failed to load receptor configuration file %s, insufficient permissions?", file.c_str());
@@ -102,7 +104,7 @@ void TcpServer::startListener()
 boost::json::object TcpServer::getStats()
 {
     boost::json::array clients;
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (auto client : clientProcessors)
     {
         clients.emplace_back(client->getStats());
@@ -118,13 +120,13 @@ boost::json::object TcpServer::getStats()
 
 void TcpServer::addClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     clientProcessors.insert(clientProcessor);
 }
 
 void TcpServer::removeClient(TcpLineProcessor *clientProcessor)
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     clientProcessors.erase(clientProcessor);
 }
 

@@ -64,11 +64,11 @@ private:
     Mantids30::Core::Threads::Safe::Queue<boost::json::object> pendingEvents;
 
     std::string server;
-    uint16_t port;
+    uint16_t port{};
     std::unique_ptr<Mantids30::Network::Sockets::Socket_TCP> connection;
     std::atomic<bool> connected{false};
     std::atomic<uint64_t> dropped{0}, processed{0};
-    uint32_t pushTimeoutMs;
+    uint32_t pushTimeoutMs{};
     boost::property_tree::ptree config;
 };
 

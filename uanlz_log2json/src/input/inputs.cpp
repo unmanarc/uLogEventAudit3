@@ -9,13 +9,13 @@ using namespace UANLZ::LOG2JSON::Input;
 std::list<std::unique_ptr<TcpServer>> Inputs::tcpServers;
 std::mutex Inputs::registryMutex;
 
-Inputs::Inputs() {}
+Inputs::Inputs() = default;
 
 boost::json::array Inputs::getStats()
 {
     boost::json::array inputStats;
 
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (const auto &inputServer : tcpServers)
     {
         inputStats.emplace_back(inputServer->getStats());
@@ -31,13 +31,13 @@ void Inputs::loadConfig(const std::string &file)
     {
         return;
     }
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     tcpServers.push_back(std::move(inputServer));
 }
 
 void Inputs::startThreads()
 {
-    std::lock_guard<std::mutex> lock(registryMutex);
+    std::scoped_lock lock(registryMutex);
     for (const auto &inputServer : tcpServers)
     {
         inputServer->startListener();

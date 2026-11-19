@@ -33,7 +33,7 @@ TcpLineProcessor::TcpLineProcessor(const std::shared_ptr<Mantids30::Core::Memory
     setMaxLineSize(128 * 1024);
 }
 
-TcpLineProcessor::~TcpLineProcessor() {}
+TcpLineProcessor::~TcpLineProcessor() = default;
 
 boost::json::object TcpLineProcessor::getStats()
 {
@@ -54,9 +54,7 @@ bool TcpLineProcessor::processParsedLine(const string &line)
     case AuditLineStatus::Parsed:
         server.incrementProcessedLines();
         processedLinesCount++;
-        AuditdEvents::EventsManager::insertClassContents(
-            {parsed.hostName, parsed.sourceIp.empty() ? remoteIp : parsed.sourceIp},
-            parsed.eventId, parsed.type, parsed.payload);
+        AuditdEvents::EventsManager::insertClassContents({parsed.hostName, parsed.sourceIp.empty() ? remoteIp : parsed.sourceIp}, parsed.eventId, parsed.type, parsed.payload);
         return true;
     }
     return true;

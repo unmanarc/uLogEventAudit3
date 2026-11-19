@@ -52,11 +52,11 @@ public:
     /**
      * @brief Return the configured local bind address.
      */
-    std::string getListenAddress() const;
+    [[nodiscard]] std::string getListenAddress() const;
     /**
      * @brief Return the configured local TCP port.
      */
-    uint16_t getListenPort() const;
+    [[nodiscard]] uint16_t getListenPort() const;
 
     /**
      * @brief Count one accepted auditd input line.
@@ -72,8 +72,8 @@ private:
 
     boost::property_tree::ptree config;
     std::string listenAddress, description;
-    uint16_t listenPort;
-    std::atomic<uint64_t> processedLinesCount, invalidLinesCount;
+    uint16_t listenPort{};
+    std::atomic<uint64_t> processedLinesCount{}, invalidLinesCount{};
 
     std::mutex registryMutex;
     std::set<TcpLineProcessor *> clientProcessors;

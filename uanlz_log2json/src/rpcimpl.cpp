@@ -14,12 +14,12 @@
 
 #include <Mantids30/Network/Sockets/socket_tls.h>
 #include <Mantids30/Protocol/FastRPC1/fastrpc.h>
-#include <inttypes.h>
+#include <cinttypes>
 
 using namespace Mantids30::Runtime;
 using namespace UANLZ::LOG2JSON;
 
-RpcImpl::RpcImpl() {}
+RpcImpl::RpcImpl() = default;
 
 void RpcImpl::runRpcClient()
 {
@@ -38,7 +38,7 @@ void RpcImpl::runRpcClient()
     {
         auto rpcSocket = std::make_shared<Mantids30::Network::Sockets::Socket_TLS>();
 
-        if (!rpcSocket->tlsKeys.loadCAFromPEMFile(Globals::getMainConfig()->get<std::string>("RPCConnector.CAFile", "rpcca.crt").c_str()))
+        if (!rpcSocket->tlsKeys.loadCAFromPEMFile(Globals::getMainConfig()->get<std::string>("RPCConnector.CAFile", "rpcca.crt")))
         {
             LOG_APP->log0(__func__, Logs::ERROR, "Error starting RPC Connector to %s:%" PRIu16 ": %s", remoteAddress.c_str(), remotePort, "Bad TLS Certificate Authority (rpcca.crt)");
             _exit(-3);
@@ -49,7 +49,9 @@ void RpcImpl::runRpcClient()
         {
             LOG_APP->log0(__func__, Logs::INFO, "Connected to @%s:%" PRIu16, remoteAddress.c_str(), remotePort);
             if (rpcSocket->writeStringEx<uint16_t>(rpcApiKey))
+            {
                 fastRpc.processConnection(rpcSocket, "SERVER");
+            }
             sleep(3);
         }
         else

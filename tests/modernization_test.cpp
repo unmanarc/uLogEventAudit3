@@ -17,7 +17,9 @@ namespace {
 void require(bool condition, const char *message)
 {
     if (!condition)
+    {
         throw std::runtime_error(message);
+    }
 }
 
 struct Tracked
@@ -42,7 +44,7 @@ void queueOwnership()
         queue.setMaxItems(1);
         auto first = std::make_unique<Tracked>(alive);
         require(queue.push(first.get(), 0), "first push");
-        first.release();
+        static_cast<void>(first.release());
         {
             auto rejected = std::make_unique<Tracked>(alive);
             require(!queue.push(rejected.get(), 0), "full queue must reject");
@@ -55,7 +57,7 @@ void queueOwnership()
         require(alive == 0, "popped item destroyed by owner");
         auto pending = std::make_unique<Tracked>(alive);
         require(queue.push(pending.get(), 0), "pending item");
-        pending.release();
+        static_cast<void>(pending.release());
     }
     require(alive == 0, "Mantids30 queue destroys pending items");
 }
@@ -118,7 +120,7 @@ void quotedFields()
 {
     AuditClass record;
     record.setClassTypeName("CWD");
-    record.setRawInput("cwd=\"/tmp fake=123\" empty=\"\" literal=7");
+    record.setRawInput(R"(cwd="/tmp fake=123" empty="" literal=7)");
     require(record.parseVariables(), "quoted record");
     const auto value = record.getJson();
     require(value.at("cwd").as_string() == "/tmp fake=123", "quoted whitespace and equals preserved");

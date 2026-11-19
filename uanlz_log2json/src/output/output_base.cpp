@@ -6,9 +6,9 @@
 
 using namespace UANLZ::LOG2JSON::Output;
 
-OutputBase::OutputBase() {}
+OutputBase::OutputBase() = default;
 
-OutputBase::~OutputBase() {}
+OutputBase::~OutputBase() = default;
 
 std::string OutputBase::getDescription() const
 {

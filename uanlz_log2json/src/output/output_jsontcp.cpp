@@ -5,7 +5,7 @@
 #include "output_jsontcp.h"
 #include "../globals.h"
 #include <boost/algorithm/string/replace.hpp>
-#include <inttypes.h>
+#include <cinttypes>
 #include <thread>
 
 using namespace UANLZ::LOG2JSON::Output;
@@ -25,17 +25,18 @@ void runTcpOutput(JsonTcpOutput *output)
 }
 
 JsonTcpOutput::JsonTcpOutput()
-    : OutputBase()
 {
     connection = std::make_unique<Mantids30::Network::Sockets::Socket_TCP>();
 }
 
-JsonTcpOutput::~JsonTcpOutput() {}
+JsonTcpOutput::~JsonTcpOutput() = default;
 
 bool JsonTcpOutput::loadConfig(const std::string &file)
 {
     if (!access(file.c_str(), R_OK))
-        boost::property_tree::ini_parser::read_ini(file.c_str(), config);
+    {
+        boost::property_tree::ini_parser::read_ini(file, config);
+    }
     else
     {
         LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
@@ -61,7 +62,9 @@ void JsonTcpOutput::logAuditEvent(const boost::json::object &eventJson, const st
         dropped++;
     }
     else
-        eventValue.release(); // Mantids30 owns the successfully queued item.
+    {
+        static_cast<void>(eventValue.release()); // Mantids30 owns the successfully queued item.
+    }
 }
 
 void JsonTcpOutput::startThread()
