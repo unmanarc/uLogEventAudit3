@@ -61,3 +61,6 @@ ltmain.sh
 
 # Autosave Files
 *.autosave
+
+# npm sources are build tooling, never served or installed.
+node_modules/
