@@ -64,9 +64,11 @@ Configuration is `/etc/ulogeventaudit3/ul3_web/webserver.conf` in Boost INFO for
 1. Register the application `ULOGEVENTAUDIT3` in uFastAuthD3 and provide its API key
    through `UL3_API_KEY` (or `Authentication.APIKey`). `UL3_APP` can override the app ID.
 2. Configure the APISync host/port, private CA and HTTPS listener certificates.
-3. Configure the `/auth` proxy and the login portal URL, origins and callback URL
-   for your actual audit hostname. The sample uses `audit.localhost:33000`.
-   Update the base64 `redirectURI` in `/login` when changing the callback URL.
+3. Configure the `/auth` proxy to the authentication handler and the `/login`
+   proxy to the embedded login portal. Both forward the application API key;
+   `/login` uses `TransformCookiePath` for portal cookies. Configure login
+   origins and the callback URL for your actual audit hostname. The sample
+   uses `audit.localhost:33000`.
 4. Startup publishes `stats` and `control`, the roles `AUDIT_READER` (stats) and
    `AUDIT_ADMIN` (stats + control), and the `LOGIN` activity through APISync.
    Assign the appropriate role to application users.
