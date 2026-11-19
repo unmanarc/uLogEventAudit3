@@ -109,19 +109,19 @@ void TcpServer::startListener()
 
 json TcpServer::getStats()
 {
-    boost::json::object serverStats{{"clients", boost::json::array{}}};
-
-    serverStats["description"] = description;
-    serverStats["processedLinesCount"] = (uint64_t)processedLinesCount;
-    serverStats["invalidLinesCount"] = (uint64_t)invalidLinesCount;
-
+    boost::json::array clients;
     std::lock_guard<std::mutex> lock(registryMutex);
     for (auto client : clientProcessors)
     {
-        serverStats["clients"].as_array().emplace_back(client->getStats());
+        clients.emplace_back(client->getStats());
     }
 
-    return serverStats;
+    return boost::json::object{
+        {"clients", std::move(clients)},
+        {"description", description},
+        {"processedLinesCount", (uint64_t)processedLinesCount},
+        {"invalidLinesCount", (uint64_t)invalidLinesCount},
+    };
 }
 
 void TcpServer::addClient(TcpLineProcessor *clientProcessor)

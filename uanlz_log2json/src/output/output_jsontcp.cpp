@@ -106,17 +106,18 @@ void JsonTcpOutput::process()
 
 json JsonTcpOutput::getStats()
 {
-    boost::json::object outputStats{{"queue", boost::json::object{}}};
-
     std::string server = config.get<std::string>("Host", "127.0.0.1");
     uint16_t port = config.get<uint16_t>("Port", 18200);
 
-    outputStats["id"] = server + ":" + to_string(port);
-    outputStats["queue"].as_object()["size"] = (uint64_t)pendingEvents.size();
-    outputStats["queue"].as_object()["maxItems"] = (uint64_t)pendingEvents.getMaxItems();
-    outputStats["queue"].as_object()["dropped"] = (uint64_t)dropped;
-    outputStats["queue"].as_object()["processed"] = (uint64_t)processed;
-    outputStats["connected"] = (bool)connected;
+    boost::json::object outputStats{
+        {"id", server + ":" + to_string(port)},
+        {"queue", boost::json::object{
+            {"size", (uint64_t)pendingEvents.size()},
+            {"maxItems", (uint64_t)pendingEvents.getMaxItems()},
+            {"dropped", (uint64_t)dropped},
+            {"processed", (uint64_t)processed}
+        }},
+        {"connected", (bool)connected}};
 
     return outputStats;
 }

@@ -52,8 +52,8 @@ void runEventDistribution(int workerId)
         {
             LOG_APP->log0(__func__, Mantids30::Runtime::Logs::DEBUG,
                           "No events so far for output thread #%d, triggering no event alert JSON...", workerId);
-            boost::json::object idleEventJson;
-            idleEventJson["noEventsAlert"] = true;
+            boost::json::object idleEventJson{
+                {"noEventsAlert", true}};
             Output::Outputs::dispatchEvent(idleEventJson, std::make_tuple<time_t, uint32_t, uint64_t>(0, 0, 0));
         }
     }
@@ -80,14 +80,16 @@ EventDistribution::EventDistribution() {}
 
 json EventDistribution::getStats()
 {
-    boost::json::object distributionStats{{"eventsQueue", boost::json::object{}},
-                                          {"eventsProcessed", boost::json::object{}}};
-    distributionStats["eventsQueue"].as_object()["maxItems"] = (uint64_t)eventsQueue.getMaxItems();
-    distributionStats["eventsQueue"].as_object()["curSize"] = (uint64_t)eventsQueue.size();
-    distributionStats["eventsQueue"].as_object()["dropped"] = (uint64_t)eventsDropped;
-
-    distributionStats["eventsProcessed"].as_object()["last10s"] = (uint64_t)eventsProcessedLastTenSeconds;
-    distributionStats["eventsProcessed"].as_object()["total"] = (uint64_t)eventsProcessed;
+    boost::json::object distributionStats{
+        {"eventsQueue", boost::json::object{
+            {"maxItems", (uint64_t)eventsQueue.getMaxItems()},
+            {"curSize", (uint64_t)eventsQueue.size()},
+            {"dropped", (uint64_t)eventsDropped}
+        }},
+        {"eventsProcessed", boost::json::object{
+            {"last10s", (uint64_t)eventsProcessedLastTenSeconds},
+            {"total", (uint64_t)eventsProcessed}
+        }}};
 
     return distributionStats;
 }

@@ -80,45 +80,34 @@ void AuditClass::setClassTypeName(const string &value)
 
 json AuditClass::getJson()
 {
-    boost::json::object recordJson{};
-
-    bool useGenericFields = true;
     if (classTypeName == "EXECVE")
     {
-        if (variablesByName.find("argc") != variablesByName.end())
+        if (auto argc = variablesByName.find("argc"); argc != variablesByName.end())
         {
-            useGenericFields = false;
-            recordJson["argc"] = variablesByName["argc"].getDisplayValue();
-            recordJson["argv"] = boost::json::array{};
+            boost::json::array arguments;
             std::string commandLine;
-            for (uint32_t index = 0; index < variablesByName["argc"].asUint32() && index < 65536; index++)
+            for (uint32_t index = 0; index < argc->second.asUint32() && index < 65536; index++)
             {
-                std::string argumentName = "a" + to_string(index);
-                if (variablesByName.find(argumentName) != variablesByName.end())
-                {
-                    recordJson["argv"].as_array().emplace_back(variablesByName[argumentName].getDisplayValue());
-                    commandLine += variablesByName[argumentName].getDisplayValue() + " ";
-                }
-                else
-                {
-                    recordJson["argv"].as_array().emplace_back("__UAA_PARSER_NOT_FOUND__");
-                    commandLine += "__UAA_PARSER_NOT_FOUND__ ";
-                }
+                const auto argument = variablesByName.find("a" + to_string(index));
+                const std::string displayValue = argument != variablesByName.end()
+                    ? argument->second.getDisplayValue() : "__UAA_PARSER_NOT_FOUND__";
+                arguments.emplace_back(displayValue);
+                commandLine += displayValue + " ";
             }
             if (!commandLine.empty())
                 commandLine.pop_back();
-            recordJson["cmdline"] = commandLine;
+            return boost::json::object{
+                {"argc", argc->second.getDisplayValue()},
+                {"argv", std::move(arguments)},
+                {"cmdline", commandLine}};
         }
     }
 
-    if (useGenericFields)
+    boost::json::object recordJson;
+    for (const auto &variable : variablesByName)
     {
-        for (auto &variable : variablesByName)
-        {
-            recordJson[variable.first] = variable.second.getDisplayValue();
-        }
+        recordJson.emplace(variable.first, variable.second.getDisplayValue());
     }
-
     return recordJson;
 }
 

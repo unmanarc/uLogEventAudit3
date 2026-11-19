@@ -29,10 +29,10 @@ TcpLineProcessor::~TcpLineProcessor() {}
 
 json TcpLineProcessor::getStats()
 {
-    boost::json::object connectionStats{};
-    connectionStats["ip"] = remoteIp;
-    connectionStats["processedLinesCount"] = (uint64_t)processedLinesCount;
-    connectionStats["droppedElements"] = (uint64_t)droppedElements;
+    boost::json::object connectionStats{
+        {"ip", remoteIp},
+        {"processedLinesCount", (uint64_t)processedLinesCount},
+        {"droppedElements", (uint64_t)droppedElements}};
     return connectionStats;
 }
 

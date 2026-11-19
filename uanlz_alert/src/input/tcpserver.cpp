@@ -96,17 +96,17 @@ void TcpServer::startListener()
 
 json TcpServer::getStats()
 {
-    boost::json::object serverStats{{"clients", boost::json::array{}}};
-
-    serverStats["description"] = description;
-
+    boost::json::array clients;
     std::lock_guard<std::mutex> lock(registryMutex);
     for (auto client : clientProcessors)
     {
-        serverStats["clients"].as_array().emplace_back(client->getStats());
+        clients.emplace_back(client->getStats());
     }
 
-    return serverStats;
+    return boost::json::object{
+        {"clients", std::move(clients)},
+        {"description", description},
+    };
 }
 
 void TcpServer::addClient(TcpLineProcessor *clientProcessor)

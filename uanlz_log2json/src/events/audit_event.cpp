@@ -107,8 +107,6 @@ AuditClass *AuditEvent::getFirstClassRecord(const string &groupName)
 
 json AuditEvent::getJson()
 {
-    boost::json::object eventJson{{"AUDITD", boost::json::object{}}, {"INFO", boost::json::object{}}};
-
     time_t unixTime = std::get<0>(eventId);
     std::tm localTime{};
     char formattedTime[32]{};
@@ -121,18 +119,16 @@ json AuditEvent::getJson()
     std::string auditId =
         to_string(unixTime) + "." + to_string(std::get<1>(eventId)) + ":" + to_string(std::get<2>(eventId));
 
-    eventJson["AUDITD"].as_object()["id"] = auditId;
-
-    eventJson["INFO"].as_object()["source"] = "auditd";
-    eventJson["INFO"].as_object()["parserVersion"] = 1;
-
-    eventJson["INFO"].as_object()["unixTime"] = (int64_t)unixTime;
-    eventJson["INFO"].as_object()["msecs"] = std::get<1>(eventId);
-    eventJson["INFO"].as_object()["id"] = (uint64_t)std::get<2>(eventId);
-
-    eventJson["INFO"].as_object()["host"] = hostId.hostname;
-    eventJson["INFO"].as_object()["ip"] = hostId.ipAddress;
-    eventJson["INFO"].as_object()["time"] = formattedTimestamp;
+    boost::json::object info{
+        {"source", "auditd"},
+        {"parserVersion", 1},
+        {"unixTime", (int64_t)unixTime},
+        {"msecs", std::get<1>(eventId)},
+        {"id", (uint64_t)std::get<2>(eventId)},
+        {"host", hostId.hostname},
+        {"ip", hostId.ipAddress},
+        {"time", formattedTimestamp}};
+    boost::json::object records;
 
     std::set<string> classes = getClassNames();
     for (const string &className : classes)
@@ -149,10 +145,19 @@ json AuditEvent::getJson()
         }
         if (!entries.empty() && Mantids30::DataFormat::JSON::HAS_MEMBER(entries.front(), "key"))
         {
-            eventJson["INFO"].as_object()["key"] = entries.front().as_object().at("key");
+            info.erase("key");
+            info.emplace("key", Mantids30::DataFormat::JSON::MEMBER_OR_NULL(entries.front(), "key"));
         }
         if (!entries.empty())
-            eventJson[className] = std::move(entries);
+            records.emplace(className, std::move(entries));
+    }
+    boost::json::object eventJson{
+        {"AUDITD", boost::json::object{{"id", auditId}}},
+        {"INFO", std::move(info)}};
+    for (auto &record : records)
+    {
+        eventJson.erase(record.key());
+        eventJson.emplace(record.key(), std::move(record.value()));
     }
     return eventJson;
 }

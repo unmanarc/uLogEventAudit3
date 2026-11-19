@@ -33,12 +33,14 @@ json EventsManager::getStats()
     boost::json::array hostStats;
     for (const auto &[hostId, hostState] : snapshotHosts())
     {
-        boost::json::object hostJson{{"events", boost::json::object{}}};
-        hostJson["host"] = hostId.hostname;
-        hostJson["ip"] = hostId.ipAddress;
-        hostJson["events"].as_object()["pending"] = (uint64_t)hostState->getPendingEventsCount();
-        hostJson["events"].as_object()["processed"] = (uint64_t)hostState->getProcessedEventsCount();
-        hostJson["events"].as_object()["dropped"] = (uint64_t)hostState->getDroppedEventsCount();
+        boost::json::object hostJson{
+            {"host", hostId.hostname},
+            {"ip", hostId.ipAddress},
+            {"events", boost::json::object{
+                {"pending", (uint64_t)hostState->getPendingEventsCount()},
+                {"processed", (uint64_t)hostState->getProcessedEventsCount()},
+                {"dropped", (uint64_t)hostState->getDroppedEventsCount()}
+            }}};
         hostStats.emplace_back(std::move(hostJson));
     }
     return hostStats;

@@ -206,9 +206,9 @@ json RpcImpl::controlAddInput(void *, const std::string &, const json &configVal
 
 json RpcImpl::statReadInputsFileConfig(void *, const std::string &, const json &, void *, const std::string &)
 {
-    boost::json::object response{};
-    response["modified"] = Input::Inputs::getModified();
-    response["inputs"] = Input::Inputs::readInputs();
+    boost::json::object response{
+        {"modified", Input::Inputs::getModified()},
+        {"inputs", Input::Inputs::readInputs()}};
     return response;
 }
 
