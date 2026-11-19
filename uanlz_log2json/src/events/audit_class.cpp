@@ -6,6 +6,7 @@
 
 #include "../globals.h"
 
+#include <Mantids30/Core/Helpers/encoders.h>
 #include <algorithm>
 #include <arpa/inet.h>
 #include <array>
@@ -34,14 +35,6 @@ void AuditClass::setRawInput(string value)
 {
     rawInput = std::move(value);
 }
-
-/**
- * @brief Decode two consecutive hexadecimal characters into one byte.
- * @param encodedValue Borrowed buffer containing at least two readable characters.
- * @pre The caller has validated the field length and hexadecimal encoding.
- * @return Decoded byte value.
- */
-unsigned char decodeHexByte(const char *encodedValue);
 
 bool AuditClass::parseVariables()
 {
@@ -110,10 +103,7 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
 
         std::array<char, 128> data{};
         const auto addressSize = variableValue.size() / 2;
-        for (size_t index = 0; index < addressSize; ++index)
-        {
-            data[index] = static_cast<char>(decodeHexByte(variableValue.data() + 2 * index));
-        }
+        Mantids30::Core::Helpers::Encoders::fromHex(variableValue, reinterpret_cast<unsigned char *>(data.data()), addressSize);
 
         // Socket records are byte sequences; copy into aligned types before reading fields.
         sa_family_t socketFamily{};

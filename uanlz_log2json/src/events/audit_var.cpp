@@ -4,6 +4,7 @@
  */
 #include "audit_var.h"
 #include "../vars/namedefs.h"
+#include <Mantids30/Core/Helpers/encoders.h>
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
@@ -34,28 +35,6 @@ inline bool isUppercaseHexString(const std::string &encodedValue)
 }
 
 /**
- * @brief Convert one ASCII hexadecimal digit to its numeric nibble.
- * @param encodedValue Hexadecimal character to decode.
- * @return Nibble value, or zero for an unrecognized character.
- */
-inline unsigned char decodeHexDigit(const char encodedValue)
-{
-    if (encodedValue >= 'A' && encodedValue <= 'F')
-    {
-        return (encodedValue - 'A') + 10;
-    }
-    else if (encodedValue >= '0' && encodedValue <= '9')
-    {
-        return (encodedValue - '0');
-    }
-    else if (encodedValue >= 'a' && encodedValue <= 'f')
-    {
-        return (encodedValue - 'a') + 10;
-    }
-    return 0;
-}
-
-/**
  * @brief Identify EXECVE argument fields, including indexed fragments.
  * @param eventType Auditd record type containing the field.
  * @param variableName Field name to classify.
@@ -65,17 +44,6 @@ inline bool isExecveArgument(const string &eventType, const string &variableName
 {
     static const boost::regex argumentPattern(R"(a[0-9]+(\[[0-9]+\])?)");
     return eventType == "EXECVE" && boost::regex_match(variableName, argumentPattern);
-}
-
-/**
- * @brief Decode two consecutive hexadecimal characters into one byte.
- * @param encodedValue Borrowed buffer containing at least two readable characters.
- * @pre The caller has validated the field length and hexadecimal encoding.
- * @return Decoded byte value.
- */
-unsigned char decodeHexByte(const char *encodedValue)
-{
-    return decodeHexDigit(encodedValue[0]) * 0x10 + decodeHexDigit(encodedValue[1]);
 }
 
 void AuditVariable::updateDisplayValue()
@@ -146,10 +114,7 @@ bool AuditVariable::parse(const string &eventType, const string &variableName, c
         if (isUppercaseHexString(variableValue) && variableValue.size() % 2 == 0)
         {
             rawValue.resize(variableValue.size() / 2);
-            for (size_t byteIndex = 0; byteIndex < rawValue.size(); ++byteIndex)
-            {
-                rawValue[byteIndex] = static_cast<char>(decodeHexByte(variableValue.data() + 2 * byteIndex));
-            }
+            Mantids30::Core::Helpers::Encoders::fromHex(variableValue, reinterpret_cast<unsigned char *>(rawValue.data()), rawValue.size());
 
             updateDisplayValue();
             return setValid(true);
