@@ -461,7 +461,7 @@ string Rules::resolvePlaceholder(const string &placeholder, const string &ruleNa
     }
     else if (placeholder.at(0) == '#')
     {
-        if (placeholder.substr(1) == "rule.name")
+        if (placeholder == "#rule.name")
         {
             return ruleName;
         }
