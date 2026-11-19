@@ -1,4 +1,4 @@
-# Building uAuditAnalyzer3
+# Building uLogEventAudit3
 
 Requires CMake 3.16+, C++17, libMantids30 3.0, Boost 1.75+ (JSON, regex,
 thread), OpenSSL, and pkg-config. The three executables use the
@@ -23,11 +23,23 @@ To review installation without changing the system:
 DESTDIR="$PWD/build/stage" cmake --install build/mantids30
 ```
 
-The web resources install into `/var/www/uauditweb3`; configuration goes into
-`/etc/uauditanalyzer3` with the options above. Service unit files install into
+The frontend ships local Bootstrap and jQuery assets. To reproduce them:
+
+```bash
+cd ul3_web/var/www
+npm ci --ignore-scripts
+npm run build-assets
+```
+
+Run CMake from the repository root. The frontend uses MANTIDSLANG templates
+under `webroot/` and local vendor files under `global/assets/`. Node.js is only
+needed to refresh vendor files; there are no runtime CDN requests.
+
+The web resources install into `/var/www/ulogeventaudit3`; configuration goes into
+`/etc/ulogeventaudit3` with the options above. Service unit files install into
 `lib/systemd/system` under the configured prefix.
 Configure credentials, certificates, origins and login URLs before enabling
-services; see [MIGRATION.md](MIGRATION.md).
+services; see [ul3_web/README.md](ul3_web/README.md).
 
 ## C++ regression tests
 
