@@ -113,6 +113,20 @@ void eventReconstruction()
     require(Mantids30::DataFormat::JSON::ASSTRING(Mantids30::DataFormat::JSON::MEMBER_OR_NULL(keyedEvent, "INFO"), "key", "") == "test-key", "record key propagated to event info");
 }
 
+/** @brief Quoted fields must not introduce fake fields or hide empty values. */
+void quotedFields()
+{
+    AuditClass record;
+    record.setClassTypeName("CWD");
+    record.setRawInput("cwd=\"/tmp fake=123\" empty=\"\" literal=7");
+    require(record.parseVariables(), "quoted record");
+    const auto value = record.getJson();
+    require(value.at("cwd").as_string() == "/tmp fake=123", "quoted whitespace and equals preserved");
+    require(!value.contains("fake"), "quoted assignment is not a field");
+    require(value.at("empty").as_string().empty(), "empty quoted value");
+    require(value.at("literal").as_string() == "7", "unquoted value after quoted fields");
+}
+
 /** @brief Check valid and truncated socket-address records without unaligned accesses. */
 void socketAddresses()
 {
@@ -145,6 +159,7 @@ int main()
         auditVariables();
         eventReconstruction();
         socketAddresses();
+        quotedFields();
         std::cout << "PASS: queue ownership, binary variables, split events and socket addresses\n";
     }
     catch (const std::exception &error)

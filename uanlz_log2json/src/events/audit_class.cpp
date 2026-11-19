@@ -19,8 +19,8 @@
 #include <boost/algorithm/string.hpp>
 using namespace boost::algorithm;
 
-static boost::regex quotedVariablePattern("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>\"[^\"]+\")");
-static boost::regex unquotedVariablePattern("(?<AUDITD_DATA_VARNAME>[^=^ ]+)=(?<AUDITD_DATA_VARVALUE>[^ ^\"]+)");
+// Consume quoted fields as a whole so embedded key=value text stays literal.
+static const boost::regex variablePattern(R"audit((?:^|[ \t])([^= \t]+)=("[^"]*"|[^" \t]+)(?=$|[ \t]))audit");
 
 using namespace std;
 using namespace UANLZ::LOG2JSON::AuditdEvents;
@@ -46,18 +46,9 @@ unsigned char decodeHexByte(const char *encodedValue);
 bool AuditClass::parseVariables()
 {
     variablesByName.clear();
-    boost::match_results<string::const_iterator> variableMatch;
-    boost::match_flag_type flags = boost::match_default;
-
-    // Auditd quotes literal text and leaves encoded/numeric fields unquoted.
-    for (string::const_iterator start = rawInput.begin(), end = rawInput.end(); boost::regex_search(start, end, variableMatch, quotedVariablePattern, flags); start = variableMatch[0].second)
+    for (boost::sregex_iterator field(rawInput.begin(), rawInput.end(), variablePattern), end; field != end; ++field)
     {
-        parseVariable(string(variableMatch[1].first, variableMatch[1].second), string(variableMatch[2].first, variableMatch[2].second));
-    }
-
-    for (string::const_iterator start = rawInput.begin(), end = rawInput.end(); boost::regex_search(start, end, variableMatch, unquotedVariablePattern, flags); start = variableMatch[0].second)
-    {
-        parseVariable(string(variableMatch[1].first, variableMatch[1].second), string(variableMatch[2].first, variableMatch[2].second));
+        parseVariable((*field)[1].str(), (*field)[2].str());
     }
 
     return mergeSplitVariables();

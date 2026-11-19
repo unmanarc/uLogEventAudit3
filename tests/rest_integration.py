@@ -259,7 +259,8 @@ WebService {{
             action = {'name': 'pipeline-action', 'path': sys.executable,
                       'args': [sys.executable, '-c', capture, str(marker),
                                '%-.INFO.id%', '%-.CWD[0].cwd%', '%+.CWD[0].cwd%',
-                               '%$.CWD[0]%', '%-.missing[0]%', '%#rule.name%', '%-.EXECVE[0].argv%']}
+                               '%$.CWD[0]%', '%-.missing[0]%', '%#rule.name%', '%-.EXECVE[0].argv%',
+                               '%%/%#rule.name%/%#rule.name%/%N%/tail%', '%-.CWD[0].literal%']}
             status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             rule = {'name': 'pipeline-rule', 'action': 'EXEC', 'actionId': 'pipeline-action',
@@ -292,18 +293,20 @@ WebService {{
             with socket.create_connection(('127.0.0.1', input_port), timeout=5) as incoming:
                 event_id = (1 << 64) - 1
                 stamp = f'{int(time.time())}.123:{event_id}'
-                lines = [f'node=integration type=CWD msg=audit({stamp}): cwd="/tmp"',
-                         f'node=integration type=EXECVE msg=audit({stamp}): argc=2 a0[0]=6563',
-                         f'node=integration type=EXECVE msg=audit({stamp}): a0[1]=686F a1="hello"']
+                lines = [f'node=integration type=CWD msg=audit({stamp}): cwd="/tmp" literal="%N%"',
+                         f'<14>Jun 22 12:19:47 relay audispd: node=integration type=EXECVE msg=audit({stamp}): argc=2 a0[0]=6563',
+                         f'Jun 22 12:19:47 relay audisp-syslog[673]: node=integration type=EXECVE msg=audit({stamp}): a0[1]=686F a1="hello"']
                 incoming.sendall(('\n'.join(lines)+'\n').encode())
             eventually(marker.exists, 'audit input -> reconstructed JSON -> TCP output -> expression -> action')
             captured = json.loads(marker.read_text())
             assert captured[0] == str(event_id), captured
             assert json.loads(captured[1]) == '/tmp', captured
             assert json.loads(captured[2]) == '/TMP', captured
-            assert json.loads(captured[3]) == {'cwd': '/tmp'} and captured[3].endswith('\n'), captured
+            assert json.loads(captured[3]) == {'cwd': '/tmp', 'literal': '%N%'} and captured[3].endswith('\n'), captured
             assert captured[4:6] == ['null', 'pipeline-rule'], captured
             assert json.loads(captured[6]) == ['echo', 'hello'], captured
+            assert captured[7] == '%/pipeline-rule/pipeline-rule/\n/tail%', captured
+            assert json.loads(captured[8]) == '%N%', captured
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
