@@ -64,7 +64,7 @@ TcpServer::TcpServer() {}
 bool TcpServer::loadConfig(const json &configValue)
 {
     listenAddress = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "ListenAddr", ""));
-    listenPort = UANLZ::JSON::asUint32(configValue, "ListenPort", 0);
+    listenPort = Mantids30::DataFormat::JSON::ASUINT(configValue, "ListenPort", 0);
     description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
     LOG_APP->log0(__func__, Logs::INFO, "Configuring JSON input '%s' @%s:%" PRIu16, description.c_str(),

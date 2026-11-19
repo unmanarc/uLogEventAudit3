@@ -107,7 +107,7 @@ json RpcImpl::statReadRunningRules(void *, const std::string &, const json &, vo
 
 json RpcImpl::statReadRunningRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningRule(UANLZ::JSON::asUint32(configValue, "id", 0xFFFFFFFF));
+    return Filters::Rules::getCurrentRunningRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "id", 0xFFFFFFFF));
 }
 
 json RpcImpl::statAreRulesModified(void *, const std::string &, const json &, void *, const std::string &)
@@ -117,7 +117,7 @@ json RpcImpl::statAreRulesModified(void *, const std::string &, const json &, vo
 
 json RpcImpl::controlRemoveRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::removeRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
+    return Filters::Rules::removeRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
 json RpcImpl::controlRemoveAction(void *, const std::string &, const json &configValue, void *, const std::string &)
@@ -147,24 +147,24 @@ json RpcImpl::controlEditAction(void *, const std::string &, const json &configV
 
 json RpcImpl::controlEditRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::editRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF),
+    return Filters::Rules::editRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF),
                                     Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
 json RpcImpl::controlAddRule(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::addRule(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF),
+    return Filters::Rules::addRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF),
                                    Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
 json RpcImpl::controlRuleUp(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::moveRuleUp(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
+    return Filters::Rules::moveRuleUp(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
 json RpcImpl::controlRuleDown(void *, const std::string &, const json &configValue, void *, const std::string &)
 {
-    return Filters::Rules::moveRuleDown(UANLZ::JSON::asUint32(configValue, "pos", 0xFFFFFFFF));
+    return Filters::Rules::moveRuleDown(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
 json RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const json &configValue, void *,

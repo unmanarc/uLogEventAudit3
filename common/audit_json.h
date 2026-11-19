@@ -6,7 +6,6 @@
 #include <Mantids30/DataFormat/JSON/json.h>
 #include <istream>
 #include <iterator>
-#include <limits>
 #include <string>
 #include <utility>
 
@@ -14,19 +13,6 @@ using json = boost::json::value;
 
 namespace UANLZ::JSON
 {
-
-/**
- * @brief Read an unsigned 32-bit JSON member without accepting fractions or numeric overflow.
- * @param value JSON object containing the requested numeric member.
- * @param key JSON member name to read.
- * @param fallback Value returned when the member is absent, invalid or outside the accepted range.
- * @return The numeric member, or fallback if it is missing, fractional, negative or out of range.
- */
-inline uint32_t asUint32(const json &value, std::string_view key, uint32_t fallback)
-{
-    const auto number = Mantids30::DataFormat::JSON::ASUINT64(value, key, std::numeric_limits<uint64_t>::max());
-    return number <= std::numeric_limits<uint32_t>::max() ? static_cast<uint32_t>(number) : fallback;
-}
 
 /**
  * @brief Read a JSON configuration array, normalizing legacy null to an empty array.

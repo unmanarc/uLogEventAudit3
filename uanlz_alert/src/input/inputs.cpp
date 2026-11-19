@@ -104,7 +104,7 @@ bool Inputs::addInput(json configValue)
     uint16_t listenPort;
 
     listenAddress = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "ListenAddr", ""));
-    listenPort = UANLZ::JSON::asUint32(configValue, "ListenPort", 0);
+    listenPort = Mantids30::DataFormat::JSON::ASUINT(configValue, "ListenPort", 0);
     description = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "Description", ""));
 
     LOG_APP->log0(__func__, Logs::INFO, "Adding JSON input '%s' to config file: Description: '%s' / @%s:%" PRIu16,
@@ -141,7 +141,7 @@ bool Inputs::removeInput(const std::string &inputId)
 
             listenAddress = std::string(
                 Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "ListenAddr", ""));
-            listenPort = UANLZ::JSON::asUint32(configuredInputs.as_array()[inputIndex], "ListenPort", 0);
+            listenPort = Mantids30::DataFormat::JSON::ASUINT(configuredInputs.as_array()[inputIndex], "ListenPort", 0);
             description = std::string(
                 Mantids30::DataFormat::JSON::ASSTRING(configuredInputs.as_array()[inputIndex], "Description", ""));
 
