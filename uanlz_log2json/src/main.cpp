@@ -20,13 +20,13 @@
 
 #include <sys/types.h>
 
+#include <csignal>
 #include <filesystem>
 #include <pwd.h>
 #include <set>
-#include <signal.h>
 #include <unistd.h>
 
-#include <inttypes.h>
+#include <cinttypes>
 #include <sys/stat.h>
 
 using namespace UANLZ::LOG2JSON;
@@ -132,11 +132,15 @@ public:
 
         if (!access((configDirectory + "/config.ini").c_str(), R_OK))
         {
-            struct stat fileStatus;
+            struct stat fileStatus{};
             // Check file properties...
-            stat((configDirectory + "/config.ini").c_str(), &fileStatus);
+            if (stat((configDirectory + "/config.ini").c_str(), &fileStatus) != 0)
+            {
+                initLog.log0(__func__, Logs::CRITICAL, "Unable to read configuration file properties");
+                return false;
+            }
 
-            int filePermissions = fileStatus.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+            const mode_t filePermissions = fileStatus.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
 
             if (filePermissions != 0600)
             {
@@ -150,7 +154,7 @@ public:
                 initLog.log0(__func__, Logs::INFO, "config.ini file permissions changed to 0600");
             }
 
-            boost::property_tree::ini_parser::read_ini((configDirectory + "/config.ini").c_str(), mainConfig);
+            boost::property_tree::ini_parser::read_ini(configDirectory + "/config.ini", mainConfig);
         }
         else
         {
@@ -161,7 +165,9 @@ public:
         *(Globals::getMainConfig()) = mainConfig;
 
         if (mainConfig.get<bool>("Logs.ToSyslog", true))
+        {
             logMode |= Logs::Mode::SYSLOG;
+        }
         Globals::setAppLog(std::make_unique<Logs::AppLog>(logMode));
         LOG_APP->enableEmptyFieldLogging = true;
         LOG_APP->enableColorLogging = mainConfig.get<bool>("Logs.ShowColors", true);
@@ -170,7 +176,7 @@ public:
         LOG_APP->enableAttributeNameLogging = false;
         LOG_APP->setDebug(Globals::getMainConfig()->get<bool>("Logs.Debug", false));
 
-        const auto loadDirectory = [&](const std::string &name, auto loadConfig)
+        const auto loadDirectory = [&, functionName = __func__](const std::string &name, auto loadConfig)
         {
             const auto directory = std::filesystem::path(configDirectory) / name;
             std::error_code error;
@@ -179,27 +185,35 @@ public:
             while (!error && iterator != end)
             {
                 if (iterator->is_regular_file(error))
+                {
                     files.insert(iterator->path());
+                }
                 if (!error)
+                {
                     iterator.increment(error);
+                }
             }
             if (error)
             {
-                LOG_APP->log0(__func__, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(), error.message().c_str());
+                LOG_APP->log0(functionName, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(), error.message().c_str());
                 return false;
             }
             for (const auto &file : files)
             {
-                LOG_APP->log0(__func__, Logs::INFO, "Loading configuration from %s", file.c_str());
+                LOG_APP->log0(functionName, Logs::INFO, "Loading configuration from %s", file.c_str());
                 loadConfig(file.string());
             }
             return true;
         };
 
         if (!loadDirectory("receptors.d", Input::Inputs::loadConfig))
+        {
             return false;
+        }
         if (!loadDirectory("dispatchers.d", Output::Outputs::loadConfig))
+        {
             return false;
+        }
 
         return true;
     }
