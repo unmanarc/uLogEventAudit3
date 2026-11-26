@@ -71,7 +71,8 @@ void TcpServer::startListener()
 {
     auto listenerSocket = std::make_shared<Socket_TCP>();
 
-    if (!listenerSocket->listenOn(listenPort, listenAddress.c_str(), true))
+    // Keep the OS receive window: listenOn's third argument is a byte count.
+    if (!listenerSocket->listenOn(listenPort, listenAddress.c_str()))
     {
         LOG_APP->log0(__func__, Logs::ERROR, "Error creating JSON TCP listener @%s:%" PRIu16, listenAddress.c_str(), listenPort);
         return;
