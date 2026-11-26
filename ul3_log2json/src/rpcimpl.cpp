@@ -3,7 +3,6 @@
  * @brief Implementation for ul3_log2json/src/rpcimpl.
  */
 #include "rpcimpl.h"
-#include "audit_rpc.h"
 
 #include "globals.h"
 #include "resource_sensing.h"
@@ -26,7 +25,7 @@ using namespace UL3::LOG2JSON;
 namespace {
 /** @brief Read endpoint definitions and the pending restart status of both endpoint files. */
 template <bool inputs>
-boost::json::object readEndpointConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value readEndpointConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     const auto inputConfig = Input::Inputs::readConfig();
     const auto outputConfig = Output::Outputs::readConfig();
@@ -37,7 +36,7 @@ boost::json::object readEndpointConfig(void *, const std::string &, const boost:
 
 /** @brief Validate and persist GUI endpoint settings for the next service restart. */
 template <bool inputs>
-boost::json::object writeEndpointConfig(void *, const std::string &, const boost::json::value &request, void *, const std::string &)
+boost::json::value writeEndpointConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &request, const std::shared_ptr<void> &, const std::string &)
 {
     try
     {
@@ -62,14 +61,18 @@ boost::json::object writeEndpointConfig(void *, const std::string &, const boost
     }
 }
 
+/** @brief Allow the RPC response to be sent before systemd restarts the service. */
+static void exitAfterReply()
+{
+    sleep(2);
+    _exit(0);
+}
+
 /** @brief Reply before exiting so systemd restarts the service with its saved endpoints. */
-bool reloadApp(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value reloadApp(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     LOG_APP->log0(__func__, Logs::WARNING, "Service restart requested via RPC");
-    std::thread([] {
-        sleep(2);
-        _exit(0);
-    }).detach();
+    std::thread(&exitAfterReply).detach();
     return true;
 }
 } // namespace
@@ -83,19 +86,19 @@ void RpcImpl::runRpcClient()
     std::string rpcApiKey = Globals::getMainConfig()->get<std::string>("RPCConnector.Log2JSONApiKey", "REPLACEME_XABCXAPIX_LOG2JSON");
 
     Mantids30::Protocol::FastRPC1 fastRpc;
-    fastRpc.addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
+    fastRpc.addMethod("stats.ResourceMonitor", {&UL3::ResourceSensing::rpcHistory, nullptr});
 
-    fastRpc.addMethod("stats.EventsPerHost", UL3::JSON::rpcMethod<&statEventsPerHost>());
-    fastRpc.addMethod("stats.OutputsDistributionThreads", UL3::JSON::rpcMethod<&statOutputsDistributionThreads>());
-    fastRpc.addMethod("stats.Outputs", UL3::JSON::rpcMethod<&statOutputs>());
-    fastRpc.addMethod("stats.Inputs", UL3::JSON::rpcMethod<&statInputs>());
-    fastRpc.addMethod("stats.ReadInputsFileConfig", UL3::JSON::rpcMethod<&readEndpointConfig<true>>());
-    fastRpc.addMethod("control.WriteInputsFileConfig", UL3::JSON::rpcMethod<&writeEndpointConfig<true>>());
-    fastRpc.addMethod("stats.ReadOutputsFileConfig", UL3::JSON::rpcMethod<&readEndpointConfig<false>>());
-    fastRpc.addMethod("control.WriteOutputsFileConfig", UL3::JSON::rpcMethod<&writeEndpointConfig<false>>());
-    fastRpc.addMethod("control.ReloadApp", UL3::JSON::rpcMethod<&reloadApp>());
-    fastRpc.addMethod("stats.SyslogModules", UL3::JSON::rpcMethod<&readSyslogModules>());
-    fastRpc.addMethod("control.SyslogModules", UL3::JSON::rpcMethod<&writeSyslogModules>());
+    fastRpc.addMethod("stats.EventsPerHost", {&statEventsPerHost, nullptr});
+    fastRpc.addMethod("stats.OutputsDistributionThreads", {&statOutputsDistributionThreads, nullptr});
+    fastRpc.addMethod("stats.Outputs", {&statOutputs, nullptr});
+    fastRpc.addMethod("stats.Inputs", {&statInputs, nullptr});
+    fastRpc.addMethod("stats.ReadInputsFileConfig", {&readEndpointConfig<true>, nullptr});
+    fastRpc.addMethod("control.WriteInputsFileConfig", {&writeEndpointConfig<true>, nullptr});
+    fastRpc.addMethod("stats.ReadOutputsFileConfig", {&readEndpointConfig<false>, nullptr});
+    fastRpc.addMethod("control.WriteOutputsFileConfig", {&writeEndpointConfig<false>, nullptr});
+    fastRpc.addMethod("control.ReloadApp", {&reloadApp, nullptr});
+    fastRpc.addMethod("stats.SyslogModules", {&readSyslogModules, nullptr});
+    fastRpc.addMethod("control.SyslogModules", {&writeSyslogModules, nullptr});
 
     for (;;)
     {
@@ -125,36 +128,36 @@ void RpcImpl::runRpcClient()
     }
 }
 
-boost::json::object RpcImpl::statEventsPerHost(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statEventsPerHost(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response{{"hosts", AuditdEvents::EventsManager::getStats()}, {"ok", true}};
     return response;
 }
 
-boost::json::object RpcImpl::statOutputsDistributionThreads(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statOutputsDistributionThreads(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response{{"events", AuditdEvents::EventDistribution::getStats()}, {"ok", true}};
     return response;
 }
 
-boost::json::object RpcImpl::statOutputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statOutputs(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response{{"outputs", Output::Outputs::getStats()}, {"ok", true}};
     return response;
 }
 
-boost::json::object RpcImpl::statInputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statInputs(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response{{"ok", true}, {"inputs", Input::Inputs::getStats()}};
     return response;
 }
 
-boost::json::object RpcImpl::readSyslogModules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::readSyslogModules(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return {{"ok", true}, {"modules", Input::SyslogModules::getConfig()}};
 }
 
-boost::json::object RpcImpl::writeSyslogModules(void *, const std::string &, const boost::json::value &input, void *, const std::string &)
+boost::json::value RpcImpl::writeSyslogModules(const std::shared_ptr<void> &, const std::string &, const boost::json::value &input, const std::shared_ptr<void> &, const std::string &)
 {
     try
     {

@@ -142,25 +142,21 @@ boost::json::object UL3::ResourceSensing::history(const std::string &resolution)
             {"samples", std::move(samples)}};
 }
 
-Mantids30::Protocol::FastRPC1::Method UL3::ResourceSensing::rpcMethod()
+boost::json::value UL3::ResourceSensing::rpcHistory(const std::shared_ptr<void> &, const std::string &, const boost::json::value &request, const std::shared_ptr<void> &, const std::string &)
 {
-    return {+[](const std::shared_ptr<void> &, const std::string &, const boost::json::value &request, const std::shared_ptr<void> &, const std::string &) -> boost::json::value
-            {
-                const auto *resolution = request.is_object() ? request.as_object().if_contains("resolution") : nullptr;
-                if (!resolution || !resolution->is_string())
-                {
-                    return boost::json::object{{"error", "invalid_resolution"}};
-                }
-                try
-                {
-                    return instance().history(std::string(resolution->as_string()));
-                }
-                catch (const std::invalid_argument &)
-                {
-                    return boost::json::object{{"error", "invalid_resolution"}};
-                }
-            },
-            nullptr};
+    const auto *resolution = request.is_object() ? request.as_object().if_contains("resolution") : nullptr;
+    if (!resolution || !resolution->is_string())
+    {
+        return boost::json::object{{"error", "invalid_resolution"}};
+    }
+    try
+    {
+        return instance().history(std::string(resolution->as_string()));
+    }
+    catch (const std::invalid_argument &)
+    {
+        return boost::json::object{{"error", "invalid_resolution"}};
+    }
 }
 
 void UL3::ResourceSensing::run()

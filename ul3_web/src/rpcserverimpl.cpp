@@ -45,16 +45,18 @@ bool RpcServerImpl::createRpcListener()
         return false;
     }
     auto socket = std::make_shared<Network::Sockets::Socket_TLS>();
+    // Select the address family separately; listenOn's third argument is a receive-buffer byte count.
+    socket->setUseIPv6(config.get<bool>("RPCServer.UseIPv6", false));
     if (!socket->tlsKeys.loadPublicKeyFromPEMFile(config.get<std::string>("RPCServer.CertFile", "snakeoil.crt").c_str())
         || !socket->tlsKeys.loadPrivateKeyFromPEMFile(config.get<std::string>("RPCServer.KeyFile", "snakeoil.key").c_str())
-        || !socket->listenOn(config.get<uint16_t>("RPCServer.ListenPort", 33001), config.get<std::string>("RPCServer.ListenAddr", "127.0.0.1").c_str(), !config.get<bool>("RPCServer.UseIPv6", false)))
+        || !socket->listenOn(config.get<uint16_t>("RPCServer.ListenPort", 33001), config.get<std::string>("RPCServer.ListenAddr", "127.0.0.1").c_str()))
     {
         LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Cannot start internal TLS listener: %s", socket->getLastError().c_str());
         return false;
     }
     Globals::fastRpc = std::make_shared<Protocol::FastRPC1>();
     Globals::fastRpc->setRemoteExecutionDisconnectedTries(0);
-    Globals::fastRpc->addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
+    Globals::fastRpc->addMethod("stats.ResourceMonitor", {&UL3::ResourceSensing::rpcHistory, nullptr});
     Globals::rpcListener = std::make_shared<Network::Sockets::Acceptors::MultiThreaded>();
     Globals::rpcListener->parameters.setMaxConcurrentClients(config.get<uint32_t>("RPCServer.MaxClients", 16));
     Globals::rpcListener->callbacks.onClientConnected = onRpcConnected;

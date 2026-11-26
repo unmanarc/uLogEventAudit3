@@ -50,8 +50,8 @@ public:
      * @throws std::invalid_argument For an unsupported resolution.
      */
     boost::json::object history(const std::string &resolution) const;
-    /** @brief Return the common stats.ResourceMonitor FastRPC handler for this process. */
-    static Mantids30::Protocol::FastRPC1::Method rpcMethod();
+    /** @brief Validate the requested resolution and return this process's resource history. */
+    static boost::json::value rpcHistory(const std::shared_ptr<void> &, const std::string &, const boost::json::value &request, const std::shared_ptr<void> &, const std::string &);
 
 private:
     /** @brief Keep independent CPU/I/O baselines and deadlines for each resolution. */

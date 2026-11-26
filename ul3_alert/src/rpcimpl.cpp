@@ -3,7 +3,6 @@
  * @brief Implementation for ul3_alert/src/rpcimpl.
  */
 #include "rpcimpl.h"
-#include "audit_rpc.h"
 #include <cinttypes>
 
 #include "globals.h"
@@ -27,39 +26,39 @@ void RpcImpl::runRpcClient()
     std::string rpcApiKey = Globals::getMainConfig()->get<std::string>("RPCConnector.AlertsApiKey", "REPLACEME_XABCXAPIX_ALERT");
 
     Mantids30::Protocol::FastRPC1 fastRpc;
-    fastRpc.addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
+    fastRpc.addMethod("stats.ResourceMonitor", {&UL3::ResourceSensing::rpcHistory, nullptr});
 
-    fastRpc.addMethod("control.RulesReload", UL3::JSON::rpcMethod<&controlRulesReload>());
-    fastRpc.addMethod("control.RulesActions", UL3::JSON::rpcMethod<&controlActionsReload>());
-    fastRpc.addMethod("control.RemoveRule", UL3::JSON::rpcMethod<&controlRemoveRule>());
-    fastRpc.addMethod("control.SaveRunningRules", UL3::JSON::rpcMethod<&controlSaveRunningRules>());
-    fastRpc.addMethod("control.WriteRulesFileConfig", UL3::JSON::rpcMethod<&controlWriteRulesFileConfig>());
-    fastRpc.addMethod("stats.ReadRunningRules", UL3::JSON::rpcMethod<&statReadRunningRules>());
-    fastRpc.addMethod("stats.ReadRunningRule", UL3::JSON::rpcMethod<&statReadRunningRule>());
-    fastRpc.addMethod("stats.ReadRulesFileConfig", UL3::JSON::rpcMethod<&statReadRulesFileConfig>());
-    fastRpc.addMethod("stats.AreRulesModified", UL3::JSON::rpcMethod<&statAreRulesModified>());
-    fastRpc.addMethod("control.AddRule", UL3::JSON::rpcMethod<&controlAddRule>());
-    fastRpc.addMethod("control.EditRule", UL3::JSON::rpcMethod<&controlEditRule>());
-    fastRpc.addMethod("control.RuleUp", UL3::JSON::rpcMethod<&controlRuleUp>());
-    fastRpc.addMethod("control.RuleDown", UL3::JSON::rpcMethod<&controlRuleDown>());
+    fastRpc.addMethod("control.RulesReload", {&controlRulesReload, nullptr});
+    fastRpc.addMethod("control.RulesActions", {&controlActionsReload, nullptr});
+    fastRpc.addMethod("control.RemoveRule", {&controlRemoveRule, nullptr});
+    fastRpc.addMethod("control.SaveRunningRules", {&controlSaveRunningRules, nullptr});
+    fastRpc.addMethod("control.WriteRulesFileConfig", {&controlWriteRulesFileConfig, nullptr});
+    fastRpc.addMethod("stats.ReadRunningRules", {&statReadRunningRules, nullptr});
+    fastRpc.addMethod("stats.ReadRunningRule", {&statReadRunningRule, nullptr});
+    fastRpc.addMethod("stats.ReadRulesFileConfig", {&statReadRulesFileConfig, nullptr});
+    fastRpc.addMethod("stats.AreRulesModified", {&statAreRulesModified, nullptr});
+    fastRpc.addMethod("control.AddRule", {&controlAddRule, nullptr});
+    fastRpc.addMethod("control.EditRule", {&controlEditRule, nullptr});
+    fastRpc.addMethod("control.RuleUp", {&controlRuleUp, nullptr});
+    fastRpc.addMethod("control.RuleDown", {&controlRuleDown, nullptr});
 
-    fastRpc.addMethod("control.WriteActionsFileConfig", UL3::JSON::rpcMethod<&controlWriteActionsFileConfig>());
-    fastRpc.addMethod("control.AddAction", UL3::JSON::rpcMethod<&controlAddAction>());
-    fastRpc.addMethod("control.EditAction", UL3::JSON::rpcMethod<&controlEditAction>());
-    fastRpc.addMethod("control.RemoveAction", UL3::JSON::rpcMethod<&controlRemoveAction>());
-    fastRpc.addMethod("control.SaveRunningActions", UL3::JSON::rpcMethod<&controlSaveRunningActions>());
-    fastRpc.addMethod("stats.AreActionsModified", UL3::JSON::rpcMethod<&statAreActionsModified>());
-    fastRpc.addMethod("stats.ReadRunningActions", UL3::JSON::rpcMethod<&statReadRunningActions>());
-    fastRpc.addMethod("stats.ReadRunningAction", UL3::JSON::rpcMethod<&statReadRunningAction>());
-    fastRpc.addMethod("stats.ReadActionsFileConfig", UL3::JSON::rpcMethod<&statReadActionsFileConfig>());
+    fastRpc.addMethod("control.WriteActionsFileConfig", {&controlWriteActionsFileConfig, nullptr});
+    fastRpc.addMethod("control.AddAction", {&controlAddAction, nullptr});
+    fastRpc.addMethod("control.EditAction", {&controlEditAction, nullptr});
+    fastRpc.addMethod("control.RemoveAction", {&controlRemoveAction, nullptr});
+    fastRpc.addMethod("control.SaveRunningActions", {&controlSaveRunningActions, nullptr});
+    fastRpc.addMethod("stats.AreActionsModified", {&statAreActionsModified, nullptr});
+    fastRpc.addMethod("stats.ReadRunningActions", {&statReadRunningActions, nullptr});
+    fastRpc.addMethod("stats.ReadRunningAction", {&statReadRunningAction, nullptr});
+    fastRpc.addMethod("stats.ReadActionsFileConfig", {&statReadActionsFileConfig, nullptr});
 
-    fastRpc.addMethod("stats.ReadRunningInputs", UL3::JSON::rpcMethod<&statReadRunningInputs>());
-    fastRpc.addMethod("stats.ReadInputsFileConfig", UL3::JSON::rpcMethod<&statReadInputsFileConfig>());
-    fastRpc.addMethod("control.AddInputToFileConfig", UL3::JSON::rpcMethod<&controlAddInput>());
-    fastRpc.addMethod("control.RemInputFromFileConfig", UL3::JSON::rpcMethod<&controlRemoveInput>());
+    fastRpc.addMethod("stats.ReadRunningInputs", {&statReadRunningInputs, nullptr});
+    fastRpc.addMethod("stats.ReadInputsFileConfig", {&statReadInputsFileConfig, nullptr});
+    fastRpc.addMethod("control.AddInputToFileConfig", {&controlAddInput, nullptr});
+    fastRpc.addMethod("control.RemInputFromFileConfig", {&controlRemoveInput, nullptr});
 
-    fastRpc.addMethod("stats.SystemStats", UL3::JSON::rpcMethod<&statSystemStats>());
-    fastRpc.addMethod("control.ReloadApp", UL3::JSON::rpcMethod<&controlReloadApp>());
+    fastRpc.addMethod("stats.SystemStats", {&statSystemStats, nullptr});
+    fastRpc.addMethod("control.ReloadApp", {&controlReloadApp, nullptr});
 
     for (;;)
     {
@@ -89,123 +88,123 @@ void RpcImpl::runRpcClient()
     }
 }
 
-bool RpcImpl::controlWriteRulesFileConfig(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlWriteRulesFileConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(configValue);
 }
 
-boost::json::value RpcImpl::statReadRulesFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadRulesFileConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::readRulesFileConfig();
 }
 
-boost::json::array RpcImpl::statReadRunningRules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningRules(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::getCurrentRunningRules();
 }
 
-boost::json::value RpcImpl::statReadRunningRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningRule(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::getCurrentRunningRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "id", 0xFFFFFFFF));
 }
 
-bool RpcImpl::statAreRulesModified(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statAreRulesModified(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::getRulesModified();
 }
 
-bool RpcImpl::controlRemoveRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlRemoveRule(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::removeRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-bool RpcImpl::controlRemoveAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlRemoveAction(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::removeAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
 }
 
-bool RpcImpl::controlSaveRunningRules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::controlSaveRunningRules(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::writeRulesFileConfig(Filters::Rules::getCurrentRunningRules());
 }
 
-bool RpcImpl::controlSaveRunningActions(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::controlSaveRunningActions(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(Filters::Rules::getCurrentRunningActions());
 }
 
-bool RpcImpl::controlAddAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlAddAction(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::addAction(configValue);
 }
 
-bool RpcImpl::controlEditAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlEditAction(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::editAction(configValue);
 }
 
-bool RpcImpl::controlEditRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlEditRule(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::editRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-bool RpcImpl::controlAddRule(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlAddRule(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::addRule(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF), Mantids30::DataFormat::JSON::MEMBER_OR_NULL(configValue, "rule"));
 }
 
-bool RpcImpl::controlRuleUp(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlRuleUp(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::moveRuleUp(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-bool RpcImpl::controlRuleDown(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlRuleDown(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::moveRuleDown(Mantids30::DataFormat::JSON::ASUINT(configValue, "pos", 0xFFFFFFFF));
 }
 
-bool RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlWriteActionsFileConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::writeActionsFileConfig(configValue);
 }
 
-boost::json::value RpcImpl::statReadActionsFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadActionsFileConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Action::redact(Filters::Rules::readActionsFileConfig());
 }
 
-bool RpcImpl::statAreActionsModified(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statAreActionsModified(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Rules::getActionsModified();
 }
 
-boost::json::array RpcImpl::statReadRunningActions(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningActions(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Action::redact(Filters::Rules::getCurrentRunningActions()).as_array();
 }
 
-boost::json::value RpcImpl::statReadRunningAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningAction(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Filters::Action::redact(Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", ""))));
 }
 
-bool RpcImpl::controlRemoveInput(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlRemoveInput(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Input::Inputs::removeInput(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "id", "")));
 }
 
-bool RpcImpl::controlAddInput(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
+boost::json::value RpcImpl::controlAddInput(const std::shared_ptr<void> &, const std::string &, const boost::json::value &configValue, const std::shared_ptr<void> &, const std::string &)
 {
     return Input::Inputs::addInput(configValue);
 }
 
-boost::json::object RpcImpl::statReadInputsFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadInputsFileConfig(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response{{"modified", Input::Inputs::getModified()}, {"inputs", Input::Inputs::readInputs()}};
     return response;
 }
 
-boost::json::array RpcImpl::statReadRunningInputs(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statReadRunningInputs(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     return Input::Inputs::getStats();
 }
@@ -219,7 +218,7 @@ void sleepAndExit()
     _exit(0);
 }
 
-bool RpcImpl::controlReloadApp(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::controlReloadApp(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     bool response = true;
     LOG_APP->log0(__func__, Logs::WARNING, "Reload requested via RPC");
@@ -228,19 +227,19 @@ bool RpcImpl::controlReloadApp(void *, const std::string &, const boost::json::v
     return response;
 }
 
-boost::json::object RpcImpl::statSystemStats(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::statSystemStats(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     boost::json::object response = Filters::Rules::getStats();
     return response;
 }
 
-bool RpcImpl::controlRulesReload(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::controlRulesReload(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     bool response = Filters::Rules::reloadRules();
     return response;
 }
 
-bool RpcImpl::controlActionsReload(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+boost::json::value RpcImpl::controlActionsReload(const std::shared_ptr<void> &, const std::string &, const boost::json::value &, const std::shared_ptr<void> &, const std::string &)
 {
     bool response = Filters::Rules::reloadActions();
     return response;
