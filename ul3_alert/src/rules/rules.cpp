@@ -12,18 +12,11 @@
 
 #include "../globals.h"
 
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <string>
-#include <system_error>
 #include <thread>
-
-#ifdef _WIN32
-#endif
 
 using namespace std;
 
@@ -52,56 +45,6 @@ std::string Rules::actionsFilePath;
 
 bool Rules::rulesModified = false;
 bool Rules::actionsModified = false;
-
-/**
- * @brief Launch an action with execvp semantics and wait for its child process.
- * @param ruleName Rule name used in launch and wait diagnostics.
- * @param file Executable name or path; a bare name uses PATH lookup.
- * @param arguments Owned argument storage, including the configured argv[0].
- * @note The parent retains argument storage until the child has finished.
- */
-void executeProcess(const std::string &ruleName, const char *file, std::vector<string> arguments)
-{
-    // The strings own argv storage until waitpid returns; execvp borrows these buffers.
-    std::vector<char *> argv;
-    argv.reserve(arguments.size() + 1);
-    for (auto &argument : arguments)
-    {
-        argv.push_back(argument.data());
-    }
-    argv.push_back(nullptr);
-
-    const pid_t pid = fork();
-    if (pid == -1)
-    {
-        const auto error = std::error_code(errno, std::generic_category()).message();
-        LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to launch '%s': %s", ruleName.c_str(), file, error.c_str());
-    }
-    else if (pid == 0)
-    {
-        execvp(file, argv.data());
-        _exit(EXIT_FAILURE);
-    }
-    else
-    {
-        int status = 0;
-        pid_t result;
-        do
-        {
-            result = waitpid(pid, &status, 0);
-        }
-        while (result == -1 && errno == EINTR);
-        if (result == -1)
-        {
-            const auto error = std::error_code(errno, std::generic_category()).message();
-            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': unable to wait for '%s': %s", ruleName.c_str(), file, error.c_str());
-        }
-        else if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        {
-            LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': execution of '%s' failed (wait status %d).", ruleName.c_str(), file, status);
-        }
-    }
-}
 
 Rules::Rules() = default;
 
@@ -196,14 +139,31 @@ bool Rules::reloadRules()
 bool Rules::reloadActions()
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
-    resetActions();
-    boost::json::value root = readActionsFileConfig();
-
-    LOG_APP->log0(__func__, Logs::INFO, "Loading actions from file: %s", actionsFilePath.c_str());
-    for (uint32_t index = 0; index < Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size(); index++)
+    const auto root = readActionsFileConfig();
+    if (!root.is_array())
     {
-        addActionUnlocked(root.as_array()[index]);
+        return false;
     }
+    std::map<std::string, unique_ptr<Action>> replacement;
+    try
+    {
+        for (const auto &definition : root.as_array())
+        {
+            auto action = std::make_unique<Action>(Action::fromConfig(definition));
+            const auto name = std::string(action->originalConfig.at("name").as_string());
+            if (replacement.count(name) != 0)
+            {
+                return false;
+            }
+            replacement.emplace(name, std::move(action));
+        }
+    }
+    catch (const std::exception &)
+    {
+        LOG_APP->log0(__func__, Logs::WARNING, "Invalid action configuration file.");
+        return false;
+    }
+    actions = std::move(replacement);
 
     actionsModified = false;
 
@@ -231,7 +191,7 @@ bool Rules::evaluate(const boost::json::value &values)
                 else
                 {
                     LOG_APP->log0(__func__, Logs::DEBUG, "Rule '%s' activated, executing action '%s'", rule->name.c_str(), rule->actionId.c_str());
-                    executeAction(rule->name, actions.at(rule->actionId)->file.c_str(), actions.at(rule->actionId)->arguments, values);
+                    executeAction(rule->name, *actions.at(rule->actionId), values);
                     if (rule->ruleAction == RULE_ACTION_EXECANDABORT)
                     {
                         break;
@@ -382,10 +342,40 @@ void Rules::runQueueCounters()
     }
 }
 
-void Rules::executeAction(const std::string &ruleName, const char *file, std::vector<string> arguments, const boost::json::value &values)
+void Rules::executeAction(const std::string &ruleName, const Action &action, const boost::json::value &values)
 {
-    expandArguments(arguments, ruleName, values);
-    executeProcess(ruleName, file, arguments);
+    bool success = false;
+    try
+    {
+        const auto &config = action.originalConfig;
+        if (Mantids30::DataFormat::JSON::ASSTRING(config, "type", "") == "command")
+        {
+            std::vector<std::string> arguments;
+            for (const auto &argument : Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(config, "args"))
+            {
+                arguments.emplace_back(argument.as_string());
+                if (Mantids30::DataFormat::JSON::ASBOOL(config, "appendNewLineToEachArgv", false))
+                {
+                    arguments.back() += "%N%";
+                }
+            }
+            expandArguments(arguments, ruleName, values);
+            success = Action::runCommand(std::string(config.at("path").as_string()), std::move(arguments),
+                                        Action::render(std::string(config.at("stdinTemplate").as_string()), values));
+        }
+        else
+        {
+            success = action.post(values);
+        }
+    }
+    catch (const std::exception &)
+    {
+        // Never print exception text, URLs, bodies or arguments: they can contain credentials/event data.
+    }
+    if (!success)
+    {
+        LOG_APP->log0(__func__, Logs::WARNING, "Rule '%s': action delivery failed.", ruleName.c_str());
+    }
 }
 
 void Rules::expandArguments(std::vector<string> &arguments, const std::string &ruleName, const boost::json::value &values)
@@ -540,7 +530,6 @@ bool Rules::addRuleUnlocked(uint32_t position, const boost::json::value &configV
 bool Rules::addActionUnlocked(const boost::json::value &configValue, bool replace)
 {
     std::string actionName = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", ""));
-    std::string actionDescription = std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "description", ""));
 
     if (!replace)
     {
@@ -559,23 +548,17 @@ bool Rules::addActionUnlocked(const boost::json::value &configValue, bool replac
         }
     }
 
-    LOG_APP->log0(__func__, Logs::INFO, "Creating Action '%s' - '%s'", actionName.c_str(), actionDescription.c_str());
-
-    auto action = std::make_unique<Action>();
-    action->originalConfig = configValue;
-    action->setFileName(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "path", "")));
-    vector<string> arguments;
-    for (const auto &arg : Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(configValue, "args"))
+    std::unique_ptr<Action> action;
+    try
     {
-        // Use the same newline placeholder as user-defined action arguments.
-        std::string argument = std::string(Mantids30::DataFormat::JSON::ASSTRING_D(arg, ""));
-        if (Mantids30::DataFormat::JSON::ASBOOL(configValue, "appendNewLineToEachArgv", false))
-        {
-            argument += "%N%";
-        }
-        arguments.push_back(argument);
+        const auto previous = actions.find(actionName);
+        action = std::make_unique<Action>(Action::fromConfig(configValue, previous == actions.end() ? nullptr : previous->second.get()));
     }
-    action->setArguments(arguments);
+    catch (const std::exception &)
+    {
+        LOG_APP->log0(__func__, Logs::WARNING, "Invalid action configuration.");
+        return false;
+    }
 
     actions.insert_or_assign(actionName, std::move(action));
 
@@ -735,21 +718,70 @@ bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
     {
         return false;
     }
-    if (readActionsFileConfig() == configValue)
+    std::unique_lock<std::shared_mutex> lock(rulesMutex);
+    std::map<std::string, std::unique_ptr<Action>> replacement;
+    boost::json::array normalized;
+    try
     {
-        actionsModified = false;
-        return true;
+        for (const auto &definition : configValue.as_array())
+        {
+            const auto name = std::string(Mantids30::DataFormat::JSON::ASSTRING(definition, "name", ""));
+            const auto previous = actions.find(name);
+            auto action = std::make_unique<Action>(Action::fromConfig(definition, previous == actions.end() ? nullptr : previous->second.get()));
+            if (replacement.count(name) != 0)
+            {
+                return false;
+            }
+            normalized.push_back(action->originalConfig);
+            replacement.emplace(name, std::move(action));
+        }
     }
-
-    std::ofstream configFile(actionsFilePath, std::ifstream::binary);
-    if (!configFile.is_open())
+    catch (const std::exception &)
     {
         return false;
     }
-    configFile << configValue;
-    configFile.close();
-
-    reloadActions();
+    const auto document = boost::json::serialize(normalized);
+    std::string temporary = actionsFilePath + ".XXXXXX";
+    const int descriptor = mkstemp(temporary.data());
+    if (descriptor == -1)
+    {
+        return false;
+    }
+    // mkstemp creates mode 0600, and rename never exposes a partial credential file.
+    bool success = true;
+    size_t offset = 0;
+    while (offset < document.size())
+    {
+        const auto count = write(descriptor, document.data() + offset, document.size() - offset);
+        if (count < 0 && errno == EINTR)
+        {
+            continue;
+        }
+        if (count <= 0)
+        {
+            success = false;
+            break;
+        }
+        offset += static_cast<size_t>(count);
+    }
+    if (success && fsync(descriptor) != 0)
+    {
+        success = false;
+    }
+    if (close(descriptor) != 0)
+    {
+        success = false;
+    }
+    if (success && std::rename(temporary.c_str(), actionsFilePath.c_str()) != 0)
+    {
+        success = false;
+    }
+    if (!success)
+    {
+        std::remove(temporary.c_str());
+        return false;
+    }
+    actions = std::move(replacement);
     actionsModified = false;
     return true;
 }

@@ -14,6 +14,7 @@
 #include <Mantids30/Scripting/JSONExprEval/jsoneval.h>
 #include <shared_mutex>
 
+#include "action.h"
 #include <audit_json.h>
 #include <boost/property_tree/ptree.hpp>
 
@@ -39,26 +40,6 @@ struct Rule
     std::string filter;
     std::unique_ptr<Mantids30::Scripting::JSONExprEval::JSONEval> expression;
 
-    boost::json::value originalConfig;
-};
-
-/** @brief Own an executable path and its configured argument vector. */
-struct Action
-{
-    /**
-     * @brief Store the executable name or path for this action.
-     * @param fileName Executable name or path to store.
-     */
-    void setFileName(const std::string &fileName) { file = fileName; }
-
-    /**
-     * @brief Store action arguments, including the configured argv[0].
-     * @param arguments Action argument vector, including the configured argv[0].
-     */
-    void setArguments(const std::vector<std::string> &arguments) { this->arguments = arguments; }
-
-    std::string file;
-    std::vector<std::string> arguments;
     boost::json::value originalConfig;
 };
 
@@ -114,7 +95,7 @@ public:
     /**
      * @brief Evaluate rules in order and execute matching actions until an abort rule stops traversal.
      * @param values Parsed event used for expression evaluation and JSON-path substitutions.
-     * @return True if at least one rule matched, regardless of action process exit status.
+     * @return True if at least one rule matched, regardless of action delivery status.
      */
     static bool evaluate(const boost::json::value &values);
 
@@ -191,7 +172,7 @@ public:
      */
     static bool writeRulesFileConfig(const boost::json::value &configValue);
     /**
-     * @brief Persist an array of actions and reload it when the contents change.
+     * @brief Validate and atomically persist a private action snapshot before replacing running actions.
      * @param configValue JSON configuration or RPC arguments expected by this operation.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
@@ -219,11 +200,11 @@ public:
      */
     static boost::json::array getCurrentRunningRules();
     /**
-     * @brief Return the original configurations of all registered actions.
+     * @brief Return private configurations of all registered actions; redact before external reads.
      */
     static boost::json::array getCurrentRunningActions();
     /**
-     * @brief Return the original configuration of a named action, or JSON null if absent.
+     * @brief Return a private action configuration, or JSON null if absent; redact before external reads.
      * @param actionName Identifier of the configured action.
      * @return Original action configuration, or JSON null if the name is absent.
      */
@@ -246,7 +227,7 @@ public:
      */
     static bool reloadRules();
     /**
-     * @brief Replace running actions from the configured file under the rules lock.
+     * @brief Validate the entire file before replacing running actions under the rules lock.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
     static bool reloadActions();
@@ -299,13 +280,12 @@ private:
     static void runQueueCounters();
 
     /**
-     * @brief Expand a private copy of configured arguments and execute the action synchronously.
-     * @param ruleName Rule name used for logging and rule-name placeholders.
-     * @param file Executable name or path passed to execvp.
-     * @param arguments Action argument vector, including the configured argv[0].
-     * @param values Parsed event used for expression evaluation and JSON-path substitutions.
+     * @brief Render event input and dispatch a validated action synchronously.
+     * @param ruleName Rule name for legacy argument expansion and diagnostics.
+     * @param action Validated command or network action.
+     * @param values Event supplied as the root MantidsLang context.
      */
-    static void executeAction(const std::string &ruleName, const char *file, std::vector<std::string> arguments, const boost::json::value &values);
+    static void executeAction(const std::string &ruleName, const Action &action, const boost::json::value &values);
     /**
      * @brief Expand action placeholders in every argument except the configured argv[0].
      * @param arguments Action argument vector, including the configured argv[0].

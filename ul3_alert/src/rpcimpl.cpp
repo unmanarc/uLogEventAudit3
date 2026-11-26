@@ -169,7 +169,7 @@ bool RpcImpl::controlWriteActionsFileConfig(void *, const std::string &, const b
 
 boost::json::value RpcImpl::statReadActionsFileConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    return Filters::Rules::readActionsFileConfig();
+    return Filters::Action::redact(Filters::Rules::readActionsFileConfig());
 }
 
 bool RpcImpl::statAreActionsModified(void *, const std::string &, const boost::json::value &, void *, const std::string &)
@@ -179,12 +179,12 @@ bool RpcImpl::statAreActionsModified(void *, const std::string &, const boost::j
 
 boost::json::array RpcImpl::statReadRunningActions(void *, const std::string &, const boost::json::value &, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningActions();
+    return Filters::Action::redact(Filters::Rules::getCurrentRunningActions()).as_array();
 }
 
 boost::json::value RpcImpl::statReadRunningAction(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
 {
-    return Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", "")));
+    return Filters::Action::redact(Filters::Rules::getCurrentRunningAction(std::string(Mantids30::DataFormat::JSON::ASSTRING(configValue, "name", ""))));
 }
 
 bool RpcImpl::controlRemoveInput(void *, const std::string &, const boost::json::value &configValue, void *, const std::string &)
