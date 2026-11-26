@@ -4,6 +4,7 @@
  */
 #include "rpcserverimpl.h"
 #include "globals.h"
+#include "resource_sensing.h"
 #include <Mantids30/Network/Sockets/socket_tls.h>
 #include <boost/algorithm/string/predicate.hpp>
 using namespace Mantids30;
@@ -53,6 +54,7 @@ bool RpcServerImpl::createRpcListener()
     }
     Globals::fastRpc = std::make_shared<Protocol::FastRPC1>();
     Globals::fastRpc->setRemoteExecutionDisconnectedTries(0);
+    Globals::fastRpc->addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
     Globals::rpcListener = std::make_shared<Network::Sockets::Acceptors::MultiThreaded>();
     Globals::rpcListener->parameters.setMaxConcurrentClients(config.get<uint32_t>("RPCServer.MaxClients", 16));
     Globals::rpcListener->callbacks.onClientConnected = onRpcConnected;

@@ -3,6 +3,7 @@
  * @brief Implementation for ul3_web/src/main.
  */
 #include "globals.h"
+#include "resource_sensing.h"
 #include "rpcserverimpl.h"
 #include "webserverimpl.h"
 #include <Mantids30/ConfigBuilder/Runtime_Logs/config_builder.h>
@@ -50,6 +51,15 @@ public:
         LOG_APP = ConfigBuilder::Runtime_Logs::Builder::createAppLog(*config);
         LOG_RPC = ConfigBuilder::Runtime_Logs::Builder::createRPCLog(*config);
         std::filesystem::current_path(configDirectory);
+        try
+        {
+            UL3::ResourceSensing::instance().start(Globals::config, "web");
+        }
+        catch (const std::exception &error)
+        {
+            LOG_APP->log0(__func__, Runtime::Logs::CRITICAL, "Cannot start resource sensing: %s", error.what());
+            return false;
+        }
         return true;
     }
     /**
@@ -72,6 +82,7 @@ public:
      */
     void _shutdown() override
     {
+        UL3::ResourceSensing::instance().stop();
         Globals::webServer.reset();
         if (Globals::fastRpc)
         {

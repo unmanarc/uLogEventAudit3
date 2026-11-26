@@ -2,6 +2,7 @@ project(ul3_web VERSION ${SVERSION} LANGUAGES CXX DESCRIPTION "uLogEventAudit3 u
 configure_file(src/config.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/config.h")
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 add_executable(ul3_web ${SOURCES})
+target_link_libraries(ul3_web PRIVATE audit_resource_sensing)
 audit_target(ul3_web
     Mantids30_Runtime_Service
     Mantids30_Runtime_Logs

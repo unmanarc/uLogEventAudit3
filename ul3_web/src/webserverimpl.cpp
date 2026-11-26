@@ -4,11 +4,13 @@
  */
 #include "webserverimpl.h"
 #include "globals.h"
+#include "resource_sensing.h"
 #include <Mantids30/Client/APISync/apisync.h>
 #include <Mantids30/ConfigBuilder/Server_WebRESTFul/config_builder.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <config.h>
 #include <cstdlib>
+#include <future>
 using namespace Mantids30;
 using namespace UL3::WEB;
 using namespace Server::WebRESTFul;
@@ -25,6 +27,45 @@ struct Route
 Route routes[] = {
 #include "rest_routes.inc"
 };
+/** @brief Fixed supported resource resolutions; callers cannot choose arbitrary RPC targets. */
+std::string resourceResolutions[] = {"3s", "1m", "60m"};
+
+/** @brief Fetch a remote process history while isolating disconnected or failed services. */
+boost::json::object remoteResources(const char *target, const std::string &resolution)
+{
+    if (!Globals::fastRpc->checkConnectionKey(target))
+    {
+        return {{"available", false}, {"error", "service_disconnected"}};
+    }
+    boost::json::value error;
+    auto result = Globals::fastRpc->runRemoteRPCMethod(target, "stats.ResourceMonitor",
+                                                      boost::json::object{{"resolution", resolution}}, &error, false);
+    if (!DataFormat::JSON::ASBOOL(error, "succeed", false) || !result.is_object()
+        || !result.as_object().if_contains("samples"))
+    {
+        return {{"available", false}, {"error", "resource_sensing_unavailable"}};
+    }
+    auto history = std::move(result.as_object());
+    history["available"] = true;
+    return history;
+}
+
+/** @brief Combine three independent process histories under the authenticated stats scope. */
+APIReturn resourceOverview(void *context, const RESTful::RequestContext &, Sessions::ClientDetails &)
+{
+    const auto &resolution = *static_cast<std::string *>(context);
+    // Parallel calls bound the wait to one RPC timeout if both peers are unresponsive.
+    auto alerts = std::async(std::launch::async, remoteResources, "ALERTS", resolution);
+    auto log2json = std::async(std::launch::async, remoteResources, "LOG2JSON", resolution);
+    auto web = UL3::ResourceSensing::instance().history(resolution);
+    web["available"] = true;
+    APIReturn response(boost::json::object{
+        {"resolution", resolution},
+        {"components", boost::json::object{{"web", std::move(web)},
+                                            {"alerts", alerts.get()}, {"log2json", log2json.get()}}}});
+    response.httpExtraHeaders["Cache-Control"] = "no-store";
+    return response;
+}
 /**
  * @brief Return authenticated session metadata and prevent response caching.
  * @param request Mantids30 request with a validated JWT token.
@@ -121,6 +162,11 @@ bool WebServerImpl::createWebServer()
     }
     auto endpoints = std::make_shared<RESTful::Endpoints>();
     endpoints->addEndpoint(Method::GET, "session", Security::JWT_COOKIE_AUTH, {}, nullptr, &sessionInfo);
+    for (auto &resolution : resourceResolutions)
+    {
+        endpoints->addEndpoint(Method::GET, "resources/" + resolution, Security::JWT_COOKIE_AUTH,
+                               {"stats"}, &resolution, &resourceOverview);
+    }
     for (auto &route : routes)
     {
         const std::string scope = route.verb == Method::GET ? "stats" : "control";
