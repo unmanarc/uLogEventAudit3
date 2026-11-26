@@ -1,5 +1,6 @@
 /** @file @brief Verify endpoint validation, pending changes and transactional persistence. */
 #include "endpointconfig.h"
+#include "../common/config_directory.h"
 
 #include <filesystem>
 #include <fstream>
@@ -22,8 +23,7 @@ static void require(bool condition, const char *message)
 /** @brief Read the complete persisted document for preservation checks. */
 static std::string read(const std::filesystem::path &path)
 {
-    std::ifstream input(path);
-    return {std::istreambuf_iterator<char>(input), {}};
+    return boost::json::serialize(UL3::JSON::readConfigDirectory(path.string()));
 }
 
 /** @brief Require a rejected save to preserve the saved snapshot and file. */
@@ -48,10 +48,10 @@ static void reject(EndpointConfig &config, const boost::json::array &definitions
 /** @brief Exercise both schemas, restart semantics, failed saves and malformed startup files. */
 static void check(const std::filesystem::path &directory, bool inputs)
 {
-    const auto path = directory / (inputs ? "inputs.json" : "outputs.json");
+    const auto path = directory / (inputs ? "inputs.d" : "outputs.d");
     const auto key = inputs ? "inputs" : "outputs";
     const auto portKey = inputs ? "ListenPort" : "Port";
-    std::ofstream(path) << "[]";
+    std::filesystem::create_directory(path);
     EndpointConfig config(inputs);
     require(config.load(path.string()).empty(), "Empty array rejected");
     const boost::json::object endpoint{{"id", "first"}, {"Description", "Unicode λ \"quoted\"\nendpoint"},
@@ -61,7 +61,7 @@ static void check(const std::filesystem::path &directory, bool inputs)
     require(config.read().at("modified").as_bool(), "Saved change not pending");
     require(boost::json::parse(read(path)) == saved, "Saved file changed values");
     struct stat status{};
-    require(stat(path.c_str(), &status) == 0 && (status.st_mode & 0777) == 0600, "Saved file permissions not private");
+    require(stat(std::filesystem::directory_iterator(path)->path().c_str(), &status) == 0 && (status.st_mode & 0777) == 0600, "Saved file permissions not private");
     config.load(path.string());
     require(!config.read().at("modified").as_bool(), "Restart did not clear pending changes");
     config.replace({});
@@ -105,8 +105,8 @@ static void check(const std::filesystem::path &directory, bool inputs)
     }
 
     // A rename failure must clean up the temporary file and retain the snapshot.
-    std::filesystem::remove(path);
-    std::filesystem::create_directory(path);
+    std::filesystem::remove_all(path);
+    std::ofstream(path) << "blocked";
     const auto before = config.read();
     bool failed = false;
     try
@@ -123,9 +123,10 @@ static void check(const std::filesystem::path &directory, bool inputs)
         require(entry.path().filename().string().find(".json.") == std::string::npos, "Temporary file leaked");
     }
     std::filesystem::remove(path);
+    std::filesystem::create_directory(path);
     for (const auto *document : {"null", "{}", "[", "[42]"})
     {
-        std::ofstream(path) << document;
+        std::ofstream(path / "invalid.json") << document;
         failed = false;
         try
         {
@@ -137,6 +138,67 @@ static void check(const std::filesystem::path &directory, bool inputs)
         }
         require(failed && config.read() == before, "Bad startup file changed configuration");
     }
+}
+
+/** @brief Verify copied files, order, nested arrays, ignored files and all-or-nothing saves. */
+static void checkDirectory(const std::filesystem::path &directory)
+{
+    namespace fs = std::filesystem;
+    const auto path = directory / "collection.d";
+    fs::create_directory(path);
+    const boost::json::object first{{"name", "../first/λ"}, {"args", boost::json::array{"one", "two"}}};
+    const boost::json::object second{{"name", "second"}};
+    std::ofstream(path / "20-second.json") << second;
+    std::ofstream(path / "10-first.json") << first;
+    std::ofstream(path / "notes.txt") << "keep";
+    std::ofstream(path / "disabled.json.disabled") << "not JSON";
+    const boost::json::array expected{first, second};
+    require(UL3::JSON::readConfigDirectory(path.string()) == expected, "Copied file ordering changed");
+    UL3::JSON::writeConfigDirectory(path.string() + "/", {second, first});
+    require(UL3::JSON::readConfigDirectory(path.string()) == boost::json::array{second, first}, "Saved order changed");
+    require(fs::exists(path / "notes.txt") && fs::exists(path / "disabled.json.disabled"), "Unrelated files removed");
+    bool failed = false;
+    try
+    {
+        UL3::JSON::writeConfigDirectory(path.string(), {first, 42});
+    }
+    catch (const std::exception &)
+    {
+        failed = true;
+    }
+    require(failed && UL3::JSON::readConfigDirectory(path.string()) == boost::json::array{second, first},
+            "Partial save changed collection");
+    for (const auto &entry : fs::directory_iterator(directory))
+    {
+        require(entry.path().filename().string().find("collection.d.") != 0, "Staging directory leaked");
+    }
+    std::ofstream(path / "invalid.json") << "[]";
+    failed = false;
+    try
+    {
+        UL3::JSON::readConfigDirectory(path.string());
+    }
+    catch (const std::exception &)
+    {
+        failed = true;
+    }
+    require(failed, "Array document accepted in collection");
+    fs::remove(path / "invalid.json");
+    fs::create_symlink(path / "notes.txt", path / "link.json");
+    failed = false;
+    try
+    {
+        UL3::JSON::readConfigDirectory(path.string());
+    }
+    catch (const std::exception &)
+    {
+        failed = true;
+    }
+    require(failed, "Symlink JSON entry accepted");
+    fs::remove(path / "link.json");
+    UL3::JSON::writeConfigDirectory(path.string(), {});
+    require(UL3::JSON::readConfigDirectory(path.string()).empty(), "Last deletion left entries");
+    fs::remove_all(path);
 }
 
 /** @brief Run in an isolated directory and remove all test artifacts. */
@@ -151,6 +213,7 @@ int main()
     const std::filesystem::path directory(created);
     try
     {
+        checkDirectory(directory);
         check(directory, true);
         check(directory, false);
         std::filesystem::remove_all(directory);

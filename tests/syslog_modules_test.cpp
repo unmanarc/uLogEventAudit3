@@ -80,7 +80,7 @@ static void checkFraming()
 /** @brief Exercise rendering through the common event interface and durable module updates. */
 static void checkModules(const std::filesystem::path &directory)
 {
-    const auto path = directory / "modules.json";
+    const auto path = directory / "modules.d";
     Input::SyslogModules::load(path.string());
     require(Input::SyslogModules::getConfig().empty(), "Missing file did not start empty");
     const boost::json::object module{
@@ -135,15 +135,15 @@ static void checkModules(const std::filesystem::path &directory)
     require(Input::SyslogModules::render("sshd", "user=bob count=7").empty(), "Removed modules survived restart");
 
     // A missing parent directory must leave the active configuration untouched.
-    Input::SyslogModules::load((directory / "unwritable" / "modules.json").string());
+    Input::SyslogModules::load((directory / "unwritable" / "modules.d").string());
     reject(configuration, {});
     require(!std::filesystem::exists(directory / "unwritable"), "Failed persistence created a directory");
 
     // Force the atomic rename to fail after writing and syncing a temporary file.
     Input::SyslogModules::load(path.string());
     Input::SyslogModules::replace(configuration);
-    std::filesystem::remove(path);
-    std::filesystem::create_directory(path);
+    std::filesystem::remove_all(path);
+    std::ofstream(path) << "blocked";
     reject({}, configuration);
     for (const auto &entry : std::filesystem::directory_iterator(directory))
     {
