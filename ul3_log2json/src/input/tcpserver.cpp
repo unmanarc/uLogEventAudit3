@@ -10,7 +10,6 @@
 #include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include <Mantids30/Network/Sockets/socket_tcp.h>
 
-#include <boost/property_tree/ini_parser.hpp>
 #include <cinttypes>
 
 using namespace std;
@@ -63,22 +62,12 @@ TcpServer::TcpServer()
     processedLinesCount = 0;
 }
 
-bool TcpServer::loadConfig(const string &file)
+bool TcpServer::loadConfig(const boost::json::object &configValue)
 {
-    if (!access(file.c_str(), R_OK))
-    {
-        boost::property_tree::ini_parser::read_ini(file, config);
-    }
-    else
-    {
-        LOG_APP->log0(__func__, Logs::WARNING, "Failed to load receptor configuration file %s, insufficient permissions?", file.c_str());
-        return false;
-    }
-
-    listenAddress = config.get<string>("ListenAddr", "127.0.0.1");
-    listenPort = config.get<uint16_t>("ListenPort", 10514);
-    description = config.get<string>("Description", "Log receiver @" + listenAddress + ":" + to_string(listenPort));
-
+    config = configValue;
+    listenAddress = std::string(config.at("ListenAddr").as_string());
+    listenPort = boost::json::value_to<uint16_t>(config.at("ListenPort"));
+    description = std::string(config.at("Description").as_string());
     return true;
 }
 

@@ -7,7 +7,6 @@
 #include "tcplineprocessor.h"
 #include <Mantids30/Network/Sockets/acceptor_multithreaded.h>
 #include <atomic>
-#include <boost/property_tree/ptree.hpp>
 #include <mutex>
 #include <set>
 
@@ -24,10 +23,10 @@ public:
 
     /**
      * @brief Load the configuration required to initialize this input or output.
-     * @param file Path of the INI configuration file.
+     * @param configValue Validated JSON endpoint definition.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    bool loadConfig(const std::string &file);
+    bool loadConfig(const boost::json::object &configValue);
     /**
      * @brief Bind the configured address and start the Mantids30 connection acceptor.
      */
@@ -70,7 +69,7 @@ public:
 private:
     std::shared_ptr<Mantids30::Network::Sockets::Acceptors::MultiThreaded> acceptor = std::make_shared<Mantids30::Network::Sockets::Acceptors::MultiThreaded>();
 
-    boost::property_tree::ptree config;
+    boost::json::object config;
     std::string listenAddress, description;
     uint16_t listenPort{};
     std::atomic<uint64_t> processedLinesCount{}, invalidLinesCount{};

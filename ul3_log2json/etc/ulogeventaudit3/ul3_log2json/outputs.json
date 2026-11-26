@@ -1,0 +1,24 @@
+[
+    {
+        "id": "alerts",
+        "Description": "Output for Alert Engine",
+        "Host": "127.0.0.1",
+        "Port": 9999,
+        "TransmissionMode": 0,
+        "TimeoutSecs": 10,
+        "ReconnectSleepTimeInSecs": 3,
+        "MaxQueuedItems": 500000,
+        "QueuePushTimeoutInMS": 0
+    },
+    {
+        "id": "remotelog",
+        "Description": "Output for any JSON based log system",
+        "Host": "127.0.0.1",
+        "Port": 18200,
+        "TransmissionMode": 1,
+        "TimeoutSecs": 10,
+        "ReconnectSleepTimeInSecs": 3,
+        "MaxQueuedItems": 500000,
+        "QueuePushTimeoutInMS": 0
+    }
+]

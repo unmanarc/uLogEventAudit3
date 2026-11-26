@@ -10,7 +10,6 @@
 #include <memory>
 
 #include <audit_json.h>
-#include <boost/property_tree/ptree.hpp>
 
 namespace UL3::LOG2JSON::Output {
 
@@ -29,10 +28,10 @@ public:
 
     /**
      * @brief Load the configuration required to initialize this input or output.
-     * @param file Path of the INI configuration file.
+     * @param configValue Validated JSON endpoint definition.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    bool loadConfig(const std::string &file) override;
+    bool loadConfig(const boost::json::object &configValue) override;
     /**
      * @brief Copy an event into the Mantids30 output queue or count a rejected enqueue.
      * @param eventJson Serialized event copied to the output queues.
@@ -69,7 +68,7 @@ private:
     std::atomic<bool> connected{false};
     std::atomic<uint64_t> dropped{0}, processed{0};
     uint32_t pushTimeoutMs{};
-    boost::property_tree::ptree config;
+    boost::json::object config;
 };
 
 } // namespace UL3::LOG2JSON::Output

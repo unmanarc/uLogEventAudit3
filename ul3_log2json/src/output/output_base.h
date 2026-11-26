@@ -24,10 +24,10 @@ public:
 
     /**
      * @brief Load the configuration required to initialize this input or output.
-     * @param file Path of the INI configuration file.
+     * @param configValue Validated JSON endpoint definition.
      * @return True when the operation accepts the request; false if it cannot be applied.
      */
-    virtual bool loadConfig(const std::string &file) = 0;
+    virtual bool loadConfig(const boost::json::object &configValue) = 0;
     /**
      * @brief Return a JSON snapshot of counters and current resource usage.
      */

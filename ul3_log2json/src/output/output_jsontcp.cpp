@@ -31,24 +31,14 @@ JsonTcpOutput::JsonTcpOutput()
 
 JsonTcpOutput::~JsonTcpOutput() = default;
 
-bool JsonTcpOutput::loadConfig(const std::string &file)
+bool JsonTcpOutput::loadConfig(const boost::json::object &configValue)
 {
-    if (!access(file.c_str(), R_OK))
-    {
-        boost::property_tree::ini_parser::read_ini(file, config);
-    }
-    else
-    {
-        LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to load Output JSON TCP Configuration: %s... Invalid Permissions", file.c_str());
-        return false;
-    }
-
-    server = config.get<std::string>("Host", "127.0.0.1");
-    port = config.get<uint16_t>("Port", 18200);
-    description = config.get<std::string>("Description", "JSON TCP Output to " + server + ":" + to_string(port));
-    pendingEvents.setMaxItems(config.get<size_t>("MaxQueuedItems", 1000000));
-    pushTimeoutMs = config.get<uint32_t>("QueuePushTimeoutInMS", 0);
-
+    config = configValue;
+    server = std::string(config.at("Host").as_string());
+    port = boost::json::value_to<uint16_t>(config.at("Port"));
+    description = std::string(config.at("Description").as_string());
+    pendingEvents.setMaxItems(boost::json::value_to<size_t>(config.at("MaxQueuedItems")));
+    pushTimeoutMs = boost::json::value_to<uint32_t>(config.at("QueuePushTimeoutInMS"));
     return true;
 }
 
@@ -72,7 +62,7 @@ void JsonTcpOutput::startThread()
 
 void JsonTcpOutput::process()
 {
-    uint16_t transmissionMode = config.get<uint16_t>("TransmitionMode", 0);
+    uint16_t transmissionMode = boost::json::value_to<uint16_t>(config.at("TransmissionMode"));
 
     // INITIAL CONNECT ATTEMPT:
     while (!reconnect())
@@ -102,9 +92,6 @@ void JsonTcpOutput::process()
 
 boost::json::object JsonTcpOutput::getStats()
 {
-    std::string server = config.get<std::string>("Host", "127.0.0.1");
-    uint16_t port = config.get<uint16_t>("Port", 18200);
-
     boost::json::object outputStats{{"id", server + ":" + to_string(port)},
                                     {"queue",
                                      boost::json::object{{"size", static_cast<uint64_t>(pendingEvents.size())},
@@ -120,13 +107,13 @@ bool JsonTcpOutput::reconnect()
 {
     connection = std::make_unique<Mantids30::Network::Sockets::Socket_TCP>();
 
-    if (!connection->connectTo(server.c_str(), port, config.get<uint32_t>("TimeoutSecs", 10)))
+    if (!connection->connectTo(server.c_str(), port, boost::json::value_to<uint32_t>(config.at("TimeoutSecs"))))
     {
         std::string msg = connection->getLastError();
         boost::replace_all(msg, "\n", ",");
         LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "JSONTCP connection error to %s:%" PRIu16 ": %s", server.c_str(), port, msg.c_str());
         connected = false;
-        sleep(config.get<uint32_t>("ReconnectSleepTimeInSecs", 3));
+        sleep(boost::json::value_to<uint32_t>(config.at("ReconnectSleepTimeInSecs")));
         return false;
     }
     else
