@@ -48,6 +48,7 @@ function renderEndpoints() {
                 button.type = "button";
                 button.className = `btn btn-sm ${style}`;
                 button.textContent = title;
+                button.setAttribute("data-icon", title === "Edit" ? "edit" : "remove");
                 button.setAttribute("aria-label", `${title} endpoint ${definition.Description}`);
                 button.addEventListener("click", handler);
                 controls.appendChild(button);

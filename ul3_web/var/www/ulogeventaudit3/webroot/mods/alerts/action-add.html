@@ -15,7 +15,7 @@
         <div class="form-check"><input class="form-check-input" type="checkbox" id="appendNewLineToEachArgv"><label class="form-check-label" for="appendNewLineToEachArgv">Append a newline to each program argument</label></div>
         <p class="form-text">Arguments are optional and retain legacy percent placeholders. Event content belongs in the stdin template.</p>
         <div id="arguments"><div class="form-group"><label for="inputArg0">Argument 0 · program name</label><input type="text" class="form-control code-input" id="inputArg0" placeholder="Defaults to the executable path"></div></div>
-        <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary" onclick="addNewArgument()">Add argument</button><button type="button" class="btn btn-outline-secondary" id="remove-argument" onclick="remLastArgument()" disabled>Remove last argument</button></div>
+        <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary" onclick="addNewArgument()" data-icon="add">Add argument</button><button type="button" class="btn btn-outline-secondary" id="remove-argument" onclick="remLastArgument()" disabled data-icon="remove">Remove last argument</button></div>
     </fieldset>
     <fieldset class="form-section" data-action-types="http_post" hidden><legend>HTTP POST</legend>
         <div class="form-group"><label for="url">Destination URL</label><input type="url" class="form-control" id="url" placeholder="https://alerts.example.com/events" required><div class="form-text">A fixed HTTP or HTTPS destination. Redirects are not followed.</div></div>
@@ -38,7 +38,7 @@
     </fieldset>
     <details class="form-section"><summary>Template help</summary><p class="form-text">Templates use MantidsLang with the input event JSON as the root context. JSON output: <code>&#123;&#123;#print_json[$]!&#125;&#125;</code>. Text field: <code>&#123;&#123;#print_raw[$INFO.host]!&#125;&#125;</code>. HTML-escaped field: <code>&#123;&#123;#print_htmlescaped[$INFO.host]!&#125;&#125;</code>. Conditions and foreach loops are supported. File includes are disabled. Use print_json for values embedded in a JSON body.</p></details>
     <p class="form-text">Changes apply to the running configuration. Use Save to disk on the actions page to keep them after a restart.</p>
-    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/actions.html">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit">Add action</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;">Save changes</button></div>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/actions.html" data-icon="cancel">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit" data-icon="add">Add action</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;" data-icon="save">Save changes</button></div>
 </form>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

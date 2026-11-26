@@ -11,6 +11,7 @@
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="/assets/css/progress.css" rel="stylesheet">
     <link href="/assets/css/console.css" rel="stylesheet">
+    <link href="/assets/css/icons.css" rel="stylesheet">
     <script src="/assets/js/jquery.min.js"></script>
     <script src="/assets/js/audit.js"></script>
     <!-- imported auth assets: -->
@@ -55,23 +56,22 @@
     <button class="sidebar-backdrop" id="sidebar-backdrop" type="button" aria-label="Close navigation" hidden></button>
     <aside class="app-sidebar" id="app-sidebar" aria-label="Workspace navigation">
         <nav>
-            <a class="sidebar-home nav-link" href="/" data-page="home"><span class="nav-symbol"
-                    aria-hidden="true">⌂</span>Overview</a>
+            <a class="sidebar-home nav-link" href="/" data-page="home"><span class="nav-symbol" data-icon="home" aria-hidden="true"></span>Overview</a>
             {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
             <a class="nav-section-label" href="/mods/alerts/stats.html">Rules &amp; alerts</a>
             <ul class="nav flex-column">
-<li class="nav-item"><a class="nav-link" id="mainview-alerts-stats-link" href="/mods/alerts/stats.html"><span class="nav-symbol" aria-hidden="true">◫</span>Alert statistics</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-alerts-inputs-link" href="/mods/alerts/inputs.html"><span class="nav-symbol" aria-hidden="true">≋</span>Inputs</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-alerts-rules-link" href="/mods/alerts/rules.html"><span class="nav-symbol" aria-hidden="true">☷</span>Rules &amp; filters</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-alerts-actions-link" href="/mods/alerts/actions.html"><span class="nav-symbol" aria-hidden="true">◇</span>Actions</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-alerts-stats-link" href="/mods/alerts/stats.html"><span class="nav-symbol" data-icon="chart" aria-hidden="true"></span>Alert statistics</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-alerts-inputs-link" href="/mods/alerts/inputs.html"><span class="nav-symbol" data-icon="input" aria-hidden="true"></span>Inputs</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-alerts-rules-link" href="/mods/alerts/rules.html"><span class="nav-symbol" data-icon="rules" aria-hidden="true"></span>Rules &amp; filters</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-alerts-actions-link" href="/mods/alerts/actions.html"><span class="nav-symbol" data-icon="action" aria-hidden="true"></span>Actions</a></li>
             </ul>
             <a class="nav-section-label" href="/mods/log2json/events.html">Log to JSON</a>
             <ul class="nav flex-column">
-<li class="nav-item"><a class="nav-link" id="mainview-log2json-events-link" href="/mods/log2json/events.html"><span class="nav-symbol" aria-hidden="true">◫</span>Event processing</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-log2json-eventsph-link" href="/mods/log2json/eventsph.html"><span class="nav-symbol" aria-hidden="true">▤</span>Events by host</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-log2json-inputs-link" href="/mods/log2json/inputs.html"><span class="nav-symbol" aria-hidden="true">≋</span>Syslog &amp; auditd inputs</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-log2json-modules-link" href="/mods/log2json/modules.html"><span class="nav-symbol" aria-hidden="true">⌘</span>Syslog modules</a></li>
-<li class="nav-item"><a class="nav-link" id="mainview-log2json-outputs-link" href="/mods/log2json/outputs.html"><span class="nav-symbol" aria-hidden="true">⊡</span>JSON outputs</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-log2json-events-link" href="/mods/log2json/events.html"><span class="nav-symbol" data-icon="activity" aria-hidden="true"></span>Event processing</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-log2json-eventsph-link" href="/mods/log2json/eventsph.html"><span class="nav-symbol" data-icon="host" aria-hidden="true"></span>Events by host</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-log2json-inputs-link" href="/mods/log2json/inputs.html"><span class="nav-symbol" data-icon="input" aria-hidden="true"></span>Syslog &amp; auditd inputs</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-log2json-modules-link" href="/mods/log2json/modules.html"><span class="nav-symbol" data-icon="module" aria-hidden="true"></span>Syslog modules</a></li>
+<li class="nav-item"><a class="nav-link" id="mainview-log2json-outputs-link" href="/mods/log2json/outputs.html"><span class="nav-symbol" data-icon="output" aria-hidden="true"></span>JSON outputs</a></li>
             </ul>
             {{/if}}{{/foreach}}
         </nav>
@@ -85,7 +85,7 @@
         <div class="page-heading">
             <div>
                 <div class="page-eyebrow" id="page-section">Workspace</div>
-                <h1 id="apptitle">Overview</h1>
+                <h1 id="apptitle" data-icon="home">Overview</h1>
                 <p id="page-description">Your event pipeline at a glance.</p>
             </div>
             <div class="page-tools"><span class="data-status" id="data-status" role="status"

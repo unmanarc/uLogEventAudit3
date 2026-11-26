@@ -4,9 +4,9 @@
 <div id="endpoint-config" data-kind="outputs"></div>
 <div id="endpoint-restart" class="alert alert-warning" role="status" hidden>
     Saved input or output settings differ from the running configuration. Restart the service to apply them.
-    <button id="endpoint-reload" class="btn btn-danger btn-sm" type="button" hidden>Restart service</button>
+    <button id="endpoint-reload" class="btn btn-danger btn-sm" type="button" hidden data-icon="refresh">Restart service</button>
 </div>
-<div class="panel-toolbar"><h2 class="panel-title">Configured outputs</h2><button id="endpoint-add" class="btn btn-primary" type="button" disabled>New output</button></div>
+<div class="panel-toolbar"><h2 class="panel-title" data-icon="output">Configured outputs</h2><button id="endpoint-add" class="btn btn-primary" type="button" disabled data-icon="add">New output</button></div>
 <table class="table table-hover" aria-label="Configured outputs" data-empty="No outputs configured.">
     <thead><tr><th scope="col">Description</th><th scope="col">Remote host</th><th scope="col">TCP port</th><th scope="col">Controls</th></tr></thead>
     <tbody id="endpoints-list"></tbody>
@@ -15,7 +15,7 @@
 <p class="form-text">Saving and removing entries updates outputs.json. Changes take effect after restarting Log to JSON. A queue push timeout of zero discards overflow immediately.</p>
 <dialog id="endpoint-dialog" class="confirm-dialog module-dialog" aria-labelledby="endpoint-dialog-title">
     <form id="endpoint-form" class="editor-form">
-        <h2 id="endpoint-dialog-title">Output settings</h2>
+        <h2 id="endpoint-dialog-title" data-icon="output">Output settings</h2>
         <div class="form-group"><label for="endpoint-Description">Description</label><input id="endpoint-Description" class="form-control" type="text" required autofocus></div>
         <div class="form-group"><label for="endpoint-Host">Remote host</label><input id="endpoint-Host" class="form-control" type="text" required></div>
         <div class="form-group"><label for="endpoint-Port">TCP port</label><input id="endpoint-Port" class="form-control" type="number" min="1" max="65535" step="1" required></div>
@@ -25,11 +25,11 @@
         <div class="form-group"><label for="endpoint-MaxQueuedItems">Maximum queued events</label><input id="endpoint-MaxQueuedItems" class="form-control" type="number" min="1" max="9007199254740991" step="1" required></div>
         <div class="form-group"><label for="endpoint-QueuePushTimeoutInMS">Queue push timeout (milliseconds)</label><input id="endpoint-QueuePushTimeoutInMS" class="form-control" type="number" min="0" max="4294967295" step="1" required></div>
         <p id="endpoint-error" class="text-danger" role="alert"></p>
-        <div class="form-actions"><button id="endpoint-cancel" class="btn btn-outline-secondary" type="button">Cancel</button><button class="btn btn-primary" type="submit">Save configuration</button></div>
+        <div class="form-actions"><button id="endpoint-cancel" class="btn btn-outline-secondary" type="button" data-icon="cancel">Cancel</button><button class="btn btn-primary" type="submit" data-icon="save">Save configuration</button></div>
     </form>
 </dialog>
 <section aria-labelledby="endpoint-activity-title">
-<h2 id="endpoint-activity-title">Running output activity</h2>
+<h2 id="endpoint-activity-title" data-icon="activity">Running output activity</h2>
 <div id="span-log2json-output-body" data-empty="No JSON outputs configured.">
 </div>
 
@@ -57,7 +57,7 @@
 
 
                 <div class="stats-layout">
-                    <section class="queue-panel"><h2>Output JSON queue</h2>
+                    <section class="queue-panel"><h2 data-icon="queue">Output JSON queue</h2>
                         <div class="progress mx-auto" data-value="0" id="span-log2json-output-perc0-${i}" role="progressbar" aria-label="Output queue usage" aria-valuemin="0" aria-valuemax="100">
                             <span class="progress-left"><span class="progress-bar border-success" id="span-log2json-output-color0-${i}"></span></span><span class="progress-right"><span class="progress-bar border-success" id="span-log2json-output-color1-${i}"></span></span>
                             <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center"><span class="h2" id="span-log2json-output-perc1-${i}">—</span><span class="ms-1">%</span></div>

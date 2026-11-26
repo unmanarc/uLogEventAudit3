@@ -9,11 +9,11 @@
   }
 </script>
 
-<div class="stats-layout"><section class="queue-panel" aria-label="Queue capacity"><h2>Auditd event queue</h2>
+<div class="stats-layout"><section class="queue-panel" aria-label="Queue capacity"><h2 data-icon="queue">Auditd event queue</h2>
         <div class="progress mx-auto" data-value="0" id="log2json-eventsQueuePercentage0" role="progressbar" aria-label="Queue usage" aria-valuemin="0" aria-valuemax="100">
             <span class="progress-left"><span class="progress-bar border-success" id="log2json-eventsQueuePercentageCOLOR0"></span></span><span class="progress-right"><span class="progress-bar border-success" id="log2json-eventsQueuePercentageCOLOR1"></span></span>
             <div class="progress-value w-100 h-100 rounded-circle d-flex align-items-center justify-content-center"><span class="h2" id="log2json-eventsQueuePercentage1">—</span><span class="ms-1">%</span></div>
-        </div><div class="queue-count" id="log2json-eventsQueueSize">Waiting for data</div><div class="form-text">Queued / capacity</div></section><div><h2 class="panel-title">Processing metrics</h2><table class="table table-hover" aria-label="Processing metrics"><thead><tr><th scope="col">Event throughput</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Events · last 10 seconds</td><td class="text-end fw-semibold" id="log2json-queueInLast10Sec">—</td></tr></tbody><thead><tr><th scope="col">Event processing</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Dropped · queue full</td><td class="text-end fw-semibold" id="log2json-dropped">—</td></tr><tr><td>Total processed</td><td class="text-end fw-semibold" id="log2json-total">—</td></tr></tbody></table></div></div>
+        </div><div class="queue-count" id="log2json-eventsQueueSize">Waiting for data</div><div class="form-text">Queued / capacity</div></section><div><h2 class="panel-title" data-icon="chart">Processing metrics</h2><table class="table table-hover" aria-label="Processing metrics"><thead><tr><th scope="col">Event throughput</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Events · last 10 seconds</td><td class="text-end fw-semibold" id="log2json-queueInLast10Sec">—</td></tr></tbody><thead><tr><th scope="col">Event processing</th><th scope="col" class="text-end">Value</th></tr></thead><tbody><tr><td>Dropped · queue full</td><td class="text-end fw-semibold" id="log2json-dropped">—</td></tr><tr><td>Total processed</td><td class="text-end fw-semibold" id="log2json-total">—</td></tr></tbody></table></div></div>
 <script>
 function drawLog2JSONFilterStats(filterStats) {
 

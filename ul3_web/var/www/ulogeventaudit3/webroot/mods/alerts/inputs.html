@@ -50,12 +50,12 @@
   id="span-alerts-inputsmodified-body" style="visibility: collapse; display: none;">
   <strong>The input configuration has been modified!</strong> <br>
   Please reload the alert service to adopt the new changes.<br>
-  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button class="btn btn-danger btn-sm" role="button" onclick="javascript:reloadAlerts()">Reload service</button>{{/if}}{{/foreach}}
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button class="btn btn-danger btn-sm" role="button" onclick="javascript:reloadAlerts()" data-icon="refresh">Reload service</button>{{/if}}{{/foreach}}
 </div>
 
 
-<div class="panel-toolbar"><h2 class="panel-title">Configured listeners</h2>
-  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/input-add.html" class="btn btn-primary" role="button">Add input</a>{{/if}}{{/foreach}}
+<div class="panel-toolbar"><h2 class="panel-title" data-icon="input">Configured listeners</h2>
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/input-add.html" class="btn btn-primary" role="button" data-icon="add">Add input</a>{{/if}}{{/foreach}}
 </div>
 
 <div id="span-alerts-inputsconfig-body" data-empty="No inputs configured. Add a listener to receive JSON events."></div>
@@ -105,7 +105,7 @@
           <h2 id="span-alerts-inputsconfig-description-${i}"></h2>
           <dl><div><dt>Listen address</dt><dd id="span-alerts-inputsconfig-laddr-${i}"></dd></div><div><dt>TCP port</dt><dd id="span-alerts-inputsconfig-lport-${i}"></dd></div></dl>
           <input type="hidden" id="span-alerts-inputsconfig-id-${i}">
-          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button type="button" class="btn btn-danger btn-sm remove-input" onclick="removeInput('${i}')" aria-label="Remove input">Remove</button>{{/if}}{{/foreach}}
+          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button type="button" class="btn btn-danger btn-sm remove-input" onclick="removeInput('${i}')" aria-label="Remove input" data-icon="remove">Remove</button>{{/if}}{{/foreach}}
         </section>`
       );
       $(`#span-alerts-inputsconfig-description-${i}`).text(input["Description"]);
@@ -132,7 +132,7 @@
   }
 </script>
 <section aria-labelledby="input-activity-title">
-<h2 id="input-activity-title">Running input activity</h2>
+<h2 id="input-activity-title" data-icon="activity">Running input activity</h2>
 <div id="span-alerts-input-body" data-empty="No inputs reporting activity yet."></div>
 
 <script>

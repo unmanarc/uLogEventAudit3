@@ -49,7 +49,7 @@
         <div class="form-group"><label for="inputPort">TCP port</label><input type="number" class="form-control" id="inputPort" min="1" max="65535" step="1" value="9999" required aria-describedby="port-help"><div class="form-text" id="port-help">An available port between 1 and 65535.</div></div>
     </div></fieldset>
     <div class="alert alert-info">After adding an input, reload the alerts service from Inputs to apply the change.</div>
-    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/inputs.html">Cancel</a><button class="btn btn-primary" type="submit">Add input</button></div>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/inputs.html" data-icon="cancel">Cancel</a><button class="btn btn-primary" type="submit" data-icon="add">Add input</button></div>
 </form>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

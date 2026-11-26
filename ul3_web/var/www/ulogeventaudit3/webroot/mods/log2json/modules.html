@@ -9,7 +9,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
         <input type="search" class="form-control" id="table-search" data-target="modules-list" placeholder="Search modules" aria-controls="modules-list" autocomplete="off">
     </div>
-    <button id="module-add" class="btn btn-primary" type="button" disabled>New module</button>
+    <button id="module-add" class="btn btn-primary" type="button" disabled data-icon="add">New module</button>
 </div>
 <table class="table table-hover" aria-label="Syslog modules" data-empty="No syslog modules configured yet.">
     <thead><tr><th scope="col">Module name</th><th scope="col">Process / logger regex</th><th scope="col">Message regex</th><th scope="col" class="text-end">Controls</th></tr></thead>
@@ -22,7 +22,7 @@
 
 <dialog id="module-dialog" class="confirm-dialog module-dialog" aria-labelledby="module-dialog-title">
     <form id="module-form" class="editor-form">
-        <h2 id="module-dialog-title">New module</h2>
+        <h2 id="module-dialog-title" data-icon="module">New module</h2>
         <div class="form-group">
             <label for="module-name">Module name</label>
             <input id="module-name" name="name" class="form-control" type="text" required autofocus>
@@ -46,8 +46,8 @@
         </details>
         <p id="module-error" class="text-danger" role="alert"></p>
         <div class="form-actions">
-            <button id="module-cancel" class="btn btn-outline-secondary" type="button">Cancel</button>
-            <button class="btn btn-primary" type="submit">Save and apply</button>
+            <button id="module-cancel" class="btn btn-outline-secondary" type="button" data-icon="cancel">Cancel</button>
+            <button class="btn btn-primary" type="submit" data-icon="save">Save and apply</button>
         </div>
     </form>
 </dialog>
@@ -95,6 +95,7 @@
                     button.type = "button";
                     button.className = `btn btn-sm ${style}`;
                     button.textContent = title;
+                    button.setAttribute("data-icon", title === "Edit" ? "edit" : "remove");
                     button.setAttribute("aria-label", `${title} module ${definition.name}`);
                     button.addEventListener("click", handler);
                     controls.appendChild(button);

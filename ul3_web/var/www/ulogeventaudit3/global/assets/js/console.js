@@ -115,6 +115,7 @@ function auditConfirm(message) {
     });
 }
 
+/** @brief Initialize page identity, navigation icons and interactive controls. */
 function auditInitUI() {
     const key = location.pathname.replace(/^\/mods\//, "").replace(/\.html$/, "");
     const page = auditPages[key];
@@ -129,6 +130,8 @@ function auditInitUI() {
         const active = document.querySelector(`.app-sidebar .nav-link[href="/mods/${activeKey}.html"]`);
         active?.classList.add("active");
         active?.setAttribute("aria-current", "page");
+        // Keep the heading icon aligned with the parent page when adding or editing.
+        document.getElementById("apptitle").setAttribute("data-icon", active?.querySelector("[data-icon]")?.dataset.icon || "home");
     } else {
         const home = document.querySelector(".sidebar-home");
         home.classList.add("active");

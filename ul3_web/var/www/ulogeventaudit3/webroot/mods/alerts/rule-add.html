@@ -195,7 +195,7 @@
         <div id="actionOptions" class="form-group mt-4"><label for="actions">Action to execute</label><select class="form-select" id="actions" required aria-describedby="action-help"></select><div class="form-text" id="action-help">Choose an existing action. <a href="/mods/alerts/action-add.html">Create an action</a> if none are available.</div></div>
     </fieldset>
     <p class="form-text">Changes apply to the running configuration. Use Save to disk on the rules page to keep them after a restart.</p>
-    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/rules.html">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit">Add rule</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;">Save changes</button></div>
+    <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/rules.html" data-icon="cancel">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit" data-icon="add">Add rule</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;" data-icon="save">Save changes</button></div>
 </form>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}
