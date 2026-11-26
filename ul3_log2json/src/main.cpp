@@ -8,6 +8,7 @@
 #include <Mantids30/Network/Sockets/socket_tls.h>
 
 #include "globals.h"
+#include "resource_sensing.h"
 #include "rpcimpl.h"
 #include <config.h>
 
@@ -40,7 +41,10 @@ public:
     /**
      * @brief Handle the Mantids30 shutdown hook for this executable.
      */
-    void _shutdown() override {}
+    void _shutdown() override
+    {
+        UL3::ResourceSensing::instance().stop();
+    }
 
     /**
      * @brief Start this executable's listeners and service-lifetime workers.
@@ -196,6 +200,15 @@ public:
             return false;
         }
 
+        try
+        {
+            UL3::ResourceSensing::instance().start(mainConfig, "log2json");
+        }
+        catch (const std::exception &error)
+        {
+            LOG_APP->log0(__func__, Logs::CRITICAL, "Cannot start resource sensing: %s", error.what());
+            return false;
+        }
         return true;
     }
 };

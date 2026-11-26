@@ -6,6 +6,7 @@
 #include "audit_rpc.h"
 
 #include "globals.h"
+#include "resource_sensing.h"
 
 #include "events/events_distributionthreads.h"
 #include "events/events_manager.h"
@@ -82,6 +83,7 @@ void RpcImpl::runRpcClient()
     std::string rpcApiKey = Globals::getMainConfig()->get<std::string>("RPCConnector.Log2JSONApiKey", "REPLACEME_XABCXAPIX_LOG2JSON");
 
     Mantids30::Protocol::FastRPC1 fastRpc;
+    fastRpc.addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
 
     fastRpc.addMethod("stats.EventsPerHost", UL3::JSON::rpcMethod<&statEventsPerHost>());
     fastRpc.addMethod("stats.OutputsDistributionThreads", UL3::JSON::rpcMethod<&statOutputsDistributionThreads>());
