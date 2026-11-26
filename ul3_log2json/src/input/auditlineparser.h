@@ -8,6 +8,18 @@
 
 namespace UL3::LOG2JSON::Input {
 
+/** @brief Syslog framing shared by auditd and configurable module parsers. */
+struct SyslogLine
+{
+    std::string hostName;
+    std::string sourceIp;
+    std::string logger;
+    std::string message;
+};
+
+/** @brief Extract RFC3164 or RFC5424 framing, excluding the PID from the logger. */
+bool parseSyslogLine(const std::string &line, SyslogLine &result);
+
 /** @brief Parsed routing fields and the untouched audit record payload. */
 struct AuditLine
 {

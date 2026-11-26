@@ -16,14 +16,13 @@
 #include "events/events_distributionthreads.h"
 #include "events/events_manager.h"
 #include "input/inputs.h"
+#include "input/syslogmodules.h"
 #include "output/outputs.h"
 
 #include <sys/types.h>
 
 #include <csignal>
-#include <filesystem>
 #include <pwd.h>
-#include <set>
 #include <unistd.h>
 
 #include <cinttypes>
@@ -176,42 +175,24 @@ public:
         LOG_APP->enableAttributeNameLogging = false;
         LOG_APP->setDebug(Globals::getMainConfig()->get<bool>("Logs.Debug", false));
 
-        const auto loadDirectory = [&, functionName = __func__](const std::string &name, auto loadConfig)
+        try
         {
-            const auto directory = std::filesystem::path(configDirectory) / name;
-            std::error_code error;
-            std::filesystem::directory_iterator iterator(directory, error), end;
-            std::set<std::filesystem::path> files;
-            while (!error && iterator != end)
-            {
-                if (iterator->is_regular_file(error))
-                {
-                    files.insert(iterator->path());
-                }
-                if (!error)
-                {
-                    iterator.increment(error);
-                }
-            }
-            if (error)
-            {
-                LOG_APP->log0(functionName, Logs::ERROR, "Unable to list configuration directory %s: %s", directory.c_str(), error.message().c_str());
-                return false;
-            }
-            for (const auto &file : files)
-            {
-                LOG_APP->log0(functionName, Logs::INFO, "Loading configuration from %s", file.c_str());
-                loadConfig(file.string());
-            }
-            return true;
-        };
-
-        if (!loadDirectory("receptors.d", Input::Inputs::loadConfig))
+            Input::SyslogModules::load(mainConfig.get<std::string>("Syslog.ModulesFile", "syslog-modules.json"));
+        }
+        catch (const std::exception &error)
         {
+            LOG_APP->log0(__func__, Logs::CRITICAL, "Unable to load syslog modules: %s", error.what());
             return false;
         }
-        if (!loadDirectory("dispatchers.d", Output::Outputs::loadConfig))
+
+        try
         {
+            Input::Inputs::loadConfig(mainConfig.get<std::string>("Inputs.File", "inputs.json"));
+            Output::Outputs::loadConfig(mainConfig.get<std::string>("Outputs.File", "outputs.json"));
+        }
+        catch (const std::exception &error)
+        {
+            LOG_APP->log0(__func__, Logs::CRITICAL, "Unable to load TCP endpoints: %s", error.what());
             return false;
         }
 

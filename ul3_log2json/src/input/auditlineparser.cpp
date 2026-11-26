@@ -17,6 +17,35 @@ bool readNumber(const boost::ssub_match &field, T &result)
 }
 } // namespace
 
+bool parseSyslogLine(const std::string &line, SyslogLine &result)
+{
+    // Header matching is continuous so payload text cannot masquerade as framing.
+    static const boost::regex legacy(
+        R"((?:<[^>\r\n]*>(?:<([^<>\r\n]+)>)?)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +[0-9]{1,2} +[0-9]{2}:[0-9]{2}:[0-9]{2} +([^ \t\r\n]+) +([^ :\[\t\r\n]+)(?:\[[0-9]+\])?:[ \t]*)");
+    static const boost::regex modern(
+        R"(<[0-9]{1,3}>1 +[^ \r\n]+ +([^ \r\n]+) +([^ \r\n]+) +[^ \r\n]+ +[^ \r\n]+ +(?:-|(?:\[(?:[^\]\\\r\n]|\\.)*\])+)(?: |$))");
+    boost::smatch fields;
+    SyslogLine parsed;
+    if (boost::regex_search(line, fields, legacy, boost::match_continuous))
+    {
+        parsed.sourceIp = fields[1].str();
+        parsed.hostName = fields[2].str();
+        parsed.logger = fields[3].str();
+    }
+    else if (boost::regex_search(line, fields, modern, boost::match_continuous))
+    {
+        parsed.hostName = fields[1].str();
+        parsed.logger = fields[2].str();
+    }
+    else
+    {
+        return false;
+    }
+    parsed.message.assign(fields[0].second, line.cend());
+    result = std::move(parsed);
+    return true;
+}
+
 AuditLineStatus parseAuditLine(const std::string &line, AuditLine &result)
 {
     if (line.empty())
@@ -24,27 +53,24 @@ AuditLineStatus parseAuditLine(const std::string &line, AuditLine &result)
         return AuditLineStatus::Ignored;
     }
 
-    // Compile once; each invocation owns its captures and numeric conversions.
-    static const boost::regex syslogPattern(
-        R"((?:<[^>\r\n]*>(?:<([^<>\r\n]+)>)?)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) +[0-9]{1,2} +[0-9]{2}:[0-9]{2}:[0-9]{2} +([^ \t\r\n]+) +([^ :\[\t\r\n]+)(?:\[[0-9]+\])?:[ \t]*)");
     static const boost::regex auditPattern(R"([ \t]*(?:node=([^ \t\r\n]+)[ \t]+)?type=([^ \t\r\n]+)[ \t]+msg=audit\(([0-9]+)\.([0-9]+):([0-9]+)\):)");
 
     AuditLine parsed;
-    auto start = line.cbegin();
-    boost::smatch fields;
-    if (boost::regex_search(start, line.cend(), fields, syslogPattern, boost::match_continuous))
+    SyslogLine syslog;
+    const bool framed = parseSyslogLine(line, syslog);
+    if (framed)
     {
-        const auto program = fields[3].str();
-        if (program != "audispd" && program != "audisp-syslog")
+        if (syslog.logger != "audispd" && syslog.logger != "audisp-syslog")
         {
             return AuditLineStatus::Ignored;
         }
-        parsed.sourceIp = fields[1].str();
-        parsed.hostName = fields[2].str();
-        start = fields[0].second;
+        parsed.sourceIp = syslog.sourceIp;
+        parsed.hostName = syslog.hostName;
     }
 
-    if (!boost::regex_search(start, line.cend(), fields, auditPattern, boost::match_continuous))
+    const auto &message = framed ? syslog.message : line;
+    boost::smatch fields;
+    if (!boost::regex_search(message, fields, auditPattern, boost::match_continuous))
     {
         return AuditLineStatus::Invalid;
     }
@@ -63,7 +89,7 @@ AuditLineStatus parseAuditLine(const std::string &line, AuditLine &result)
     }
     parsed.type = fields[2].str();
     parsed.eventId = {seconds, milliseconds, serial};
-    parsed.payload.assign(fields[0].second, line.cend());
+    parsed.payload.assign(fields[0].second, message.cend());
     result = std::move(parsed);
     return AuditLineStatus::Parsed;
 }

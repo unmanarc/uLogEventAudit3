@@ -6,9 +6,11 @@
 #include "tcpserver.h"
 
 #include "../events/events_manager.h"
+#include "../events/events_distributionthreads.h"
 #include "../globals.h"
 
 #include "auditlineparser.h"
+#include "syslogmodules.h"
 
 using namespace std;
 using namespace UL3::LOG2JSON::Input;
@@ -43,6 +45,30 @@ boost::json::object TcpLineProcessor::getStats()
 
 bool TcpLineProcessor::processParsedLine(const string &line)
 {
+    SyslogLine syslog;
+    if (parseSyslogLine(line, syslog) && syslog.logger != "audispd" && syslog.logger != "audisp-syslog")
+    {
+        try
+        {
+            auto events = SyslogModules::render(syslog.logger, syslog.message);
+            if (!events.empty())
+            {
+                server.incrementProcessedLines();
+                processedLinesCount++;
+            }
+            for (auto &document : events)
+            {
+                AuditdEvents::EventDistribution::pushEvent(std::make_unique<Events::SyslogEvent>(std::move(document)));
+            }
+        }
+        catch (const std::exception &)
+        {
+            // Boost.Regex may reject an excessively complex match at runtime.
+            addInvalidLine(line);
+        }
+        return true;
+    }
+
     AuditLine parsed;
     switch (parseAuditLine(line, parsed))
     {
