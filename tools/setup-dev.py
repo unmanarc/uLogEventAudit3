@@ -85,23 +85,25 @@ def main():
         write_new(target / 'config.ini', text)
         write_new(target / 'rpcca.crt', (web / 'snakeoil.crt').read_text(), 0o644)
     alert = config / 'ul3_alert'
-    write_new(alert / 'inputs.json', json.dumps([{
+    write_new(alert / 'inputs.d/00000000-dev-local.json', json.dumps({
         'Description': 'Local development JSON input', 'ListenAddr': '127.0.0.1',
         'ListenPort': 19999, 'id': 'dev-local',
-    }], indent=2) + '\n')
-    write_new(alert / 'rules.json', '[]\n')
-    write_new(alert / 'actions.json', '[]\n')
+    }, indent=2) + '\n')
+    for collection in ['rules.d', 'actions.d']:
+        (alert / collection).mkdir(parents=True, exist_ok=True)
     converter = config / 'ul3_log2json'
     source = repo / 'ul3_log2json/etc/ulogeventaudit3/ul3_log2json'
-    inputs = json.loads((source / 'inputs.json').read_text())
-    for endpoint in inputs:
+    for file in sorted((source / 'inputs.d').glob('*.json')):
+        endpoint = json.loads(file.read_text())
         endpoint['ListenAddr'] = '127.0.0.1'
         endpoint['ListenPort'] = 11514
-    write_new(converter / 'inputs.json', json.dumps(inputs, indent=2) + '\n')
-    outputs = [endpoint for endpoint in json.loads((source / 'outputs.json').read_text())
-               if endpoint['id'] == 'alerts']
-    outputs[0]['Port'] = 19999
-    write_new(converter / 'outputs.json', json.dumps(outputs, indent=2) + '\n')
+        write_new(converter / 'inputs.d' / file.name, json.dumps(endpoint, indent=2) + '\n')
+    for file in sorted((source / 'outputs.d').glob('*.json')):
+        endpoint = json.loads(file.read_text())
+        if endpoint['id'] == 'alerts':
+            endpoint['Port'] = 19999
+            write_new(converter / 'outputs.d' / file.name, json.dumps(endpoint, indent=2) + '\n')
+    (converter / 'syslog_modules.d').mkdir(parents=True, exist_ok=True)
     link_new(prefix / 'var/www/ulogeventaudit3', repo / 'ul3_web/var/www/ulogeventaudit3')
     for name in ['ul3_web', 'ul3_alert', 'ul3_log2json']:
         binary = build / name / name

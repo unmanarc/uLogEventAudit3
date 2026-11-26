@@ -132,14 +132,14 @@ static void checkActions()
 static void checkPersistence(const fs::path &directory)
 {
     UL3::JSONALERT::Globals::setAppLog(std::make_unique<Mantids30::Runtime::Logs::AppLog>());
-    const auto path = directory / "actions.json";
+    const auto path = directory / "actions.d";
     Rules::setActionsFilePath(path.string());
     const boost::json::object definition{{"name", "telegram"}, {"type", "telegram"}, {"botToken", "123:secret"},
         {"chatId", "@security"}, {"messageTemplate", "{{#print_json[$]!}}"}};
     require(Rules::addAction(definition), "Cannot add Telegram action");
     require(Rules::writeActionsFileConfig(Rules::getCurrentRunningActions()), "Cannot persist action");
     struct stat status{};
-    require(stat(path.c_str(), &status) == 0 && (status.st_mode & 0777) == 0600, "Configuration not private");
+    require(stat(fs::directory_iterator(path)->path().c_str(), &status) == 0 && (status.st_mode & 0777) == 0600, "Configuration not private");
     require(Rules::reloadActions(), "Cannot reload action");
     auto publicConfig = Action::redact(Rules::getCurrentRunningAction("telegram"));
     publicConfig.as_object()["description"] = "Updated";
@@ -151,10 +151,10 @@ static void checkPersistence(const fs::path &directory)
     require(!Rules::writeActionsFileConfig(boost::json::array{definition, definition}), "Duplicate definitions accepted");
     require(!Rules::writeActionsFileConfig(boost::json::array{boost::json::object{{"name", "bad"}, {"type", "bad"}}}), "Invalid bulk save accepted");
     require(Rules::getCurrentRunningActions() == saved, "Failed save changed running actions");
-    std::ofstream(path) << "[42]";
+    std::ofstream(path / "invalid.json") << "[42]";
     require(!Rules::reloadActions() && Rules::getCurrentRunningActions() == saved, "Invalid reload lost running actions");
-    fs::remove(path);
-    fs::create_directory(path);
+    fs::remove_all(path);
+    std::ofstream(path) << "blocked";
     require(!Rules::writeActionsFileConfig(boost::json::array{}), "Failed rename reported success");
     require(Rules::getCurrentRunningActions() == saved, "Failed rename changed running actions");
     require(std::distance(fs::directory_iterator(directory), fs::directory_iterator{}) == 1, "Temporary configuration leaked");

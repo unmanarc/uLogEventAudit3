@@ -27,6 +27,20 @@ ROOT = Path(__file__).resolve().parents[1]
 SECRET = 'integration-only-secret-with-at-least-32-bytes'
 
 
+def read_collection(path):
+    """Read ordered object files for persistence assertions."""
+    return [json.loads(file.read_text()) for file in sorted(path.glob('*.json'))]
+
+
+def write_collection(path, definitions):
+    """Seed a backend collection using one file per object."""
+    path.mkdir(parents=True, exist_ok=True)
+    for file in path.glob('*.json'):
+        file.unlink()
+    for index, definition in enumerate(definitions):
+        (path / f'{index:08d}.json').write_text(json.dumps(definition))
+
+
 def free_port():
     with socket.socket() as s:
         s.bind(('127.0.0.1', 0))
@@ -270,16 +284,16 @@ WebService {{
                 (directory/'config.ini').write_text(ini)
                 (directory/'config.ini').chmod(0o600)
                 if name == 'ul3_alert':
-                    for file in ['rules.json', 'actions.json']:
-                        (directory/file).write_text('[]')
-                    (directory/'inputs.json').write_text(json.dumps([{'Description':'test input', 'ListenAddr':'127.0.0.1', 'ListenPort':alert_port, 'id':'test-input'}]))
+                    for collection in ['rules.d', 'actions.d']:
+                        write_collection(directory/collection, [])
+                    write_collection(directory/'inputs.d', [{'Description':'test input', 'ListenAddr':'127.0.0.1', 'ListenPort':alert_port, 'id':'test-input'}])
                 else:
-                    (directory/'inputs.json').write_text(json.dumps([{
+                    write_collection(directory/'inputs.d', [{
                         'id': 'syslog-test', 'Description': 'Test syslog input',
-                        'ListenAddr': '127.0.0.1', 'ListenPort': input_port}]))
-                    (directory/'outputs.json').write_text(json.dumps([{
+                        'ListenAddr': '127.0.0.1', 'ListenPort': input_port}])
+                    write_collection(directory/'outputs.d', [{
                         'id': 'alerts-test', 'Description': 'Test alert output',
-                        'Host': '127.0.0.1', 'Port': alert_port, 'TransmissionMode': 0}]))
+                        'Host': '127.0.0.1', 'Port': alert_port, 'TransmissionMode': 0}])
                 launch(name, directory)
             eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
             eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
@@ -304,16 +318,16 @@ WebService {{
                 result = json.loads(body)
                 assert status == 200 and result['ok'] and result['modified'] and result['restartRequired'], body
                 assert result[kind] == changed
-                file = tmp/'ul3_log2json'/(kind+'.json')
-                assert json.loads(file.read_text()) == changed
+                file = tmp/'ul3_log2json'/(kind+'.d')
+                assert read_collection(file) == changed
                 other = 'outputs' if kind == 'inputs' else 'inputs'
                 assert json.loads(request('/api/v1/log2json/'+other+'/config', reader)[1])['restartRequired']
                 for invalid in [None, {}, [42], [dict(changed[0], **{port_key: 65536})],
                                 [dict(changed[0], **{port_key: True})], changed+changed]:
-                    before = file.read_text()
+                    before = read_collection(file)
                     status, body = request(resource, admin, 'PUT', {kind: invalid}, 'test-csrf-id')
                     assert status == 200 and not json.loads(body)['ok'], (status, body)
-                    assert file.read_text() == before
+                    assert read_collection(file) == before
                 running = json.loads(request('/api/v1/log2json/'+kind, reader)[1])[stats_key]
                 if kind == 'inputs':
                     assert running[0]['description'] == original[0]['Description']
@@ -324,7 +338,7 @@ WebService {{
                 for definitions in [changed+[second], changed, [], original]:
                     status, body = request(resource, admin, 'PUT', {kind: definitions}, 'test-csrf-id')
                     assert status == 200 and json.loads(body)['ok'], body
-                    assert json.loads(file.read_text()) == definitions
+                    assert read_collection(file) == definitions
                 assert not json.loads(body)['modified'] and not json.loads(body)['restartRequired'], body
             assert request('/api/v1/log2json/reload', reader, 'POST', {}, 'test-csrf-id')[0] == 401
             assert request('/api/v1/log2json/reload', admin, 'POST', {})[0] == 403
@@ -339,30 +353,29 @@ WebService {{
             status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
                                    {'id': added_input['id']}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            assert len(json.loads((tmp/'ul3_alert/inputs.json').read_text())) == 1
-            input_file = tmp/'ul3_alert/inputs.json'
-            original_inputs = input_file.read_text()
+            assert len(read_collection(tmp/'ul3_alert/inputs.d')) == 1
+            input_file = tmp/'ul3_alert/inputs.d'
+            original_inputs = read_collection(input_file)
             status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
                                    {'id': 'test-input'}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            assert json.loads(input_file.read_text()) == []
-            input_file.write_text('null')
-            status, body = request('/api/v1/alerts/inputs/config', reader)
-            assert status == 200 and json.loads(body)['inputs'] == [], (status, body)
-            for invalid_document in ['{', '{}', '[] trailing']:
-                input_file.write_text(invalid_document)
+            assert read_collection(input_file) == []
+            for invalid_document in ['null', '[{}]', '{', '[] trailing']:
+                invalid_file = input_file/'invalid.json'
+                invalid_file.write_text(invalid_document)
                 status, body = request('/api/v1/alerts/inputs/config', admin, 'POST', new_input, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
-                assert input_file.read_text() == invalid_document
-            input_file.write_text(original_inputs)
+                assert invalid_file.read_text() == invalid_document
+            invalid_file.unlink()
+            write_collection(input_file, original_inputs)
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
-                config_file = tmp/'ul3_alert'/(resource+'.json')
-                assert json.loads(config_file.read_text()) == []
+                config_file = tmp/'ul3_alert'/(resource+'.d')
+                assert read_collection(config_file) == []
                 status, body = request('/api/v1/alerts/'+resource+'/config', admin, 'PUT', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
-                assert json.loads(config_file.read_text()) == []
+                assert read_collection(config_file) == []
             assert request('/api/v1/alerts/rules/item', admin, data={'id': 0})[0] == 200
             action = {'name': 'test-action', 'description': 'test', 'path': '/bin/true', 'args': ['/bin/true']}
             status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
@@ -383,9 +396,9 @@ WebService {{
             assert status == 200 and json.loads(body) is True, (status, body)
             status, body = request('/api/v1/alerts/actions/save', admin, 'POST', {}, 'test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            action_file = tmp/'ul3_alert/actions.json'
-            assert json.loads(action_file.read_text())[0]['botToken'] == telegram['botToken']
-            assert action_file.stat().st_mode & 0o777 == 0o600
+            action_file = tmp/'ul3_alert/actions.d'
+            assert read_collection(action_file)[0]['botToken'] == telegram['botToken']
+            assert all(file.stat().st_mode & 0o777 == 0o600 for file in action_file.glob('*.json'))
             for resource in ['actions', 'actions/config']:
                 status, body = request('/api/v1/alerts/' + resource, reader)
                 assert status == 200 and 'test_secret' not in body and 'botToken' not in body, (status, body)
@@ -457,14 +470,14 @@ WebService {{
             assert request('/api/v1/log2json/modules', admin, 'PUT', module_payload)[0] == 403
             status, body = request('/api/v1/log2json/modules', admin, 'PUT', module_payload, 'test-csrf-id')
             assert status == 200 and json.loads(body)['ok'], (status, body)
-            module_file = tmp/'ul3_log2json/syslog-modules.json'
-            assert json.loads(module_file.read_text()) == modules
+            module_file = tmp/'ul3_log2json/syslog_modules.d'
+            assert read_collection(module_file) == modules
             status, body = request('/api/v1/log2json/modules', reader)
             assert status == 200 and json.loads(body)['modules'] == modules, (status, body)
             invalid_modules = [dict(modules[0], messageRegex='(')]
             status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': invalid_modules}, 'test-csrf-id')
             assert status == 200 and not json.loads(body)['ok'], (status, body)
-            assert json.loads(module_file.read_text()) == modules
+            assert read_collection(module_file) == modules
             for serial, prefix in [(73, '<14>Jun 22 12:19:47 relay sshd[42]: '),
                                    (74, '<14>1 2026-11-26T12:19:47Z relay sshd 42 auth [meta x="y"] ')]:
                 marker.unlink()
@@ -475,11 +488,11 @@ WebService {{
                 assert captured[0] == str(serial) and json.loads(captured[1]) == '/tmp', captured
                 assert json.loads(captured[6]) == ['hello "λ"'] and json.loads(captured[8]) == 'syslog', captured
             status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': []}, 'test-csrf-id')
-            assert status == 200 and json.loads(body)['ok'] and json.loads(module_file.read_text()) == [], (status, body)
+            assert status == 200 and json.loads(body)['ok'] and read_collection(module_file) == [], (status, body)
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
-                assert json.loads((tmp/'ul3_alert'/ (resource+'.json')).read_text())
+                assert read_collection(tmp/'ul3_alert'/ (resource+'.d'))
             # Emulate systemd after the authorized restart and verify saved endpoints become active.
             restarted_port = free_port()
             for kind in ['inputs', 'outputs']:

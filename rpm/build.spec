@@ -82,7 +82,7 @@ cp -a ul3_web/etc/ulogeventaudit3/ul3_web $RPM_BUILD_ROOT/etc/ulogeventaudit3/
 cp -a ul3_log2json/etc/ulogeventaudit3/ul3_log2json $RPM_BUILD_ROOT/etc/ulogeventaudit3/
 cp -a ul3_alert/etc/ulogeventaudit3/ul3_alert $RPM_BUILD_ROOT/etc/ulogeventaudit3/
 chmod 600 $RPM_BUILD_ROOT/etc/ulogeventaudit3/ul3_web/snakeoil.key
-chmod 600 $RPM_BUILD_ROOT/etc/ulogeventaudit3/ul3_alert/*.json
+chmod 600 $RPM_BUILD_ROOT/etc/ulogeventaudit3/ul3_alert/*.d/*.json
 chmod 600 $RPM_BUILD_ROOT/etc/ulogeventaudit3/*/*.ini
 chmod 600 $RPM_BUILD_ROOT/etc/ulogeventaudit3/ul3_web/webserver.conf
 mkdir -vp $RPM_BUILD_ROOT/usr/lib/systemd/system
