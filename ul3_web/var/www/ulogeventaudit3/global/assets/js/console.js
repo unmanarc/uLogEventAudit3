@@ -10,7 +10,7 @@ const auditPages = {
     "alerts/action-add": ["Add an action", "Configure a command, HTTP POST or Telegram message.", "actions"],
     "log2json/events": ["Event processing", "Monitor the auditd event queue and processing throughput."],
     "log2json/eventsph": ["Events by host", "Find pending, processed and dropped events for each source host."],
-    "log2json/inputs": ["Syslog & auditd inputs", "Configure TCP listeners and monitor source connections, processed lines and invalid input."],
+    "log2json/inputs": ["Syslog+Auditd inputs", "Configure TCP listeners and monitor source connections, processed lines and invalid input."],
     "log2json/modules": ["Syslog modules", "Convert syslog messages to JSON using logger filters, message captures and templates."],
     "log2json/outputs": ["JSON outputs", "Configure JSON destinations and monitor connections, outgoing queues and delivery."]
 };

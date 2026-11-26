@@ -1,4 +1,4 @@
-# Syslog and Auditd Log Processing Application
+# Syslog+Auditd Log Processing Application
 
 ## Overview
 This application is designed to receive auditd logs via a centralized RSYSLOG connection and reassemble fragmented messages into structured JSON format. The processed data can be forwarded in real-time over TCP to downstream systems such as ELK stacks or utilized by uLogEventAudit3 Alerts for generating security notifications and actions.
@@ -65,7 +65,7 @@ This configuration is designed to add the fromhost-ip property/variable to the r
 
 ### Input configuration
 
-`inputs.d/` stores one JSON object per `.json` file in `/etc/ulogeventaudit3/ul3_log2json`. Open **Log to JSON → Syslog & auditd inputs** to add, edit or remove TCP listeners. Each entry has a unique `id`, a `Description`, a `ListenAddr` and a numeric `ListenPort` between 1 and 65535.
+`inputs.d/` stores one JSON object per `.json` file in `/etc/ulogeventaudit3/ul3_log2json`. Open **Log to JSON → Syslog+Auditd inputs** to add, edit or remove TCP listeners. Each entry has a unique `id`, a `Description`, a `ListenAddr` and a numeric `ListenPort` between 1 and 65535.
 
 ```json
     {

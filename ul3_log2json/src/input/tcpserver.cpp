@@ -40,7 +40,7 @@ void processClientConnection(void *context, const std::shared_ptr<Socket_Stream>
     pthread_setname_np(pthread_self(), threadName.c_str());
 #endif
 
-    LOG_APP->log1(__func__, remoteAddress, Logs::INFO, "Receiving %srsyslog+auditd incoming connection...", secure ? "secure " : "");
+    LOG_APP->log1(__func__, remoteAddress, Logs::INFO, "Receiving %srSyslog+Auditd incoming connection...", secure ? "secure " : "");
 
     server->addClient(&lineProcessor);
     struct ClientRegistration
