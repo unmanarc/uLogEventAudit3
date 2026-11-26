@@ -156,9 +156,9 @@ public:
         LOG_APP->enableAttributeNameLogging = false;
         LOG_APP->setDebug(Globals::getMainConfig()->get<bool>("Logs.Debug", false));
 
-        Input::Inputs::setConfigFilePath(Globals::getMainConfig()->get<std::string>("Input.InputsPath", "inputs.json"));
-        Filters::Rules::setRulesFilePath(Globals::getMainConfig()->get<std::string>("Filters.RulesPath", "rules.json"));
-        Filters::Rules::setActionsFilePath(Globals::getMainConfig()->get<std::string>("Filters.ActionsPath", "actions.json"));
+        Input::Inputs::setConfigFilePath(Globals::getMainConfig()->get<std::string>("Input.InputsPath", "inputs.d"));
+        Filters::Rules::setRulesFilePath(Globals::getMainConfig()->get<std::string>("Filters.RulesPath", "rules.d"));
+        Filters::Rules::setActionsFilePath(Globals::getMainConfig()->get<std::string>("Filters.ActionsPath", "actions.d"));
 
         Filters::Rules::setEvaluationQueueMaxSize(Globals::getMainConfig()->get<size_t>("Filters.QueueSize", 100000));
         Filters::Rules::setQueuePushTimeoutMs(Globals::getMainConfig()->get<uint64_t>("Filters.QueueMaxPushWaitTimeInMS", 0));

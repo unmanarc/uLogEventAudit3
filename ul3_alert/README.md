@@ -26,24 +26,16 @@ The filtering functionality in ul3_alert leverages **JSONPath** integrated with 
 
 ### Inputs Configuration
 
-The configuration **/etc/ulogeventaudit3/ul3_alert/inputs.json** define the receptors responsible for receiving and processing incoming JSON lines to be processed.
+The directory **/etc/ulogeventaudit3/ul3_alert/inputs.d/** stores one input object per `.json` file for receiving incoming JSON lines.
 
 #### Example input Configuration File:
 ```json
-[
-	{
-		"Description" : "Alert JSON TCP Input",
-		"ListenAddr" : "127.0.0.1",
-		"ListenPort" : 9999,
-		"id" : "fpL9mjmU"
-	},
-	{
-		"Description" : "Alert JSON TCP Input from other host",
-		"ListenAddr" : "0.0.0.0",
-		"ListenPort" : 9998,
-		"id" : "fpL9mjmA"
-	}
-]
+{
+    "Description": "Alert JSON TCP Input",
+    "ListenAddr": "127.0.0.1",
+    "ListenPort": 9999,
+    "id": "fpL9mjmU"
+}
 ```
 
 - **Description**: Human-readable name for the receptor.
@@ -55,7 +47,7 @@ Open **Rules & alerts → Inputs** to inspect saved listeners and running client
 
 ### Actions Configuration
 
-Actions are stored in **/etc/ulogeventaudit3/ul3_alert/actions.json**. Open
+Actions are stored in **/etc/ulogeventaudit3/ul3_alert/actions.d/**. Open
 **Rules & alerts → Actions** to add or edit an action and select **Run command**,
 **HTTP POST**, or **Telegram message**. Each rule references the action's unique
 `name`; the existing rule operations `EXEC` and `EXECANDABORT` work with all three
@@ -188,3 +180,23 @@ text. Failed validation, saves and reloads preserve the running actions.
     - Restrict access to trusted IP addresses/subnets using firewall rules.
     - Ensure all incoming connections pass through a secure network, such as a private VLAN or a restricted VPN tunnel.
     - Avoid exposing the port to the public internet; limit access only to necessary endpoints.
+
+### Configuration directories
+
+Configuration collections use one JSON object per `.json` file. Copy an object file
+into the matching directory to reuse it, then reload or restart the service as
+required for that collection. Only immediate regular `.json` files are loaded,
+in lexicographic filename order. Missing or empty directories contain no entries.
+Other extensions (for example `.json.disabled`) are ignored and preserved on save.
+
+The converter uses `inputs.d/`, `outputs.d/` and `syslog_modules.d/`. The alert engine
+uses `inputs.d/`, `rules.d/` and `actions.d/`; each rule contains its filter expression.
+Nested arrays such as command `args` remain part of their containing object.
+Definitions must retain unique IDs or names where required by their schema.
+
+GUI saves generate filenames such as `00000000-alerts.json`, using the entry's ID
+or name and a numeric prefix to preserve order, including rule moves. File names
+may change on save. Files are private (0600); the service account needs write
+access to the parent directory to atomically replace the collection. REST payloads
+continue to use arrays. Existing INI path keys now refer to directories; legacy
+array files are no longer loaded.

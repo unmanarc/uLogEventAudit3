@@ -3,6 +3,7 @@
  * @brief Implementation for ul3_alert/src/input/inputs.
  */
 #include "inputs.h"
+#include "../../../common/config_directory.h"
 #include <Mantids30/Core/Helpers/random.h>
 #include <cinttypes>
 #include <fstream>
@@ -34,51 +35,23 @@ boost::json::array Inputs::getStats()
 
 boost::json::value Inputs::readInputs(bool *readOk)
 {
-    boost::json::value configuredInputs;
     if (readOk)
     {
         *readOk = false;
     }
-
-    if (access(configFilePath.c_str(), R_OK))
+    try
     {
-        // Create empty JSON for unexistent file:
-        boost::json::array r;
-
-        LOG_APP->log0(__func__, Logs::INFO, "Inputs file '%s' not found, creating an empty file.", configFilePath.c_str());
-
-        std::ofstream configFile(configFilePath, std::ifstream::binary);
-        if (!configFile.is_open())
-        {
-            return false;
-        }
-        configFile << r;
-        configFile.close();
-    }
-
-    // Read JSON from file:
-    std::ifstream configFile(configFilePath, std::ifstream::binary);
-
-    if (!configFile.is_open())
-    {
+        auto definitions = UL3::JSON::readConfigDirectory(configFilePath);
         if (readOk)
         {
-            *readOk = false;
+            *readOk = true;
         }
-        return configuredInputs;
+        return definitions;
     }
-
-    if (!UL3::JSON::readConfigArray(configFile, configuredInputs))
+    catch (const std::exception &)
     {
         return {};
     }
-
-    if (readOk)
-    {
-        *readOk = true;
-    }
-
-    return configuredInputs;
 }
 
 bool Inputs::writeInputs(const boost::json::value &configValue)
@@ -91,14 +64,14 @@ bool Inputs::writeInputs(const boost::json::value &configValue)
     {
         return true;
     }
-
-    std::ofstream configFile(configFilePath, std::ifstream::binary);
-    if (!configFile.is_open())
+    try
+    {
+        UL3::JSON::writeConfigDirectory(configFilePath, configValue.as_array());
+    }
+    catch (const std::exception &)
     {
         return false;
     }
-    configFile << configValue;
-    configFile.close();
     modified = true;
     return true;
 }

@@ -3,6 +3,7 @@
  * @brief Implementation for ul3_alert/src/rules/rules.
  */
 #include "rules.h"
+#include "../../../common/config_directory.h"
 #include <shared_mutex>
 
 #include <boost/algorithm/string.hpp>
@@ -122,8 +123,12 @@ bool Rules::enqueueLine(const string &inputText)
 bool Rules::reloadRules()
 {
     std::unique_lock<std::shared_mutex> lock(rulesMutex);
-    resetRules();
     boost::json::value root = readRulesFileConfig();
+    if (!root.is_array())
+    {
+        return false;
+    }
+    resetRules();
     LOG_APP->log0(__func__, Logs::INFO, "Loading filters from file: %s", rulesFilePath.c_str());
 
     for (uint32_t index = 0; index < Mantids30::DataFormat::JSON::ASARRAY_OR_EMPTY(root).size(); index++)
@@ -698,13 +703,14 @@ bool Rules::writeRulesFileConfig(const boost::json::value &configValue)
         return true;
     }
 
-    std::ofstream configFile(rulesFilePath, std::ifstream::binary);
-    if (!configFile.is_open())
+    try
+    {
+        UL3::JSON::writeConfigDirectory(rulesFilePath, configValue.as_array());
+    }
+    catch (const std::exception &)
     {
         return false;
     }
-    configFile << configValue;
-    configFile.close();
 
     reloadRules();
     rulesModified = false;
@@ -740,45 +746,12 @@ bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
     {
         return false;
     }
-    const auto document = boost::json::serialize(normalized);
-    std::string temporary = actionsFilePath + ".XXXXXX";
-    const int descriptor = mkstemp(temporary.data());
-    if (descriptor == -1)
+    try
     {
-        return false;
+        UL3::JSON::writeConfigDirectory(actionsFilePath, normalized);
     }
-    // mkstemp creates mode 0600, and rename never exposes a partial credential file.
-    bool success = true;
-    size_t offset = 0;
-    while (offset < document.size())
+    catch (const std::exception &)
     {
-        const auto count = write(descriptor, document.data() + offset, document.size() - offset);
-        if (count < 0 && errno == EINTR)
-        {
-            continue;
-        }
-        if (count <= 0)
-        {
-            success = false;
-            break;
-        }
-        offset += static_cast<size_t>(count);
-    }
-    if (success && fsync(descriptor) != 0)
-    {
-        success = false;
-    }
-    if (close(descriptor) != 0)
-    {
-        success = false;
-    }
-    if (success && std::rename(temporary.c_str(), actionsFilePath.c_str()) != 0)
-    {
-        success = false;
-    }
-    if (!success)
-    {
-        std::remove(temporary.c_str());
         return false;
     }
     actions = std::move(replacement);
@@ -788,32 +761,26 @@ bool Rules::writeActionsFileConfig(const boost::json::value &configValue)
 
 boost::json::value Rules::readRulesFileConfig()
 {
-    boost::json::value root;
-    std::ifstream configFile(rulesFilePath, std::ifstream::binary);
-    if (!configFile.is_open())
+    try
     {
-        return root;
+        return UL3::JSON::readConfigDirectory(rulesFilePath);
     }
-    if (!UL3::JSON::readConfigArray(configFile, root))
+    catch (const std::exception &)
     {
         return {};
     }
-    return root;
 }
 
 boost::json::value Rules::readActionsFileConfig()
 {
-    boost::json::value root;
-    std::ifstream configFile(actionsFilePath, std::ifstream::binary);
-    if (!configFile.is_open())
+    try
     {
-        return root;
+        return UL3::JSON::readConfigDirectory(actionsFilePath);
     }
-    if (!UL3::JSON::readConfigArray(configFile, root))
+    catch (const std::exception &)
     {
         return {};
     }
-    return root;
 }
 
 void Rules::setQueuePushTimeoutMs(const uint64_t &value)
