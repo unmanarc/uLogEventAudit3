@@ -5,7 +5,7 @@ networking, parsing, RPC, JSON helper, expression evaluation and queue facilitie
 
 ## Naming and layout
 
-- Types use `PascalCase`: `AuditEvent`, `TcpServer`, `RuleAction`.
+- Types use `PascalCase`: `AuditdEvent`, `TcpServer`, `RuleAction`.
 - Functions, parameters, local variables and members use `lowerCamelCase`:
   `getMainConfig`, `recordData`, `hostsMutex`. Use verbs for operations and names
   that describe the data for variables. Avoid type prefixes such as `s`, `j`, `b`

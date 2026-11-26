@@ -4,9 +4,7 @@
  */
 #pragma once
 
-#include "audit_host.h"
-
-#include <atomic>
+#include "auditd_host.h"
 #include <map>
 #include <string>
 
@@ -48,10 +46,10 @@ public:
      * @param eventType Auditd record type used to detect event completion.
      * @param recordData Owned record text to append or move into the event.
      */
-    static void insertClassContents(const AuditHostId &hostId, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData);
+    static void insertRecord(const AuditdHostId &hostId, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData);
 
 private:
-    using HostMap = std::map<AuditHostId, std::shared_ptr<AuditHost>>;
+    using HostMap = std::map<AuditdHostId, std::shared_ptr<AuditdHost>>;
     /**
      * @brief Copy shared host owners while holding only the host registry mutex.
      */

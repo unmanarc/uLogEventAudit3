@@ -64,15 +64,15 @@ void EventsManager::startGarbageCollector()
     std::thread(runGarbageCollector).detach();
 }
 
-void EventsManager::insertClassContents(const AuditHostId &hostId, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData)
+void EventsManager::insertRecord(const AuditdHostId &hostId, const std::tuple<time_t, uint32_t, uint64_t> &eventId, const std::string &eventType, std::string recordData)
 {
-    std::shared_ptr<AuditHost> hostState;
+    std::shared_ptr<AuditdHost> hostState;
     {
         std::scoped_lock lock(hostsMutex);
         auto position = hostsById.find(hostId);
         if (position == hostsById.end())
         {
-            auto newHost = std::make_shared<AuditHost>();
+            auto newHost = std::make_shared<AuditdHost>();
             newHost->setHostId(hostId);
             position = hostsById.emplace(hostId, std::move(newHost)).first;
         }
@@ -80,7 +80,7 @@ void EventsManager::insertClassContents(const AuditHostId &hostId, const std::tu
     }
     // A shared owner keeps the host alive after releasing the registry lock.
     // Per-host queue waits must not block reception or statistics for other hosts.
-    hostState->insertClassContents(eventId, eventType, std::move(recordData));
+    hostState->insertRecord(eventId, eventType, std::move(recordData));
 }
 
 EventsManager::HostMap EventsManager::snapshotHosts()

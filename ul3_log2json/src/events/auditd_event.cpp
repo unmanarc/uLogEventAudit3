@@ -1,8 +1,8 @@
 /**
  * @file
- * @brief Implementation for ul3_log2json/src/events/audit_event.
+ * @brief Implementation for ul3_log2json/src/events/auditd_event.
  */
-#include "audit_event.h"
+#include "auditd_event.h"
 #include "../vars/namedefs.h"
 
 #include <ctime>
@@ -15,26 +15,26 @@ using namespace boost::algorithm;
 using namespace std;
 using namespace UL3::LOG2JSON::AuditdEvents;
 
-AuditEvent::AuditEvent()
+AuditdEvent::AuditdEvent()
 {
     creationTime = std::chrono::steady_clock::now();
     eventId = std::make_tuple<time_t, uint32_t, uint64_t>(0, 0, 0);
 }
 
-uint64_t AuditEvent::getAgeSeconds()
+uint64_t AuditdEvent::getAgeSeconds()
 {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - creationTime).count();
 }
 
-bool AuditEvent::insertClassContents(const string &eventType, std::string recordData)
+bool AuditdEvent::insertRecord(const string &eventType, std::string recordData)
 {
-    auto existing = classRecords.find(eventType);
+    auto existing = recordsByType.find(eventType);
     // PATH has one record per path; other record types can span several input lines.
-    if (eventType == "PATH" || existing == classRecords.end())
+    if (eventType == "PATH" || existing == recordsByType.end())
     {
-        auto entry = classRecords.emplace(eventType, AuditClass{});
+        auto entry = recordsByType.emplace(eventType, AuditdRecord{});
         entry->second.setRawInput(std::move(recordData));
-        entry->second.setClassTypeName(eventType);
+        entry->second.setRecordType(eventType);
     }
     else
     {
@@ -43,29 +43,29 @@ bool AuditEvent::insertClassContents(const string &eventType, std::string record
     return NameDefs::isEndEventType(eventType);
 }
 
-std::tuple<time_t, uint32_t, uint64_t> AuditEvent::getEventId() const
+std::tuple<time_t, uint32_t, uint64_t> AuditdEvent::getEventId() const
 {
     return eventId;
 }
 
-void AuditEvent::setEventId(const std::tuple<time_t, uint32_t, uint64_t> &value)
+void AuditdEvent::setEventId(const std::tuple<time_t, uint32_t, uint64_t> &value)
 {
     eventId = value;
 }
 
-AuditHostId AuditEvent::getHostId() const
+AuditdHostId AuditdEvent::getHostId() const
 {
     return hostId;
 }
 
-void AuditEvent::setHostId(const AuditHostId &value)
+void AuditdEvent::setHostId(const AuditdHostId &value)
 {
     hostId = value;
 }
 
-bool AuditEvent::process()
+bool AuditdEvent::process()
 {
-    for (auto &record : classRecords)
+    for (auto &record : recordsByType)
     {
         record.second.parseVariables();
     }
@@ -73,28 +73,28 @@ bool AuditEvent::process()
     return true;
 }
 
-std::set<string> AuditEvent::getClassNames()
+std::set<string> AuditdEvent::getRecordTypes()
 {
     std::set<string> records;
-    for (auto &record : classRecords)
+    for (auto &record : recordsByType)
     {
         records.insert(record.first);
     }
     return records;
 }
 
-bool AuditEvent::hasMultipleClassRecords(const string &groupName)
+bool AuditdEvent::hasMultipleRecords(const string &recordType)
 {
-    auto result = classRecords.equal_range(groupName);
+    auto result = recordsByType.equal_range(recordType);
     return std::distance(result.first, result.second) > 1;
 }
 
-std::list<AuditClass *> AuditEvent::getClassRecords(const string &groupName)
+std::list<AuditdRecord *> AuditdEvent::getRecords(const string &recordType)
 {
-    list<AuditClass *> records;
-    for (auto &record : classRecords)
+    list<AuditdRecord *> records;
+    for (auto &record : recordsByType)
     {
-        if (record.first == groupName)
+        if (record.first == recordType)
         {
             records.push_back(&record.second);
         }
@@ -102,16 +102,16 @@ std::list<AuditClass *> AuditEvent::getClassRecords(const string &groupName)
     return records;
 }
 
-AuditClass *AuditEvent::getFirstClassRecord(const string &groupName)
+AuditdRecord *AuditdEvent::getFirstRecord(const string &recordType)
 {
-    if (auto it = classRecords.find(groupName); it != classRecords.end())
+    if (auto it = recordsByType.find(recordType); it != recordsByType.end())
     {
         return &it->second;
     }
     return nullptr;
 }
 
-boost::json::object AuditEvent::getJson()
+boost::json::object AuditdEvent::getJson()
 {
     time_t unixTime = std::get<0>(eventId);
     std::tm localTime{};
@@ -138,18 +138,18 @@ boost::json::object AuditEvent::getJson()
                              {"time", formattedTimestamp}};
     boost::json::object records;
 
-    std::set<string> classes = getClassNames();
-    for (const string &className : classes)
+    std::set<string> recordTypes = getRecordTypes();
+    for (const string &recordType : recordTypes)
     {
         boost::json::array entries;
-        auto [first, last] = classRecords.equal_range(className);
+        auto [first, last] = recordsByType.equal_range(recordType);
         for (auto it = first; it != last; ++it)
         {
-            if (className != "INFO")
+            if (recordType != "INFO")
             {
                 entries.emplace_back(it->second.getJson());
             }
-            // TODO: limit max classes
+            // TODO: limit the number of record types.
         }
         if (!entries.empty() && Mantids30::DataFormat::JSON::HAS_MEMBER(entries.front(), "key"))
         {
@@ -158,7 +158,7 @@ boost::json::object AuditEvent::getJson()
         }
         if (!entries.empty())
         {
-            records.emplace(className, std::move(entries));
+            records.emplace(recordType, std::move(entries));
         }
     }
     boost::json::object eventJson{{"AUDITD", boost::json::object{{"id", auditId}}}, {"INFO", std::move(info)}};

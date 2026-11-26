@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "../events/audit_event.h"
+#include "../events/auditd_event.h"
 #include <audit_json.h>
 
 namespace UL3::LOG2JSON::Output {

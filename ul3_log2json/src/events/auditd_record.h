@@ -1,10 +1,10 @@
 /**
  * @file
- * @brief Declarations and contracts for ul3_log2json/src/events/audit_class.
+ * @brief Declarations and contracts for ul3_log2json/src/events/auditd_record.
  */
 #pragma once
 
-#include "audit_var.h"
+#include "auditd_field.h"
 
 #include <audit_json.h>
 
@@ -14,13 +14,13 @@
 namespace UL3::LOG2JSON::AuditdEvents {
 
 /** @brief Own one auditd record type and its parsed fields. */
-class AuditClass
+class AuditdRecord
 {
 public:
     /**
      * @brief Create an empty auditd record container.
      */
-    AuditClass() = default;
+    AuditdRecord() = default;
 
     /**
      * @brief Return mutable access to the owned auditd record text.
@@ -42,12 +42,12 @@ public:
     /**
      * @brief Return the auditd record type, such as EXECVE or PATH.
      */
-    [[nodiscard]] std::string getClassTypeName() const;
+    [[nodiscard]] std::string getRecordType() const;
     /**
      * @brief Set the auditd record type used to interpret field values.
      * @param value Auditd record type name.
      */
-    void setClassTypeName(const std::string &value);
+    void setRecordType(const std::string &value);
 
     /**
      * @brief Serialize record fields, reconstructing argv and cmdline for EXECVE records.
@@ -79,8 +79,8 @@ private:
     std::string getChunkVariableName(const std::string &variableName, const size_t &position);
 
     std::string rawInput;
-    std::string classTypeName;
-    std::map<std::string, AuditVariable> variablesByName;
+    std::string recordType;
+    std::map<std::string, AuditdField> variablesByName;
 };
 
 } // namespace UL3::LOG2JSON::AuditdEvents

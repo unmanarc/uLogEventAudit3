@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Declarations and contracts for ul3_log2json/src/events/audit_var.
+ * @brief Declarations and contracts for ul3_log2json/src/events/auditd_field.
  */
 #pragma once
 
@@ -10,20 +10,20 @@
 namespace UL3::LOG2JSON::AuditdEvents {
 
 /** @brief Own a decoded auditd field and its printable representation. */
-class AuditVariable
+class AuditdField
 {
 public:
     /**
      * @brief Create an empty, invalid audit variable.
      */
-    AuditVariable() = default;
+    AuditdField() = default;
 
     /**
      * @brief Append a decoded fragment while retaining both binary and display representations.
      * @param other Decoded fragment to append; this variable becomes invalid if the fragment is invalid.
      * @return False if the source fragment is invalid; otherwise true after concatenation.
      */
-    bool append(const AuditVariable &other);
+    bool append(const AuditdField &other);
 
     /**
      * @brief Replace this variable with a quoted, hexadecimal or literal auditd field value.

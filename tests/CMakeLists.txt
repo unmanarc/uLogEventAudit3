@@ -1,8 +1,8 @@
 add_executable(audit_modernization_test
     modernization_test.cpp
-    ../ul3_log2json/src/events/audit_var.cpp
-    ../ul3_log2json/src/events/audit_class.cpp
-    ../ul3_log2json/src/events/audit_event.cpp
+    ../ul3_log2json/src/events/auditd_field.cpp
+    ../ul3_log2json/src/events/auditd_record.cpp
+    ../ul3_log2json/src/events/auditd_event.cpp
     ../ul3_log2json/src/vars/namedefs.cpp
     ../ul3_log2json/src/globals.cpp)
 target_include_directories(audit_modernization_test PRIVATE ../ul3_log2json/src)

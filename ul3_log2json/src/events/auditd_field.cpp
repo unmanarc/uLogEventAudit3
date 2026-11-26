@@ -1,8 +1,8 @@
 /**
  * @file
- * @brief Implementation for ul3_log2json/src/events/audit_var.
+ * @brief Implementation for ul3_log2json/src/events/auditd_field.
  */
-#include "audit_var.h"
+#include "auditd_field.h"
 #include "../vars/namedefs.h"
 #include <Mantids30/Core/Helpers/encoders.h>
 #include <algorithm>
@@ -13,7 +13,7 @@ using namespace boost::algorithm;
 using namespace std;
 using namespace UL3::LOG2JSON::AuditdEvents;
 
-bool AuditVariable::append(const AuditVariable &other)
+bool AuditdField::append(const AuditdField &other)
 {
     if (!other.isValid())
     {
@@ -46,7 +46,7 @@ inline bool isExecveArgument(const string &eventType, const string &variableName
     return eventType == "EXECVE" && boost::regex_match(variableName, argumentPattern);
 }
 
-void AuditVariable::updateDisplayValue()
+void AuditdField::updateDisplayValue()
 {
     displayValue = rawValue;
     for (char &byte : displayValue)
@@ -58,38 +58,38 @@ void AuditVariable::updateDisplayValue()
     }
 }
 
-size_t AuditVariable::getRawValueSize() const
+size_t AuditdField::getRawValueSize() const
 {
     return rawValue.size();
 }
 
-uint32_t AuditVariable::asUint32() const
+uint32_t AuditdField::asUint32() const
 {
     return strtoul(displayValue.c_str(), nullptr, 10);
 }
 
-const string &AuditVariable::getDisplayValue() const
+const string &AuditdField::getDisplayValue() const
 {
     return displayValue;
 }
 
-const char *AuditVariable::getRawValue() const
+const char *AuditdField::getRawValue() const
 {
     return rawValue.c_str();
 }
 
-bool AuditVariable::isValid() const
+bool AuditdField::isValid() const
 {
     return valid;
 }
 
-bool AuditVariable::setValid(bool isValid)
+bool AuditdField::setValid(bool isValid)
 {
     valid = isValid;
     return valid;
 }
 
-bool AuditVariable::parse(const string &eventType, const string &variableName, const string &variableValue)
+bool AuditdField::parse(const string &eventType, const string &variableName, const string &variableValue)
 {
     rawValue.clear();
     displayValue.clear();

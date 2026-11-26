@@ -1,5 +1,5 @@
-#include "events/audit_event.h"
-#include "events/audit_var.h"
+#include "events/auditd_event.h"
+#include "events/auditd_field.h"
 #include "globals.h"
 #include "vars/namedefs.h"
 #include <Mantids30/Core/Threads/safe_queue.h>
@@ -70,7 +70,7 @@ void queueOwnership()
 /** @brief Check binary decoding, repeated parsing and safe fragment concatenation. */
 void auditVariables()
 {
-    AuditVariable head, tail;
+    AuditdField head, tail;
     require(head.parse("EXECVE", "a0", "41420021"), "hex decoding");
     require(head.getRawValueSize() == 4 && head.getDisplayValue() == "AB  ", "binary and display values");
     require(head.getRawValue()[2] == '\0', "raw embedded NUL preserved");
@@ -96,13 +96,13 @@ void auditVariables()
 /** @brief Check multi-record reconstruction and preservation of 64-bit event identities. */
 void eventReconstruction()
 {
-    AuditEvent event;
+    AuditdEvent event;
     event.setEventId({1700000000, 123, 9007199254740993ULL});
     event.setHostId({"test", "127.0.0.1"});
-    event.insertClassContents("EXECVE", "argc=2 a0[0]=6563 a0[1]=686F");
-    event.insertClassContents("EXECVE", "a1=68656C6C6F");
-    event.insertClassContents("PATH", "item=0 name=\"/bin/echo\"");
-    event.insertClassContents("PATH", "item=1 name=\"/tmp\"");
+    event.insertRecord("EXECVE", "argc=2 a0[0]=6563 a0[1]=686F");
+    event.insertRecord("EXECVE", "a1=68656C6C6F");
+    event.insertRecord("PATH", "item=0 name=\"/bin/echo\"");
+    event.insertRecord("PATH", "item=1 name=\"/tmp\"");
     require(event.process(), "process event");
     auto value = event.getJson();
     const auto &object = value;
@@ -110,11 +110,11 @@ void eventReconstruction()
     require(args.size() == 2 && args[0].as_string() == "echo" && args[1].as_string() == "hello", "split arguments and merged records reconstructed");
     require(object.at("PATH").as_array().size() == 2, "PATH records remain separate");
     require(object.at("INFO").if_object()->at("id").as_uint64() == 9007199254740993ULL, "64-bit event ID preserved");
-    require(event.getFirstClassRecord("EXECVE") != nullptr && event.getFirstClassRecord("missing") == nullptr, "borrowed class lookup");
-    require(event.getClassRecords("PATH").size() == 2, "borrowed multi-class lookup");
+    require(event.getFirstRecord("EXECVE") != nullptr && event.getFirstRecord("missing") == nullptr, "borrowed record lookup");
+    require(event.getRecords("PATH").size() == 2, "borrowed multi-record lookup");
     require(event.process() && event.getJson() == value, "reprocessing does not append old chunks");
     require(!Mantids30::DataFormat::JSON::HAS_MEMBER(object.at("INFO"), "key"), "absent event key omitted");
-    event.insertClassContents("SYSCALL", "key=\"test-key\"");
+    event.insertRecord("SYSCALL", "key=\"test-key\"");
     require(event.process(), "process keyed event");
     const auto keyedEvent = event.getJson();
     require(Mantids30::DataFormat::JSON::ASSTRING(Mantids30::DataFormat::JSON::MEMBER_OR_NULL(keyedEvent, "INFO"), "key", "") == "test-key", "record key propagated to event info");
@@ -123,8 +123,8 @@ void eventReconstruction()
 /** @brief Quoted fields must not introduce fake fields or hide empty values. */
 void quotedFields()
 {
-    AuditClass record;
-    record.setClassTypeName("CWD");
+    AuditdRecord record;
+    record.setRecordType("CWD");
     record.setRawInput(R"(cwd="/tmp fake=123" empty="" literal=7)");
     require(record.parseVariables(), "quoted record");
     const auto value = record.getJson();
@@ -137,8 +137,8 @@ void quotedFields()
 /** @brief Check valid and truncated socket-address records without unaligned accesses. */
 void socketAddresses()
 {
-    AuditClass record;
-    record.setClassTypeName("SOCKADDR");
+    AuditdRecord record;
+    record.setRecordType("SOCKADDR");
     record.setRawInput("saddr=020000507F0000010000000000000000");
     require(record.parseVariables(), "IPv4 address record");
     auto value = record.getJson();

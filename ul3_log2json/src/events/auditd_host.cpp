@@ -1,8 +1,8 @@
 /**
  * @file
- * @brief Implementation for ul3_log2json/src/events/audit_host.
+ * @brief Implementation for ul3_log2json/src/events/auditd_host.
  */
-#include "audit_host.h"
+#include "auditd_host.h"
 #include "../globals.h"
 #include "events_distributionthreads.h"
 #include <vector>
@@ -16,33 +16,33 @@ namespace {
  * @param event Event supplying seconds, milliseconds and serial number.
  * @return Auditd identity in seconds.milliseconds:serial format.
  */
-string formatEventId(const AuditEvent &event)
+string formatEventId(const AuditdEvent &event)
 {
     const auto [seconds, milliseconds, eventLabel] = event.getEventId();
     return to_string(seconds) + "." + to_string(milliseconds) + ":" + to_string(eventLabel);
 }
 } // namespace
 
-AuditHost::AuditHost()
+AuditdHost::AuditdHost()
     : droppedEventsCount(0)
     , processedEventsCount(0)
 {
     enforceMaxAge = Globals::getMainConfig()->get<bool>("GC.EnforceMaxAge", true);
 }
 
-void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eventId, const string &eventType, string recordData)
+void AuditdHost::insertRecord(const tuple<time_t, uint32_t, uint64_t> &eventId, const string &eventType, string recordData)
 {
     unique_lock<mutex> lock(eventsMutex);
     auto position = auditEvents.find(eventId);
     if (position == auditEvents.end())
     {
-        auto event = make_unique<AuditEvent>();
+        auto event = make_unique<AuditdEvent>();
         event->setEventId(eventId);
         event->setHostId(hostId);
         position = auditEvents.emplace(eventId, std::move(event)).first;
     }
 
-    if (position->second->insertClassContents(eventType, std::move(recordData)) && !enforceMaxAge)
+    if (position->second->insertRecord(eventType, std::move(recordData)) && !enforceMaxAge)
     {
         auto event = std::move(position->second);
         auditEvents.erase(position);
@@ -61,7 +61,7 @@ void AuditHost::insertClassContents(const tuple<time_t, uint32_t, uint64_t> &eve
     }
 }
 
-void AuditHost::setHostId(const AuditHostId &value)
+void AuditdHost::setHostId(const AuditdHostId &value)
 {
     std::scoped_lock lock(eventsMutex);
     if (hostId.hostname.empty())
@@ -70,9 +70,9 @@ void AuditHost::setHostId(const AuditHostId &value)
     }
 }
 
-void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
+void AuditdHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
 {
-    vector<unique_ptr<AuditEvent>> expired;
+    vector<unique_ptr<AuditdEvent>> expired;
     string hostname;
     {
         std::scoped_lock lock(eventsMutex);
@@ -121,17 +121,17 @@ void AuditHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
     }
 }
 
-size_t AuditHost::getPendingEventsCount()
+size_t AuditdHost::getPendingEventsCount()
 {
     std::scoped_lock lock(eventsMutex);
     return auditEvents.size();
 }
 
-uint64_t AuditHost::getDroppedEventsCount() const
+uint64_t AuditdHost::getDroppedEventsCount() const
 {
     return droppedEventsCount.load();
 }
-uint64_t AuditHost::getProcessedEventsCount() const
+uint64_t AuditdHost::getProcessedEventsCount() const
 {
     return processedEventsCount.load();
 }

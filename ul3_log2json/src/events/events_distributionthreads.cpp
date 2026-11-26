@@ -4,7 +4,6 @@
  */
 #include "events_distributionthreads.h"
 
-#include <chrono>
 #include <thread>
 
 #include "../globals.h"
@@ -14,7 +13,8 @@ using namespace std;
 using namespace UL3::LOG2JSON::AuditdEvents;
 using namespace UL3::LOG2JSON;
 
-Mantids30::Core::Threads::Safe::Queue<AuditEvent> EventDistribution::eventsQueue;
+// Shared queue used by producers and distribution workers.
+Mantids30::Core::Threads::Safe::Queue<AuditdEvent> EventDistribution::eventsQueue;
 uint32_t EventDistribution::pushTimeoutMs = 0;
 
 std::atomic<uint64_t> EventDistribution::eventsProcessed;
@@ -108,9 +108,9 @@ void EventDistribution::startDistributionThreads(const size_t &threads)
     }
 }
 
-bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditEvent> event)
+bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditdEvent> event)
 {
-    bool queued = eventsQueue.push(std::shared_ptr<AuditEvent>(std::move(event)), pushTimeoutMs);
+    bool queued = eventsQueue.push(std::shared_ptr<AuditdEvent>(std::move(event)), pushTimeoutMs);
     if (!queued)
     {
         eventsDropped++;
@@ -118,7 +118,7 @@ bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditEvent> event)
     return queued;
 }
 
-std::shared_ptr<AuditEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
+std::shared_ptr<AuditdEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
 {
     return eventsQueue.pop(popTimeoutMs);
 }

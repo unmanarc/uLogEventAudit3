@@ -1,8 +1,8 @@
 /**
  * @file
- * @brief Implementation for ul3_log2json/src/events/audit_class.
+ * @brief Implementation for ul3_log2json/src/events/auditd_record.
  */
-#include "audit_class.h"
+#include "auditd_record.h"
 
 #include "../globals.h"
 
@@ -26,17 +26,17 @@ static const boost::regex variablePattern(R"audit((?:^|[ \t])([^= \t]+)=("[^"]*"
 using namespace std;
 using namespace UL3::LOG2JSON::AuditdEvents;
 
-string &AuditClass::getRawInput()
+string &AuditdRecord::getRawInput()
 {
     return rawInput;
 }
 
-void AuditClass::setRawInput(string value)
+void AuditdRecord::setRawInput(string value)
 {
     rawInput = std::move(value);
 }
 
-bool AuditClass::parseVariables()
+bool AuditdRecord::parseVariables()
 {
     variablesByName.clear();
     for (boost::sregex_iterator field(rawInput.begin(), rawInput.end(), variablePattern), end; field != end; ++field)
@@ -47,19 +47,19 @@ bool AuditClass::parseVariables()
     return mergeSplitVariables();
 }
 
-string AuditClass::getClassTypeName() const
+string AuditdRecord::getRecordType() const
 {
-    return classTypeName;
+    return recordType;
 }
 
-void AuditClass::setClassTypeName(const string &value)
+void AuditdRecord::setRecordType(const string &value)
 {
-    classTypeName = value;
+    recordType = value;
 }
 
-boost::json::object AuditClass::getJson()
+boost::json::object AuditdRecord::getJson()
 {
-    if (classTypeName == "EXECVE")
+    if (recordType == "EXECVE")
     {
         if (auto argc = variablesByName.find("argc"); argc != variablesByName.end())
         {
@@ -88,14 +88,14 @@ boost::json::object AuditClass::getJson()
     return recordJson;
 }
 
-void AuditClass::parseVariable(const string &variableName, const string &variableValue)
+void AuditdRecord::parseVariable(const string &variableName, const string &variableValue)
 {
-    if (!variablesByName[variableName].parse(classTypeName, variableName, variableValue))
+    if (!variablesByName[variableName].parse(recordType, variableName, variableValue))
     {
         LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Unable to parse variable '%s' with value '%s'", variableName.c_str(), variableValue.c_str());
     }
 
-    if (classTypeName == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) && variableValue.size() < 250 && variableValue.size() % 2 == 0
+    if (recordType == "SOCKADDR" && variableName == "saddr" && variableValue.size() >= 2 * sizeof(sa_family_t) && variableValue.size() < 250 && variableValue.size() % 2 == 0
         && boost::all(variableValue, boost::is_any_of("0123456789abcdefABCDEF")))
     {
         string family, ipAddress, path;
@@ -165,17 +165,17 @@ void AuditClass::parseVariable(const string &variableName, const string &variabl
             break;
         }
 
-        variablesByName["family"].parse(classTypeName, "family", family);
-        variablesByName["ipaddr"].parse(classTypeName, "ipaddr", ipAddress);
+        variablesByName["family"].parse(recordType, "family", family);
+        variablesByName["ipaddr"].parse(recordType, "ipaddr", ipAddress);
         if (!path.empty())
         {
-            variablesByName["unix_path"].parse(classTypeName, "unix_path", path);
+            variablesByName["unix_path"].parse(recordType, "unix_path", path);
         }
-        variablesByName["port"].parse(classTypeName, "port", to_string(port));
+        variablesByName["port"].parse(recordType, "port", to_string(port));
     }
 }
 
-bool AuditClass::mergeSplitVariables()
+bool AuditdRecord::mergeSplitVariables()
 {
     // Merge only contiguous chunks: missing indexes leave later chunks visible as orphans.
     set<string> splitVariableNames = getSplitVariableNames();
@@ -205,7 +205,7 @@ bool AuditClass::mergeSplitVariables()
     return true;
 }
 
-set<string> AuditClass::getSplitVariableNames()
+set<string> AuditdRecord::getSplitVariableNames()
 {
     set<string> splitVariableNames;
     for (const auto &variable : variablesByName)
@@ -222,7 +222,7 @@ set<string> AuditClass::getSplitVariableNames()
     return splitVariableNames;
 }
 
-string AuditClass::getChunkVariableName(const string &variableName, const size_t &position)
+string AuditdRecord::getChunkVariableName(const string &variableName, const size_t &position)
 {
     return variableName + "[" + to_string(position) + "]";
 }

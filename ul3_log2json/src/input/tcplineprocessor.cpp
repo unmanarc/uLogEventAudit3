@@ -54,7 +54,7 @@ bool TcpLineProcessor::processParsedLine(const string &line)
     case AuditLineStatus::Parsed:
         server.incrementProcessedLines();
         processedLinesCount++;
-        AuditdEvents::EventsManager::insertClassContents({parsed.hostName, parsed.sourceIp.empty() ? remoteIp : parsed.sourceIp}, parsed.eventId, parsed.type, parsed.payload);
+        AuditdEvents::EventsManager::insertRecord({parsed.hostName, parsed.sourceIp.empty() ? remoteIp : parsed.sourceIp}, parsed.eventId, parsed.type, parsed.payload);
         return true;
     }
     return true;
