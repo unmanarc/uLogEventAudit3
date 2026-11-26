@@ -2,7 +2,6 @@
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
-
   // Default Main View:
   function auditReady() {
     loadActions();
@@ -10,6 +9,7 @@
 
 
 
+  /** @brief Load a rule and restore its action even while a search is active. */
   function displayRule(pos) {
 
     var payloadData = {
@@ -54,7 +54,9 @@
           document.getElementById("bEXEC").checked = true;
         }
 
-        $('#actions').val(result['actionId']);
+        const select = document.getElementById("actions");
+        select.value = result['actionId'] || "";
+        select.dispatchEvent(new Event("change", {bubbles: true}));
 
         document.getElementById("ruleEvaluationFilter").value = result['filter'];
         document.getElementById("rulePos").value = pos;
@@ -67,6 +69,7 @@
     return true;
   }
 
+  /** @brief Load all actions before restoring an existing rule's configuration. */
   function loadActions() {
     var payloadData = {
       "method": "GET", "resource": "alerts/actions"
@@ -74,31 +77,31 @@
     auditRequest(payloadData, {
       success: function (result) {
 
-        if (result != null)
-        {
-
-
-        document.getElementById("actions").innerHTML = '<option value="" disabled selected>Select an action</option>';
-        let i = 0;
-
-        for (let action of result) {
-
-          var sel = document.getElementById(`actions`);
-          var opt = document.createElement('option');
-          opt.appendChild(document.createTextNode(action["name"] + ': ' + action["description"]));
-          opt.value = action["name"];
-          sel.appendChild(opt);
-
-          i++;
+        if (result != null) {
+          const select = document.getElementById("actions");
+          const selectedValue = select.value;
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Select an action";
+          placeholder.disabled = true;
+          // Preserve the full native list; the combobox filters its own results.
+          const options = result.map(action => {
+            const option = document.createElement("option");
+            option.value = action.name;
+            option.textContent = `${action.name}: ${action.description}`;
+            return option;
+          });
+          select.replaceChildren(placeholder, ...options);
+          select.value = selectedValue || "";
+          select.dispatchEvent(new Event("change", {bubbles: true}));
         }
-      }
 
-    if (window.location.search.substr(1)!="")
-    {
-      let ruleId = parseInt(window.location.search.substr(1));
-      if (ruleId != null)
-        displayRule(ruleId);
-    }
+        if (window.location.search.substr(1)!="") {
+          let ruleId = parseInt(window.location.search.substr(1));
+          if (ruleId != null) {
+            displayRule(ruleId);
+          }
+        }
 
       },
       error: commonFunctionError
@@ -106,6 +109,7 @@
 
   }
 
+  /** @brief Enable action selection and search only for execution behaviors. */
   function checkActions() {
     document.getElementById("actions").disabled = document.getElementById("bABORT").checked;
     if (document.getElementById("bEXECANDABORT").checked || document.getElementById("bEXEC").checked) {
@@ -192,7 +196,11 @@
         <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bEXEC" checked onchange="checkActions()"><label for="bEXEC">Execute action and continue<small>Run the action, then evaluate the remaining rules.</small></label></div>
         <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bEXECANDABORT" onchange="checkActions()"><label for="bEXECANDABORT">Execute action and stop<small>Run the action and skip the remaining rules for this event.</small></label></div>
         <div class="radio-option"><input class="form-check-input" type="radio" name="rule-behavior" id="bABORT" onchange="checkActions()"><label for="bABORT">Stop evaluation<small>Skip the remaining rules without executing an action.</small></label></div>
-        <div id="actionOptions" class="form-group mt-4"><label for="actions">Action to execute</label><select class="form-select" id="actions" required aria-describedby="action-help"></select><div class="form-text" id="action-help">Choose an existing action. <a href="/mods/alerts/action-add.html">Create an action</a> if none are available.</div></div>
+        <div id="actionOptions" class="form-group mt-4">
+            <label for="actions">Action to execute</label>
+            <select class="form-select" id="actions" data-searchable="Filter by name or description" required aria-describedby="action-help"></select>
+            <div class="form-text" id="action-help">Choose an existing action. <a href="/mods/alerts/action-add.html">Create an action</a> if none are available.</div>
+        </div>
     </fieldset>
     <p class="form-text">Changes apply to the running configuration. Use Save to disk on the rules page to keep them after a restart.</p>
     <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/rules.html" data-icon="cancel">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit" data-icon="add">Add rule</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;" data-icon="save">Save changes</button></div>
