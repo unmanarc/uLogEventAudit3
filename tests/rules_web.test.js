@@ -54,7 +54,7 @@ pending.callbacks.success({name: "Existing rule", action: "EXEC", actionId: "arc
 assert.equal(select.value, "archive");
 element("editor-form").reportValidity = () => true;
 vm.runInContext('addRule("edit")', context);
-assert.equal(pending.request.method, "PUT");
+assert.equal(pending.request.method, "EditRule");
 assert.equal(pending.request.payload.rule.actionId, "archive");
 // Stop-only rules disable the action control and omit the action from the payload.
 element("bABORT").checked = true;

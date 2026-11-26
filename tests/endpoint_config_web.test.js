@@ -77,7 +77,7 @@ async function testEndpointEditor(kind) {
     /** @brief Complete a captured request with the backend result. */
     function respond(result) {
         const handlers = pending.handlers;
-        if (result.ok && pending.request.method === 'PUT') {
+        if (result.ok && pending.request.scope === 'control') {
             result[kind] = pending.request.payload[kind];
             result.restartRequired = true;
         }
@@ -91,7 +91,7 @@ async function testEndpointEditor(kind) {
             Host: '127.0.0.1', Port: 9999, TransmissionMode: 0, TimeoutSecs: 10,
             ReconnectSleepTimeInSecs: 3, MaxQueuedItems: 500000, QueuePushTimeoutInMS: 0})};
     run('auditReady()');
-    assert.equal(pending.request.method, 'GET');
+    assert.equal(pending.request.scope, 'stats');
     assert.equal(activityReads, 1);
     assert.equal(element('endpoint-add').disabled, true);
     respond({ok: true, [kind]: [original]});
@@ -113,8 +113,8 @@ async function testEndpointEditor(kind) {
     assert.equal(element('endpoint-Description').value, original.Description);
     element('endpoint-Description').value = 'updated';
     submit();
-    assert.equal(pending.request.method, 'PUT');
-    assert.equal(pending.request.resource, `log2json/${kind}/config`);
+    assert.equal(pending.request.scope, 'control');
+    assert.equal(pending.request.method, kind === 'inputs' ? 'WriteInputsFileConfig' : 'WriteOutputsFileConfig');
     assert.equal(pending.request.payload[kind][0].Description, 'updated');
     assert.equal(pending.request.payload[kind][0].id, 'first');
     assert.equal(typeof pending.request.payload[kind][0][kind === 'inputs' ? 'ListenPort' : 'Port'], 'number');
@@ -176,8 +176,8 @@ async function testEndpointEditor(kind) {
     assert.equal(pending, beforeRestart);
     confirmed = true;
     await run('restartLog2JSON()');
-    assert.equal(pending.request.resource, 'log2json/reload');
-    assert.equal(pending.request.method, 'POST');
+    assert.equal(pending.request.method, 'ReloadApp');
+    assert.equal(pending.request.scope, 'control');
     respond(false);
     assert.equal(reloadScheduled, false);
 

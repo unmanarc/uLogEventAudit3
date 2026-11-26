@@ -80,7 +80,7 @@ module.exports = async function testModuleEditor() {
     function submit() { element('module-form').listeners.submit({preventDefault() {}}); }
     const original = {name: '<img src=x onerror=alert(1)>', loggerRegex: '^sshd$', messageRegex: '(.*)', jsonTemplate: '{"message":(string)<$1>}'};
     run('auditReady()');
-    assert.equal(pending.request.method, 'GET');
+    assert.equal(pending.request.scope, 'stats');
     assert.equal(element('module-add').disabled, true);
     respond({ok: true, modules: [original]});
     const row = element('modules-list').children[0];
@@ -99,8 +99,8 @@ module.exports = async function testModuleEditor() {
     assert.equal(element('module-name').value, original.name);
     element('module-name').value = 'updated';
     submit();
-    assert.equal(pending.request.method, 'PUT');
-    assert.equal(pending.request.resource, 'log2json/modules');
+    assert.equal(pending.request.scope, 'control');
+    assert.equal(pending.request.method, 'SyslogModules');
     assert.equal(pending.request.payload.modules[0].name, 'updated');
     assert.equal(element('module-cancel').disabled, true);
     let cancelled = false;

@@ -59,10 +59,31 @@ assert.equal(run('resourceValue({processIO: null}, "processIO.readBytesPerSecond
 assert.equal(run('resourceNumber(null)'), "Unavailable");
 assert.equal(run('resourceUptime(0)'), "0d 0h 0m");
 run("auditReady(); auditReady();");
-assert.equal(requests.length, 1, "Overlapping requests were sent");
-assert.equal(requests[0].url, "/api/v1/resources/3s");
-assert.throws(() => run('auditRequest({method: "GET", resource: "resources/5m"})'));
-assert.throws(() => run('auditRequest({method: "PUT", resource: "resources/3s"})'));
+assert.equal(requests.length, 3, "Overlapping polling cycles were sent");
+for (const [index, target] of ["WEB", "ALERTS", "LOG2JSON"].entries()) {
+    assert.equal(requests[index].url, "/api/v1/remote.stats");
+    assert.equal(requests[index].type, "POST");
+    assert.deepEqual(JSON.parse(requests[index].data), {target, method: "ResourceMonitor", payload: {resolution: "3s"}});
+}
+assert.throws(() => run('auditRequest({method: "GET", resource: "resources/3s"})'));
+
+/** @brief Complete a polling cycle in a different order from dispatch, including partial failures. */
+function finishCycle(start, response) {
+    for (const offset of [2, 0, 1]) {
+        const request = requests[start + offset];
+        const component = JSON.parse(request.data).target.toLowerCase();
+        const history = response.components[component];
+        if (history?.available) {
+            request.success(history);
+        } else {
+            request.error({status: 503});
+        }
+        request.complete({}, history?.available ? "success" : "error");
+        if (offset !== 1) {
+            assert.equal(run("resourceDashboard.pending"), true, "Polling resumed before every component completed");
+        }
+    }
+}
 
 const now = Date.now();
 const response = {resolution: "3s", components: {
@@ -82,8 +103,7 @@ for (const history of Object.values(response.components)) {
         history.latest = history.samples.at(-1);
     }
 }
-requests[0].success(response);
-requests[0].complete({}, "success");
+finishCycle(0, response);
 assert.equal(element("resource-status-alerts").textContent, "Disconnected");
 assert.match(element("resource-message").textContent, /Alerts/);
 assert.match(element("resource-readout-memory").textContent, /Web: 2 MiB/);
@@ -104,42 +124,55 @@ for (const metric of ["cpu", "memory", "io", "storage", "threads", "handles"]) {
     assert.doesNotMatch(JSON.stringify(element("resource-chart-" + metric).children), /NaN|Infinity/);
 }
 
-// Switching while a request is pending must discard that request's obsolete result.
+// Switching while a polling cycle is pending must discard all of its obsolete results.
 run("resourceRefresh()");
-assert.equal(requests.length, 2);
+assert.equal(requests.length, 6);
 element("resource-resolution").listeners.change({target: {value: "60m"}});
-assert.equal(requests.length, 2);
-requests[1].success(response);
+assert.equal(requests.length, 6);
+finishCycle(3, response);
 assert.equal(element("resource-message").textContent, "Loading selected resolution…");
-requests[1].complete({}, "success");
 assert.equal([...timers.values()][0].delay, 0);
 run("resourceRefresh()");
-assert.equal(requests.at(-1).url, "/api/v1/resources/60m");
-requests.at(-1).success({...response, resolution: "60m"});
-requests.at(-1).complete({}, "success");
+for (const request of requests.slice(6)) {
+    assert.equal(JSON.parse(request.data).payload.resolution, "60m");
+}
+finishCycle(6, {...response, resolution: "60m"});
 assert.equal([...timers.values()][0].delay, 60000);
 
-// Hidden tabs pause requests; repeated failures remain visible and back off.
+// Hidden tabs pause polling; a complete outage backs off without overlapping requests.
 context.document.hidden = true;
 run("resourceRefresh()");
-assert.equal(requests.length, 3);
+assert.equal(requests.length, 9);
 context.document.hidden = false;
 documentEvents.visibilitychange();
-assert.equal(requests.length, 4);
-requests.at(-1).error({status: 503});
-requests.at(-1).complete({}, "error");
-assert.match(element("resource-message").textContent, /may be stale/);
+assert.equal(requests.length, 12);
+finishCycle(9, {components: {}});
+assert.match(element("resource-message").textContent, /Measurements are unavailable/);
 assert.equal([...timers.values()][0].delay, 10000);
 windowEvents.pagehide();
 run("resourceRefresh()");
-assert.equal(requests.length, 4);
+assert.equal(requests.length, 12);
 assert.equal(timers.size, 0);
 windowEvents.pageshow({persisted: true});
-assert.equal(requests.length, 5, "Back navigation left polling stopped");
-requests.at(-1).success(response);
-requests.at(-1).complete({}, "success");
+assert.equal(requests.length, 15, "Back navigation left polling stopped");
+finishCycle(12, response);
 windowEvents.pagehide();
 scopes = [];
 run("auditReady()");
-assert.equal(requests.length, 5);
-console.log("PASS: combined resource charts, missing values, resolution races and nonoverlapping scoped polling");
+assert.equal(requests.length, 15);
+
+// Expired credentials stop the entire cycle and report the authentication failure once.
+scopes = ["stats"];
+let authErrors = 0;
+context.commonFunctionError = () => { authErrors++; };
+windowEvents.pageshow({persisted: true});
+for (const request of requests.slice(15)) {
+    request.error({status: 403});
+    request.complete({}, "error");
+}
+assert.equal(authErrors, 1);
+assert.equal(timers.size, 0);
+assert.equal(run("resourceDashboard.pending"), false);
+run("resourceRefresh()");
+assert.equal(requests.length, 18);
+console.log("PASS: parallel scoped resource RPCs, partial failures, resolution races and nonoverlapping polling");

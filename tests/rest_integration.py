@@ -5,6 +5,7 @@ No existing configuration, account, or running service is modified.
 """
 import argparse
 import base64
+import concurrent.futures
 import hashlib
 import hmac
 import http.client
@@ -168,6 +169,12 @@ WebService {{
                 conn.close()
                 return result
 
+            def rpc(target, method, jwt=None, data=None, csrf=None):
+                """Call the scoped POST gateway with a bare backend method name."""
+                scope, name = method.split('.', 1)
+                return request('/api/v1/remote.'+scope, jwt, 'POST',
+                               {'target': target, 'method': name, 'payload': data or {}}, csrf)
+
             def eventually(check, description):
                 deadline = time.monotonic()+15
                 while time.monotonic() < deadline:
@@ -187,18 +194,29 @@ WebService {{
             assert json.loads(payload)['csrfToken'] == 'test-csrf-id'
             for jwt in (None, admin+'bad', token(['stats'], app='OTHER'), token(['stats'], expired=True)):
                 assert request('/api/v1/session', jwt)[0] == 403
-            assert request('/api/v1/alerts/stats', token([]))[0] == 401
-            assert request('/api/v1/alerts/stats', reader)[0] == 503
-            assert request('/api/v1/resources/3s', token([]))[0] == 401
-            assert request('/api/v1/resources/3s')[0] == 403
-            assert request('/api/v1/resources/5m', reader)[0] == 404
-            status, body = request('/api/v1/resources/3s', reader)
-            resources = json.loads(body)['components']
-            assert status == 200 and resources['web']['available'], (status, body)
-            assert resources['web']['capacity'] == 2 and resources['web']['component'] == 'web'
-            assert not resources['alerts']['available'] and not resources['log2json']['available'], body
-            assert request('/api/v1/alerts/rules/save', reader, 'POST', {}, 'test-csrf-id')[0] == 401
-            assert request('/api/v1/alerts/rules/save', admin, 'POST', {})[0] == 403
+            assert rpc('ALERTS', 'stats.SystemStats', jwt=token([]))[0] == 401
+            assert rpc('ALERTS', 'stats.SystemStats', jwt=reader)[0] == 503
+            for invalid in [None, {}, {'target': 'OTHER', 'method': 'SystemStats'},
+                            {'target': 'ALERTS', 'method': 'control.ReloadApp'},
+                            {'target': 'ALERTS', 'method': 'SystemStats', 'payload': 1}]:
+                assert request('/api/v1/remote.stats', reader, 'POST', invalid)[0] == 400
+            assert request('/api/v1/alerts/stats', reader)[0] == 404
+            assert request('/api/v1/resources/3s', reader)[0] == 404
+            for target in ['WEB', 'ALERTS', 'LOG2JSON']:
+                assert rpc(target, 'stats.ResourceMonitor', token([]), {'resolution': '3s'})[0] == 401
+                assert rpc(target, 'stats.ResourceMonitor', data={'resolution': '3s'})[0] == 403
+            for data in [{}, {'resolution': '5m'}, {'resolution': 3}]:
+                status, body = rpc('WEB', 'stats.ResourceMonitor', reader, data)
+                assert status == 200 and json.loads(body) == {'error': 'invalid_resolution'}, (status, body)
+            assert rpc('WEB', 'stats.MissingMethod', reader)[0] == 502
+            assert rpc('WEB', 'control.ResourceMonitor', admin, {'resolution': '3s'}, 'test-csrf-id')[0] == 502
+            status, body = rpc('WEB', 'stats.ResourceMonitor', reader, {'resolution': '3s'})
+            history = json.loads(body)
+            assert status == 200 and history['capacity'] == 2 and history['component'] == 'web', (status, body)
+            for target in ['ALERTS', 'LOG2JSON']:
+                assert rpc(target, 'stats.ResourceMonitor', reader, {'resolution': '3s'})[0] == 503
+            assert rpc('ALERTS', 'control.SaveRunningRules', jwt=reader, data={}, csrf='test-csrf-id')[0] == 401
+            assert rpc('ALERTS', 'control.SaveRunningRules', jwt=admin, data={})[0] == 403
             assert request('/api/v1/not-a-resource', admin)[0] == 404
             assert request('/resources.conf', admin)[0] in (403,404)
             status, page = request('/mods/alerts/rules.html', admin)
@@ -314,16 +332,19 @@ WebService {{
                         'id': 'alerts-test', 'Description': 'Test alert output',
                         'Host': '127.0.0.1', 'Port': alert_port, 'TransmissionMode': 0}])
                 launch(name, directory)
-            eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
-            eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
+            eventually(lambda: rpc('ALERTS', 'stats.SystemStats', jwt=reader)[0] == 200, 'alert backend TLS / FastRPC1')
+            eventually(lambda: rpc('LOG2JSON', 'stats.Inputs', jwt=reader)[0] == 200, 'converter TLS / FastRPC1')
+            # The endpoint chooses the namespace even when the body supplies another scope.
+            assert request('/api/v1/remote.stats', reader, 'POST',
+                           {'target': 'ALERTS', 'method': 'ReloadApp', 'scope': 'control'})[0] == 502
             # Every process owns its histories and exposes them through its own FastRPC handler.
             for resolution, interval in [('3s', 3), ('1m', 60), ('60m', 3600)]:
-                status, body = request('/api/v1/resources/' + resolution, reader)
-                resources = json.loads(body)['components']
-                assert status == 200, (status, body)
                 pids = set()
-                for component, history in resources.items():
-                    assert history['available'] and history['component'] == component, body
+                for target in ['WEB', 'ALERTS', 'LOG2JSON']:
+                    status, body = rpc(target, 'stats.ResourceMonitor', reader, {'resolution': resolution})
+                    history = json.loads(body)
+                    assert status == 200, (status, body)
+                    assert history['component'] == target.lower(), body
                     assert history['capacity'] == 2 and history['intervalSeconds'] == interval, body
                     assert 1 <= len(history['samples']) <= 2, body
                     assert history['latest'] == history['samples'][-1], body
@@ -337,46 +358,62 @@ WebService {{
 
             def resource_rates_ready():
                 """Wait for interval deltas from all three independent sensor threads."""
-                status, body = request('/api/v1/resources/3s', reader)
-                return status == 200 and all(
-                    history.get('available') and history['latest']['processCpuPercent'] is not None
-                    and history['latest']['processIO']['readBytesPerSecond'] is not None
-                    for history in json.loads(body)['components'].values())
+                for target in ['WEB', 'ALERTS', 'LOG2JSON']:
+                    status, body = rpc(target, 'stats.ResourceMonitor', reader, {'resolution': '3s'})
+                    history = json.loads(body)
+                    if status != 200 or history['latest']['processCpuPercent'] is None or history['latest']['processIO']['readBytesPerSecond'] is None:
+                        return False
+                return True
 
             eventually(resource_rates_ready, 'resource CPU and I/O baselines for all three processes')
-            original_converter_pid = json.loads(request('/api/v1/resources/1m', reader)[1])['components']['log2json']['latest']['processId']
-            # Numeric GET arguments must survive encoded JSON and FastRPC1.
-            for path, member in [('alerts/rules', None), ('alerts/actions', None),
-                                 ('log2json/hosts', 'hosts'), ('log2json/inputs', 'inputs'),
-                                 ('log2json/outputs', 'outputs')]:
-                status, body = request('/api/v1/'+path, reader)
+
+            def check_resource_poll(target):
+                """Regress resource replies stalled by an accidentally tiny TCP receive window."""
+                started = time.monotonic()
+                status, body = rpc(target, 'stats.ResourceMonitor', reader, {'resolution': '3s'})
+                elapsed = time.monotonic() - started
+                assert status == 200, (target, status, body)
+                assert elapsed < 2, (target, 'Resource poll stalled', elapsed)
+                assert json.loads(body)['component'] == target.lower(), (target, body)
+
+            # Several dashboards share each backend connection and must receive their own replies.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=9) as pool:
+                list(pool.map(check_resource_poll, ['WEB', 'ALERTS', 'LOG2JSON'] * 12))
+            original_converter_pid = json.loads(rpc('LOG2JSON', 'stats.ResourceMonitor', reader, {'resolution': '1m'})[1])['latest']['processId']
+            # RPC payloads and results must survive JSON and FastRPC1.
+            for target, method, member in [('ALERTS', 'stats.ReadRunningRules', None),
+                                           ('ALERTS', 'stats.ReadRunningActions', None),
+                                           ('LOG2JSON', 'stats.EventsPerHost', 'hosts'),
+                                           ('LOG2JSON', 'stats.Inputs', 'inputs'),
+                                           ('LOG2JSON', 'stats.Outputs', 'outputs')]:
+                status, body = rpc(target, method, reader)
                 result = json.loads(body)
-                assert status == 200 and isinstance(result if member is None else result[member], list), (path, body)
+                assert status == 200 and isinstance(result if member is None else result[member], list), (method, body)
             # Endpoint edits validate and persist without changing running workers.
             for kind, port_key, stats_key in [('inputs', 'ListenPort', 'inputs'), ('outputs', 'Port', 'outputs')]:
-                resource = '/api/v1/log2json/'+kind+'/config'
-                status, body = request(resource, reader)
+                config_method = 'InputsFileConfig' if kind == 'inputs' else 'OutputsFileConfig'
+                status, body = rpc('LOG2JSON', 'stats.Read'+config_method, reader)
                 original = json.loads(body)[kind]
                 assert status == 200 and not json.loads(body)['modified'], body
                 changed = [dict(original[0], Description='Updated λ "endpoint"')]
                 changed[0][port_key] = free_port()
-                assert request(resource, reader, 'PUT', {kind: changed}, 'test-csrf-id')[0] == 401
-                assert request(resource, admin, 'PUT', {kind: changed})[0] == 403
-                status, body = request(resource, admin, 'PUT', {kind: changed}, 'test-csrf-id')
+                assert rpc('LOG2JSON', 'control.Write'+config_method, reader, {kind: changed}, 'test-csrf-id')[0] == 401
+                assert rpc('LOG2JSON', 'control.Write'+config_method, admin, {kind: changed})[0] == 403
+                status, body = rpc('LOG2JSON', 'control.Write'+config_method, admin, {kind: changed}, 'test-csrf-id')
                 result = json.loads(body)
                 assert status == 200 and result['ok'] and result['modified'] and result['restartRequired'], body
                 assert result[kind] == changed
                 file = tmp/'ul3_log2json'/(kind+'.d')
                 assert read_collection(file) == changed
                 other = 'outputs' if kind == 'inputs' else 'inputs'
-                assert json.loads(request('/api/v1/log2json/'+other+'/config', reader)[1])['restartRequired']
+                assert json.loads(rpc('LOG2JSON', 'stats.Read'+('InputsFileConfig' if other == 'inputs' else 'OutputsFileConfig'), reader)[1])['restartRequired']
                 for invalid in [None, {}, [42], [dict(changed[0], **{port_key: 65536})],
                                 [dict(changed[0], **{port_key: True})], changed+changed]:
                     before = read_collection(file)
-                    status, body = request(resource, admin, 'PUT', {kind: invalid}, 'test-csrf-id')
+                    status, body = rpc('LOG2JSON', 'control.Write'+config_method, admin, {kind: invalid}, 'test-csrf-id')
                     assert status == 200 and not json.loads(body)['ok'], (status, body)
                     assert read_collection(file) == before
-                running = json.loads(request('/api/v1/log2json/'+kind, reader)[1])[stats_key]
+                running = json.loads(rpc('LOG2JSON', 'stats.'+kind.title(), reader)[1])[stats_key]
                 if kind == 'inputs':
                     assert running[0]['description'] == original[0]['Description']
                 else:
@@ -384,75 +421,73 @@ WebService {{
                 # Full-array writes also add and remove endpoints, including the last one.
                 second = dict(changed[0], id='second', **{port_key: free_port()})
                 for definitions in [changed+[second], changed, [], original]:
-                    status, body = request(resource, admin, 'PUT', {kind: definitions}, 'test-csrf-id')
+                    status, body = rpc('LOG2JSON', 'control.Write'+config_method, admin, {kind: definitions}, 'test-csrf-id')
                     assert status == 200 and json.loads(body)['ok'], body
                     assert read_collection(file) == definitions
                 assert not json.loads(body)['modified'] and not json.loads(body)['restartRequired'], body
-            assert request('/api/v1/log2json/reload', reader, 'POST', {}, 'test-csrf-id')[0] == 401
-            assert request('/api/v1/log2json/reload', admin, 'POST', {})[0] == 403
+            assert rpc('LOG2JSON', 'control.ReloadApp', jwt=reader, data={}, csrf='test-csrf-id')[0] == 401
+            assert rpc('LOG2JSON', 'control.ReloadApp', jwt=admin, data={})[0] == 403
             # Input configuration writes preserve Unicode, escapes, numbers and booleans.
             new_input = {'Description': 'test \u03bb "quoted"\ninput', 'ListenAddr': '127.0.0.1',
                          'ListenPort': 12345, 'enabled': False}
-            status, body = request('/api/v1/alerts/inputs/config', admin, 'POST', new_input, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddInputToFileConfig', jwt=admin, data=new_input, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/inputs/config', reader)
+            status, body = rpc('ALERTS', 'stats.ReadInputsFileConfig', jwt=reader)
             added_input = json.loads(body)['inputs'][0]
             assert all(added_input[key] == value for key, value in new_input.items()), body
-            status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
-                                   {'id': added_input['id']}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.RemInputFromFileConfig', jwt=admin, data={'id': added_input['id']}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             assert len(read_collection(tmp/'ul3_alert/inputs.d')) == 1
             input_file = tmp/'ul3_alert/inputs.d'
             original_inputs = read_collection(input_file)
-            status, body = request('/api/v1/alerts/inputs/config', admin, 'DELETE',
-                                   {'id': 'test-input'}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.RemInputFromFileConfig', jwt=admin, data={'id': 'test-input'}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             assert read_collection(input_file) == []
             for invalid_document in ['null', '[{}]', '{', '[] trailing']:
                 invalid_file = input_file/'invalid.json'
                 invalid_file.write_text(invalid_document)
-                status, body = request('/api/v1/alerts/inputs/config', admin, 'POST', new_input, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.AddInputToFileConfig', jwt=admin, data=new_input, csrf='test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
                 assert invalid_file.read_text() == invalid_document
             invalid_file.unlink()
             write_collection(input_file, original_inputs)
             for resource in ['actions', 'rules']:
-                status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.SaveRunning'+resource.title(), admin, {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
                 config_file = tmp/'ul3_alert'/(resource+'.d')
                 assert read_collection(config_file) == []
-                status, body = request('/api/v1/alerts/'+resource+'/config', admin, 'PUT', {}, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.Write'+resource.title()+'FileConfig', admin, {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
                 assert read_collection(config_file) == []
-            assert request('/api/v1/alerts/rules/item', admin, data={'id': 0})[0] == 200
+            assert rpc('ALERTS', 'stats.ReadRunningRule', jwt=admin, data={'id': 0})[0] == 200
             action = {'name': 'test-action', 'description': 'test', 'path': '/bin/true', 'args': ['/bin/true']}
-            status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddAction', jwt=admin, data=action, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/actions/item', admin, data={'name': 'test-action'})
+            status, body = rpc('ALERTS', 'stats.ReadRunningAction', jwt=admin, data={'name': 'test-action'})
             assert status == 200 and json.loads(body)['name'] == 'test-action', (status, body)
-            assert request('/api/v1/alerts/actions', admin, 'DELETE', {'name': 'test-action'}, 'test-csrf-id')[0] == 200
+            assert rpc('ALERTS', 'control.RemoveAction', jwt=admin, data={'name': 'test-action'}, csrf='test-csrf-id')[0] == 200
             # Tokens are write-only across every read API, including saved-file reads.
             telegram = {'name': 'telegram-secret', 'type': 'telegram', 'botToken': '123:test_secret',
                         'chatId': '@security', 'messageTemplate': '{{#print_json[$]!}}'}
-            status, body = request('/api/v1/alerts/actions', admin, 'POST', telegram, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddAction', jwt=admin, data=telegram, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/actions/item', reader, data={'name': telegram['name']})
+            status, body = rpc('ALERTS', 'stats.ReadRunningAction', jwt=reader, data={'name': telegram['name']})
             public_action = json.loads(body)
             assert status == 200 and public_action['hasBotToken'] and 'botToken' not in public_action, body
             public_action['description'] = 'Edited without retrieving the token'
-            status, body = request('/api/v1/alerts/actions', admin, 'PUT', public_action, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.EditAction', jwt=admin, data=public_action, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/actions/save', admin, 'POST', {}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.SaveRunningActions', jwt=admin, data={}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             action_file = tmp/'ul3_alert/actions.d'
             assert read_collection(action_file)[0]['botToken'] == telegram['botToken']
             assert all(file.stat().st_mode & 0o777 == 0o600 for file in action_file.glob('*.json'))
-            for resource in ['actions', 'actions/config']:
-                status, body = request('/api/v1/alerts/' + resource, reader)
+            for method in ['stats.ReadRunningActions', 'stats.ReadActionsFileConfig']:
+                status, body = rpc('ALERTS', method, reader)
                 assert status == 200 and 'test_secret' not in body and 'botToken' not in body, (status, body)
-            status, body = request('/api/v1/alerts/actions/reload', admin, 'POST', {}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.RulesActions', jwt=admin, data={}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/actions', admin, 'DELETE', {'name': telegram['name']}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.RemoveAction', jwt=admin, data={'name': telegram['name']}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             marker = tmp/'rule-executed'
             capture = 'import json,sys; from pathlib import Path; Path(sys.argv[1] + ".stdin").write_text(sys.stdin.read()); Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))'
@@ -461,34 +496,33 @@ WebService {{
                                '%-.INFO.id%', '%-.CWD[0].cwd%', '%+.CWD[0].cwd%',
                                '%$.CWD[0]%', '%-.missing[0]%', '%#rule.name%', '%-.EXECVE[0].argv%',
                                '%%/%#rule.name%/%#rule.name%/%N%/tail%', '%-.CWD[0].literal%']}
-            status, body = request('/api/v1/alerts/actions', admin, 'POST', action, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddAction', jwt=admin, data=action, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             rule = {'name': 'pipeline-rule', 'action': 'EXEC', 'actionId': 'pipeline-action',
                     'filter': 'IS_EQUAL($.CWD[0].cwd,"/tmp")'}
-            status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 0, 'rule': rule}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddRule', jwt=admin, data={'pos': 0, 'rule': rule}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             # Replacements and reordering must retain ownership and the configured values.
             action['description'] = 'updated pipeline action'
-            status, body = request('/api/v1/alerts/actions', admin, 'PUT', action, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.EditAction', jwt=admin, data=action, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/rules', admin, 'PUT', {'pos': 0, 'rule': rule}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.EditRule', jwt=admin, data={'pos': 0, 'rule': rule}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             spare_rule = dict(rule, name='spare-rule')
-            status, body = request('/api/v1/alerts/rules', admin, 'POST', {'pos': 1, 'rule': spare_rule}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.AddRule', jwt=admin, data={'pos': 1, 'rule': spare_rule}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             for direction, position in [('up', 1), ('down', 0)]:
-                status, body = request('/api/v1/alerts/rules/' + direction, admin, 'POST', {'pos': position}, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.Rule'+direction.title(), admin, {'pos': position}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
-            status, body = request('/api/v1/alerts/rules/item', reader, data={'id': 0})
+            status, body = rpc('ALERTS', 'stats.ReadRunningRule', jwt=reader, data={'id': 0})
             assert status == 200 and json.loads(body)['name'] == rule['name'], (status, body)
-            status, body = request('/api/v1/alerts/rules', admin, 'DELETE', {'pos': 1}, 'test-csrf-id')
+            status, body = rpc('ALERTS', 'control.RemoveRule', jwt=admin, data={'pos': 1}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             # Invalid numeric positions must never wrap or truncate to rule zero.
             for invalid_id in [-1, 0.5, 1 << 32, '0', None]:
-                status, body = request('/api/v1/alerts/rules/item', reader, data={'id': invalid_id})
+                status, body = rpc('ALERTS', 'stats.ReadRunningRule', jwt=reader, data={'id': invalid_id})
                 assert status == 200 and json.loads(body) is None, (status, body)
-                status, body = request('/api/v1/alerts/rules', admin, 'DELETE',
-                                       {'pos': invalid_id}, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.RemoveRule', jwt=admin, data={'pos': invalid_id}, csrf='test-csrf-id')
                 assert status == 200 and json.loads(body) is False, (status, body)
             with socket.create_connection(('127.0.0.1', input_port), timeout=5) as incoming:
                 event_id = (1 << 64) - 1
@@ -514,16 +548,16 @@ WebService {{
                         'messageRegex': r'^path=(\S+) id=(\d+) command=(.*)$',
                         'jsonTemplate': '{"INFO":{"id":(unsigned)<$2>},"CWD":[{"cwd":(string)<$1>,"literal":"syslog"}],"EXECVE":[{"argv":[(string)<$3>]}]}'}]
             module_payload = {'modules': modules}
-            assert request('/api/v1/log2json/modules', reader, 'PUT', module_payload, 'test-csrf-id')[0] == 401
-            assert request('/api/v1/log2json/modules', admin, 'PUT', module_payload)[0] == 403
-            status, body = request('/api/v1/log2json/modules', admin, 'PUT', module_payload, 'test-csrf-id')
+            assert rpc('LOG2JSON', 'control.SyslogModules', jwt=reader, data=module_payload, csrf='test-csrf-id')[0] == 401
+            assert rpc('LOG2JSON', 'control.SyslogModules', jwt=admin, data=module_payload)[0] == 403
+            status, body = rpc('LOG2JSON', 'control.SyslogModules', jwt=admin, data=module_payload, csrf='test-csrf-id')
             assert status == 200 and json.loads(body)['ok'], (status, body)
             module_file = tmp/'ul3_log2json/syslog_modules.d'
             assert read_collection(module_file) == modules
-            status, body = request('/api/v1/log2json/modules', reader)
+            status, body = rpc('LOG2JSON', 'stats.SyslogModules', jwt=reader)
             assert status == 200 and json.loads(body)['modules'] == modules, (status, body)
             invalid_modules = [dict(modules[0], messageRegex='(')]
-            status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': invalid_modules}, 'test-csrf-id')
+            status, body = rpc('LOG2JSON', 'control.SyslogModules', jwt=admin, data={'modules': invalid_modules}, csrf='test-csrf-id')
             assert status == 200 and not json.loads(body)['ok'], (status, body)
             assert read_collection(module_file) == modules
             for serial, prefix in [(73, '<14>Jun 22 12:19:47 relay sshd[42]: '),
@@ -535,39 +569,42 @@ WebService {{
                 captured = json.loads(marker.read_text())
                 assert captured[0] == str(serial) and json.loads(captured[1]) == '/tmp', captured
                 assert json.loads(captured[6]) == ['hello "λ"'] and json.loads(captured[8]) == 'syslog', captured
-            status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': []}, 'test-csrf-id')
+            status, body = rpc('LOG2JSON', 'control.SyslogModules', jwt=admin, data={'modules': []}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body)['ok'] and read_collection(module_file) == [], (status, body)
             for resource in ['actions', 'rules']:
-                status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
+                status, body = rpc('ALERTS', 'control.SaveRunning'+resource.title(), admin, {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
                 assert read_collection(tmp/'ul3_alert'/ (resource+'.d'))
             # Emulate systemd after the authorized restart and verify saved endpoints become active.
             restarted_port = free_port()
             for kind in ['inputs', 'outputs']:
-                resource = '/api/v1/log2json/'+kind+'/config'
-                definitions = json.loads(request(resource, reader)[1])[kind]
+                config_method = 'InputsFileConfig' if kind == 'inputs' else 'OutputsFileConfig'
+                definitions = json.loads(rpc('LOG2JSON', 'stats.Read'+config_method, reader)[1])[kind]
                 definitions[0]['Description'] = 'Applied after restart'
                 if kind == 'inputs':
                     definitions[0]['ListenPort'] = restarted_port
-                status, body = request(resource, admin, 'PUT', {kind: definitions}, 'test-csrf-id')
+                status, body = rpc('LOG2JSON', 'control.Write'+config_method, admin, {kind: definitions}, 'test-csrf-id')
                 assert status == 200 and json.loads(body)['restartRequired'], body
-            request('/api/v1/log2json/modules', admin, 'PUT', module_payload, 'test-csrf-id')
+            rpc('LOG2JSON', 'control.SyslogModules', jwt=admin, data=module_payload, csrf='test-csrf-id')
             converter = processes[-1]
-            status, body = request('/api/v1/log2json/reload', admin, 'POST', {}, 'test-csrf-id')
+            status, body = rpc('LOG2JSON', 'control.ReloadApp', jwt=admin, data={}, csrf='test-csrf-id')
             assert status == 200 and json.loads(body) is True, (status, body)
             assert converter.wait(timeout=8) == 0
             processes.remove(converter)
-            eventually(lambda: not json.loads(request('/api/v1/resources/3s', reader)[1])['components']['log2json']['available'],
-                       'resource overview degrades gracefully after converter disconnect')
+            eventually(lambda: rpc('LOG2JSON', 'stats.ResourceMonitor', reader, {'resolution': '3s'})[0] == 503,
+                       'resource RPC reports converter disconnect')
+            assert rpc('WEB', 'stats.ResourceMonitor', reader, {'resolution': '3s'})[0] == 200
+            assert rpc('ALERTS', 'stats.ResourceMonitor', reader, {'resolution': '3s'})[0] == 200
             launch('ul3_log2json', tmp/'ul3_log2json')
-            eventually(lambda: request('/api/v1/log2json/inputs/config', reader)[0] == 200,
+            eventually(lambda: rpc('LOG2JSON', 'stats.ReadInputsFileConfig', jwt=reader)[0] == 200,
                        'converter reconnect after restart')
-            restarted_resources = json.loads(request('/api/v1/resources/1m', reader)[1])['components']['log2json']
-            assert restarted_resources['available'] and len(restarted_resources['samples']) == 1
+            status, body = rpc('LOG2JSON', 'stats.ResourceMonitor', reader, {'resolution': '1m'})
+            restarted_resources = json.loads(body)
+            assert status == 200 and len(restarted_resources['samples']) == 1
             assert restarted_resources['latest']['processId'] != original_converter_pid
             assert restarted_resources['latest']['processCpuPercent'] is None
             for kind in ['inputs', 'outputs']:
-                result = json.loads(request('/api/v1/log2json/'+kind+'/config', reader)[1])
+                result = json.loads(rpc('LOG2JSON', 'stats.Read'+kind.title()+'FileConfig', reader)[1])
                 assert not result['modified'] and not result['restartRequired'], result
                 assert result[kind][0]['Description'] == 'Applied after restart'
             marker.unlink()
@@ -576,7 +613,7 @@ WebService {{
             eventually(marker.exists, 'saved endpoint configuration -> restart -> input -> output -> action')
             assert json.loads(marker.read_text())[0] == '91'
             assert any(name == 'updateAccessControlContext'  for name, _ in AppSync.requests)
-            print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, GET parameters, persisted endpoint edits, service restart, audit-to-action and configurable syslog-to-action pipelines')
+            print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, scoped POST gateways, RPC payloads, persisted endpoint edits, service restart, audit-to-action and configurable syslog-to-action pipelines')
         except Exception:
             for log in logfiles:
                 log.flush()

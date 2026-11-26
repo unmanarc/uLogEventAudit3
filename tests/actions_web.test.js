@@ -55,7 +55,7 @@ assert.equal(element("botToken").required, true);
 assert.equal(element("timeoutSeconds").disabled, false);
 
 vm.runInContext('displayAction("notify")', context);
-assert.equal(pending.request.resource, "alerts/actions/item");
+assert.equal(pending.request.method, "ReadRunningAction");
 pending.callbacks.success({name: "notify", type: "telegram", hasBotToken: true,
     chatId: "@security", messageTemplate: "Text <script> stays text", parseMode: "", timeoutSeconds: 15});
 assert.equal(element("botToken").value, "");
@@ -64,7 +64,7 @@ assert.equal(element("messageTemplate").value, "Text <script> stays text");
 assert.equal(element("actionName").readOnly, true);
 vm.runInContext('addAction("edit")', context);
 let payload = JSON.parse(JSON.stringify(pending.request.payload));
-assert.equal(pending.request.method, "PUT");
+assert.equal(pending.request.method, "EditAction");
 assert.equal(payload.type, "telegram");
 assert.equal(payload.chatId, "@security");
 assert.equal(payload.botToken, undefined);

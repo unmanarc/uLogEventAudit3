@@ -53,47 +53,52 @@ async function request(value, handlers = {}) {
     assert.equal(welcome.textContent, 'María <Admin>');
     assert.equal(readyCalls, 2);
 
-    let options = await request({method: 'GET', resource: 'alerts/rules'});
-    assert.equal(options.type, 'GET');
-    assert.equal(options.url, '/api/v1/alerts/rules');
-    assert.equal(options.data, undefined);
-    options = await request({method: 'GET', resource: 'alerts/actions/item', payload: {name: 'acción & test'}});
-    assert.deepEqual(JSON.parse(decodeURIComponent(options.url.split('?')[1])), {name: 'acción & test'});
+    let options = await request({scope: 'stats', target: 'ALERTS', method: 'ReadRunningRules'});
+    assert.equal(options.type, 'POST');
+    assert.equal(options.url, '/api/v1/remote.stats');
+    assert.deepEqual(JSON.parse(options.data), {target: 'ALERTS', method: 'ReadRunningRules', payload: {}});
+    options = await request({scope: 'stats', target: 'ALERTS', method: 'ReadRunningAction', payload: {name: 'acción & test'}});
+    assert.deepEqual(JSON.parse(options.data), {target: 'ALERTS', method: 'ReadRunningAction', payload: {name: 'acción & test'}});
+    options = await request({scope: 'stats', target: 'WEB', method: 'ResourceMonitor', payload: {resolution: '1m'}});
+    assert.equal(options.url, '/api/v1/remote.stats');
+    assert.deepEqual(JSON.parse(options.data), {target: 'WEB', method: 'ResourceMonitor', payload: {resolution: '1m'}});
     assert.equal(sessionReads, 0);
-    options = await request({method: 'DELETE', resource: 'alerts/rules', payload: {pos: 0}});
-    assert.deepEqual(JSON.parse(options.data), {pos: 0});
+    options = await request({scope: 'control', target: 'ALERTS', method: 'RemoveRule', payload: {pos: 0}});
+    assert.equal(options.url, '/api/v1/remote.control');
+    assert.deepEqual(JSON.parse(options.data), {target: 'ALERTS', method: 'RemoveRule', payload: {pos: 0}});
     assert.equal(options.headers['X-CSRF-Token'], 'csrf-1');
     assert.equal(options.contentType, 'application/json');
     // jQuery cache:false appends a non-JSON `?_=...` query rejected by Mantids30.
     // The session endpoint already sends Cache-Control: no-store.
     assert.equal(sessionOptions.cache, true);
     assert.equal(sessionOptions.data, undefined);
-    options = await request({method: 'POST', resource: 'alerts/rules/save'});
+    options = await request({scope: 'control', target: 'ALERTS', method: 'SaveRunningRules'});
     assert.equal(options.headers['X-CSRF-Token'], 'csrf-2');
     await assert.rejects(request({method: 'GET', resource: '../session'}));
-    await assert.rejects(request({method: 'PATCH', resource: 'alerts/rules'}));
+    await assert.rejects(request({scope: 'stats', target: 'ALERTS', method: 'control.ReloadApp'}));
+    await assert.rejects(request({scope: 'stats', target: 'OTHER', method: 'SystemStats'}));
     scopes = ['stats'];
     let denied = false;
     captured = null;
-    await request({method: 'POST', resource: 'alerts/rules/save'}, {error: xhr => { denied = xhr.status === 403; }});
+    await request({scope: 'control', target: 'ALERTS', method: 'SaveRunningRules'}, {error: xhr => { denied = xhr.status === 403; }});
     assert.equal(denied, true);
     assert.equal(captured, null);
     assert.equal(sessionReads, 2);
     // UI request tracking must finish on backend errors and failed CSRF renewal.
     scopes = ['stats', 'control'];
     const starts = [], finishes = [];
-    context.auditRequestStarted = method => starts.push(method);
+    context.auditRequestStarted = scope => starts.push(scope);
     context.auditRequestFinished = failed => finishes.push(failed);
-    options = await request({method: 'GET', resource: 'alerts/rules'});
+    options = await request({scope: 'stats', target: 'ALERTS', method: 'ReadRunningRules'});
     options.complete({}, 'error');
-    assert.deepEqual(starts, ['GET']);
+    assert.deepEqual(starts, ['stats']);
     assert.deepEqual(finishes, [true]);
     const originalAjax = context.$.ajax;
     context.$.ajax = options => options.url === '/api/v1/session'
         ? Promise.reject({status: 503}) : originalAjax(options);
     let renewalError = false;
     let renewalComplete = 0;
-    await request({method: 'POST', resource: 'alerts/rules/save'}, {
+    await request({scope: 'control', target: 'ALERTS', method: 'SaveRunningRules'}, {
         error: () => { renewalError = true; },
         complete: (xhr, status) => {
             assert.equal(xhr.status, 503);
@@ -103,7 +108,7 @@ async function request(value, handlers = {}) {
     });
     assert.equal(renewalError, true);
     assert.equal(renewalComplete, 1);
-    assert.deepEqual(starts, ['GET', 'POST']);
+    assert.deepEqual(starts, ['stats', 'control']);
     assert.deepEqual(finishes, [true, true]);
 
     // A queue that drains from >50% to empty must clear both halves and its label.
@@ -171,7 +176,7 @@ async function request(value, handlers = {}) {
         vm.runInContext(pageScripts, pageContext);
         if (subsystem === 'alerts') {
             vm.runInContext('auditReady()', pageContext);
-            assert.deepEqual(requests.map(item => item.request.resource), ['alerts/inputs/config', 'alerts/inputs']);
+            assert.deepEqual(requests.map(item => item.request.method), ['ReadInputsFileConfig', 'ReadRunningInputs']);
             requests[0].handlers.success({modified: true, inputs: [{id: 'test', Description: 'Saved listener', ListenAddr: '127.0.0.1', ListenPort: 9999}]});
             requests[1].handlers.success([{description: 'Running listener', clients: [{ip: '192.0.2.1', processedLinesCount: 7, droppedElements: 2}]}]);
             assert.equal(values.get('#span-alerts-inputsconfig-description-0'), 'Saved listener');
@@ -184,7 +189,7 @@ async function request(value, handlers = {}) {
             assert.match(page, /id="endpoints-list"/);
             assert.match(page, /src="\/assets\/js\/endpoints.js"/);
             vm.runInContext('loadEndpointActivity()', pageContext);
-            assert.equal(requests[0].request.resource, `log2json/${kind}`);
+            assert.equal(requests[0].request.method, kind === 'inputs' ? 'Inputs' : 'Outputs');
             if (kind === 'inputs') {
                 requests[0].handlers.success({inputs: [{description: 'Running input', processedLinesCount: 42, invalidLinesCount: 3, clients: []}]});
                 assert.equal(values.get('#span-log2json-input-proclines-0'), 42);
@@ -197,7 +202,7 @@ async function request(value, handlers = {}) {
     }
     assert.doesNotMatch(header, /\/mods\/(alerts|log2json)\/(inputsconfig|outputsconfig)\.html/);
     await require('./syslog_modules_web.test.js')();
-    console.log('PASS: JSON requests, Unicode query arguments, fresh CSRF after renewal, and scope gating');
+    console.log('PASS: JSON requests, Unicode RPC payloads, fresh CSRF after renewal, and scope gating');
     console.log('PASS: nested-page auth path, profile display name, and page initialization');
     console.log('PASS: UI request lifecycle, queue reset/unavailable states, and per-host rendering');
 })().catch(error => {console.error(error); process.exitCode = 1;});

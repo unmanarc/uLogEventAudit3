@@ -125,7 +125,7 @@ static void checkLifecycle()
     require(restarted.at("capacity").as_uint64() == 300, "Default retention changed");
     require(restarted.at("samples").as_array().size() == 1, "Restart retained old history");
     require(restarted.at("latest").as_object().at("processCpuPercent").is_null(), "Restart retained CPU baseline");
-    const auto method = ResourceSensing::rpcMethod();
+    const Mantids30::Protocol::FastRPC1::Method method{&ResourceSensing::rpcHistory, nullptr};
     for (const auto &request : {boost::json::value(nullptr), boost::json::value(boost::json::object{}), boost::json::value(boost::json::object{{"resolution", "wrong"}})})
     {
         const auto result = method.method(nullptr, "SERVER", request, nullptr, "");
