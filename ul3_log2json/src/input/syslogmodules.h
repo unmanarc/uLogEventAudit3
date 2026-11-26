@@ -11,7 +11,7 @@ namespace UL3::LOG2JSON::Input {
 class SyslogModules
 {
 public:
-    /** @brief Load modules from a JSON file; a missing file starts with no modules. */
+    /** @brief Load one module per JSON file from a directory; missing directories are empty. */
     static void load(const std::string &path);
     /** @brief Return editable module definitions from the current snapshot. */
     static boost::json::array getConfig();

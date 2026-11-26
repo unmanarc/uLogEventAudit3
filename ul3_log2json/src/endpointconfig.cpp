@@ -1,16 +1,10 @@
 /** @file @brief Validate endpoint files and save GUI changes without replacing live workers. */
 #include "endpointconfig.h"
+#include "../../common/config_directory.h"
 
-#include <cerrno>
-#include <cstdio>
-#include <cstdlib>
-#include <fstream>
-#include <iterator>
 #include <limits>
 #include <set>
 #include <stdexcept>
-#include <system_error>
-#include <unistd.h>
 
 namespace UL3::LOG2JSON {
 namespace {
@@ -49,49 +43,6 @@ void number(boost::json::object &object, const char *key, uint64_t minimum, uint
     *value = integer;
 }
 
-/** @brief Atomically replace the JSON file using a private temporary file in its directory. */
-void persist(const std::string &path, const std::string &document)
-{
-    std::string temporary = path + ".XXXXXX";
-    const int descriptor = mkstemp(temporary.data());
-    if (descriptor < 0)
-    {
-        throw std::system_error(errno, std::generic_category(), "Cannot create endpoint configuration");
-    }
-    int failure = 0;
-    size_t offset = 0;
-    while (offset < document.size())
-    {
-        const auto written = write(descriptor, document.data() + offset, document.size() - offset);
-        if (written < 0 && errno == EINTR)
-        {
-            continue;
-        }
-        if (written <= 0)
-        {
-            failure = written < 0 ? errno : EIO;
-            break;
-        }
-        offset += static_cast<size_t>(written);
-    }
-    if (!failure && fsync(descriptor) != 0)
-    {
-        failure = errno;
-    }
-    if (close(descriptor) != 0 && !failure)
-    {
-        failure = errno;
-    }
-    if (!failure && std::rename(temporary.c_str(), path.c_str()) != 0)
-    {
-        failure = errno;
-    }
-    if (failure)
-    {
-        std::remove(temporary.c_str());
-        throw std::system_error(failure, std::generic_category(), "Cannot save endpoint configuration");
-    }
-}
 } // namespace
 
 boost::json::array EndpointConfig::validate(const boost::json::array &definitions) const
@@ -138,22 +89,7 @@ boost::json::array EndpointConfig::validate(const boost::json::array &definition
 boost::json::array EndpointConfig::load(const std::string &file)
 {
     std::scoped_lock lock(mutex);
-    std::ifstream input(file, std::ios::binary);
-    if (!input)
-    {
-        throw std::runtime_error("Cannot read endpoint configuration: " + file);
-    }
-    const std::string document{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
-    if (input.bad())
-    {
-        throw std::runtime_error("Cannot read endpoint configuration: " + file);
-    }
-    const auto value = boost::json::parse(document);
-    if (!value.is_array())
-    {
-        throw std::invalid_argument("Endpoint configuration must be an array: " + file);
-    }
-    const auto definitions = validate(value.as_array());
+    const auto definitions = validate(UL3::JSON::readConfigDirectory(file));
     path = file;
     saved = definitions;
     running = definitions;
@@ -176,7 +112,7 @@ void EndpointConfig::replace(const boost::json::array &definitions)
     }
     if (saved != validated)
     {
-        persist(path, UL3::JSON::toStyledString(validated));
+        UL3::JSON::writeConfigDirectory(path, validated);
         saved = std::move(validated);
     }
 }

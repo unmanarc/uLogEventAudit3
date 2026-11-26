@@ -13,7 +13,7 @@ class EndpointConfig
 public:
     /** @brief Select listener or destination validation rules. */
     explicit EndpointConfig(bool inputs) : inputs(inputs) {}
-    /** @brief Read and validate a JSON array before initializing the running snapshot. */
+    /** @brief Read and validate an ordered directory of JSON objects before initializing the running snapshot. */
     boost::json::array load(const std::string &path);
     /** @brief Return saved definitions and whether they differ from running settings. */
     boost::json::object read();
