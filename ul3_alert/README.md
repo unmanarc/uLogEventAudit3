@@ -55,56 +55,115 @@ Open **Rules & alerts → Inputs** to inspect saved listeners and running client
 
 ### Actions Configuration
 
-Actions are defined in the file **/etc/ulogeventaudit3/ul3_alert/actions.json** and can be triggered when specific filtering criteria are met. These actions allow for executing external programs or scripts, which receive arguments derived from JSON Path expressions, rule names, binary data, or other variables present in the processed JSON objects.
+Actions are stored in **/etc/ulogeventaudit3/ul3_alert/actions.json**. Open
+**Rules & alerts → Actions** to add or edit an action and select **Run command**,
+**HTTP POST**, or **Telegram message**. Each rule references the action's unique
+`name`; the existing rule operations `EXEC` and `EXECANDABORT` work with all three
+types. Changes run immediately; use **Save to disk** to retain them after restart.
 
-For example, an action might execute a program that sends an email alert using parameters extracted via JSONPath (e.g., `$.message`) along with contextual information like the triggering rule's name. The configuration specifies how each action should behave and what inputs it requires to perform its task.
+#### Templates
 
-#### Example actions Configuration File:
+All body, message and stdin templates use libMantids30's **MantidsLang**, with
+the complete incoming event JSON as the root context. For example:
+
+```text
+Host: {{#print_raw[$INFO.host]!}}
+Event: {{#print_json[$]!}}
+{{#foreach [$PATH as path]}}Path: {{#print_raw[$path.name]!}}
+{{/foreach}}
+```
+
+Use `print_raw` for plain text, `print_htmlescaped` for HTML text, and
+`print_json` when inserting a value into JSON (it supplies quotes and escaping).
+Conditions and loops are supported. Local file includes/rendering are disabled.
+Templates are limited to 64 KiB and rendered output to 1 MiB. Inserted event
+values are data and are never interpreted again as templates.
+
+#### Run command
 
 ```json
-[
-	{
-		"appendNewLineToEachArgv" : true,
-		"args" : 
-		[
-			"sendmsg.sh",
-			"%%F0%%9F%%9A%%A8 %%E2%%9A%%A0 *%#rule.name%* %%E2%%9A%%A0 %%F0%%9F%%9A%%A8 %N%#TIME=*%-.INFO.time%*",
-			"#KEY=*%-.INFO.key%* / #ID=%-.INFO.unixTime%.%-.INFO.msecs%:%-.INFO.id%",
-			"#HOST=*%-.INFO.host%*",
-			"```",
-			"PATHS= {%-.PATH[0].name%, %-.PATH[1].name%, %-.PATH[2].name%,%-.PATH[3].mode%, %-.PATH[4].mode%, %-.PATH[5].mode%}",
-			"MODES= {%-.PATH[0].mode%, %-.PATH[1].mode%, %-.PATH[2].mode%,%-.PATH[3].mode%, %-.PATH[4].mode%, %-.PATH[5].mode%}",
-			"DIR(CWD)= %-.CWD[0].cwd%",
-			"UID/GID= %-.SYSCALL[0].uid% / %-.SYSCALL[0].gid%",
-			"PID/PPID= %-.SYSCALL[0].pid% / %-.SYSCALL[0].ppid%",
-			"SELINUX=%-.SYSCALL[0].subj%",
-			"SES/TTY=%-.SYSCALL[0].ses% / %-.SYSCALL[0].tty%",
-			"RET/SUC=%-.SYSCALL[0].exit% / %-.SYSCALL[0].success% ```",
-			"PROCESS NAME: ``` %-.PROCTITLE[0].proctitle% ```",
-			"EXECVE CMDLINE: ``` %-.EXECVE[0].cmdline% ```"
-		],
-		"description" : "Send Message via sendmsg.sh",
-		"name" : "SendMSG",
-		"path" : "/usr/bin/sendmsg.sh"
-	}
-]
+{
+  "name": "system-log",
+  "type": "command",
+  "path": "/usr/bin/logger",
+  "args": ["logger", "--tag", "ul3-alert"],
+  "stdinTemplate": "{{#print_json[$]!}}\n"
+}
 ```
-The variables used within the `args` field of an action configuration are resolved using specific syntax patterns. Here's a breakdown of how these variables work:
 
-1. **%%0A0D%%**: Return the  binary represenation of the hex code inside (`\n\r`).
-1. **%N%**: Return a newline (`\n`). 
-2. **JSONPath Styled (starts with `$`, - Eg. %$.INFO%)**:
-   - Parses the substring after `$` as a JSONPath.
-   - Resolves the path in the input JSON data.
-   - Returns the result formatted in styled (pretty-printed multi-line) JSON.
-3. **JSONPath Unstyled (starts with `-` - %-.INFO.host% )**:
-   - Similar to above but returns unstyled, single-line JSON without formatting.
-4. **Uppercase JSONPath (starts with `+` - %+.INFO.host% )**:
-   - Resolves the path similarly to the `-` case but converts the result to uppercase.
-5. **Rule Metadata (starts with `#`, - %#rule.name%)**:
-   - If `var` is `"#rule.name"`, returns the current rule’s name.
+The rendered input goes to the program's **stdin**, followed by EOF. No shell
+is invoked. An omitted `stdinTemplate` sends the whole event as JSON with a
+newline; an empty template sends empty input. Arguments are optional; when
+omitted, argv[0] defaults to the executable path. Configured arguments include
+argv[0] explicitly and keep the legacy percent placeholders in subsequent
+arguments: `%N%` (newline), `%#rule.name%` (rule name), `%$.INFO%` (pretty JSON),
+`%-.INFO.host%` (compact JSON), `%+.INFO.host%` (uppercase compact JSON), and
+`%%` (literal percent). `appendNewLineToEachArgv` preserves its existing behavior.
+Legacy actions without `type` load as commands and also receive the default
+JSON stdin input.
 
-This syntax allows dynamic insertion of metadata and event details into action arguments for context-rich notifications.
+#### HTTP POST
+
+```json
+{
+  "name": "webhook",
+  "type": "http_post",
+  "url": "https://alerts.example.com/events",
+  "contentType": "application/json",
+  "bodyTemplate": "{\"host\":{{#print_json[$INFO.host]!}},\"event\":{{#print_json[$]!}}}",
+  "timeoutSeconds": 15
+}
+```
+
+The libMantids30 HTTP client sends the rendered body to a fixed HTTP/HTTPS URL.
+The content type defaults to `application/json`. Optional `bearerToken`
+authentication requires HTTPS. URLs cannot contain embedded credentials or
+fragments. HTTPS verifies the certificate chain and hostname; redirects and
+retries are not automatic. The timeout (1–300 seconds) applies separately to
+connect/read/write operations. Responses are limited to 1 MiB; transport errors,
+truncated responses and non-2xx statuses are failures.
+
+#### Telegram message
+
+```json
+{
+  "name": "security-channel",
+  "type": "telegram",
+  "botToken": "123456:REPLACE_WITH_BOT_TOKEN",
+  "chatId": "@security_channel",
+  "messageTemplate": "Alert from {{#print_raw[$INFO.host]!}}\n{{#print_json[$]!}}",
+  "parseMode": "",
+  "disableNotification": false,
+  "timeoutSeconds": 15
+}
+```
+
+Each action has its own bot token, channel/chat ID and message template. Obtain
+a token from BotFather and grant the bot permission to post in the destination
+channel. The message is rendered first, then serialized safely as the `text`
+field in the JSON request to Telegram's HTTPS `sendMessage` endpoint. An HTTP
+success also requires Telegram's JSON `ok` flag to be true.
+
+Plain text is the default. Optional `HTML` and `MarkdownV2` modes require escaping
+for that format; `print_htmlescaped` is available for HTML text. Telegram limits
+messages to 4096 characters after entity parsing; oversized or incorrectly
+formatted messages are rejected by Telegram. See the
+[Telegram Bot API](https://core.telegram.org/bots/api#sendmessage).
+
+#### Credentials
+
+The GUI uses password fields. Read APIs omit `botToken` and `bearerToken` and
+return `hasBotToken` / `hasBearerToken` flags. Leaving a password field blank on
+an edit retains the stored value; enter a new value to rotate it. The HTTP form
+also offers **Remove stored bearer token**. Raw API edits preserve omitted
+credentials and use an explicit empty bearer token to remove it. Switching types
+removes unrelated fields and credentials.
+
+Configuration saves validate the whole array before replacing it atomically
+with permissions `0600`. Credentials remain in the private server configuration
+file; they are not encrypted at rest. Keep that file and its backups restricted
+to the service account. Delivery logs omit URLs, bodies, arguments and exception
+text. Failed validation, saves and reloads preserve the running actions.
 
 ### Integration Steps:
 
