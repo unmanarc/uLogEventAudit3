@@ -37,8 +37,8 @@ accents from the existing SVG brand. `console.css` defines the responsive theme;
 request status and removal dialogs. These are plain local assets: no extra
 dependencies or asset build are needed when editing the application UI.
 
-Statistics have an explicit Refresh button and show the last successful update;
-they do not poll automatically. Lists distinguish loading, empty and failed
+Module statistics have an explicit Refresh button and show the last successful update.
+The System resources page polls automatically. Lists distinguish loading, empty and failed
 requests. Editor forms use native validation and keyboard submission, with
 write controls disabled while saving. Rule/action changes still need Save to
 disk; input changes still need a service reload, as explained in the UI.
@@ -86,10 +86,107 @@ returns user, CSRF value, remaining lifetime and version. Read operations requir
 `stats`; writes require `control` plus `X-CSRF-Token`. JSON GET arguments use the
 Mantids30 convention `?` followed by URL-encoded JSON. Mutations send a JSON body.
 
-The server's complete allowlist is [rest_routes.inc](src/rest_routes.inc).
+The backend forwarding allowlist is [rest_routes.inc](src/rest_routes.inc).
 Resources cover `alerts/rules`, `alerts/actions`, `alerts/inputs`, their
 configuration, save/reload operations, `alerts/stats`, and the `log2json` hosts,
 inputs, outputs and distribution statistics. There is no browser RPC gateway.
+
+## OS resource dashboard and sensing API
+
+Each executable owns one joined background sensor thread using libMantids30's
+`Core::Helpers::ResourceMonitor`. It samples three independent resolutions:
+`3s` (3 seconds), `1m` (60 seconds), and `60m` (3600 seconds). Each resolution
+has its own CPU and I/O baseline; coarse rates cover the whole coarse interval.
+The first sample is immediate, with null CPU percentages and I/O rates until
+the next sample of that resolution. Missing OS counters remain JSON `null`.
+
+Retention defaults to 300 samples **per resolution, per process**: approximately
+15 minutes, 5 hours, and 12.5 days. The bounded histories are held in memory and
+reset on process restart. Set the following in both backends' `config.ini` files:
+
+```ini
+[ResourceMonitor]
+SamplesPerSeries=300
+```
+
+The web service keeps its existing Boost INFO `webserver.conf` format:
+
+```text
+ResourceMonitor
+{
+    SamplesPerSeries 300
+}
+```
+
+The valid range is 1..3000; invalid configuration fails startup. Restart the
+corresponding service after changing its retention. Each service can retain a
+different number of samples. OS reads run outside the history mutex; API reads
+copy stored measurements and do not trigger sensing. Shutdown wakes the sensor
+immediately rather than waiting for its next deadline.
+
+All three FastRPC instances register `stats.ResourceMonitor`, accepting
+`{"resolution":"3s"}` (or `1m` / `60m`) over their existing authenticated internal
+connections. Invalid arguments return `{"error":"invalid_resolution"}`.
+The web reads its local sensor and calls both remote services concurrently.
+Authenticated readers with `stats` scope can fetch:
+
+- `GET /api/v1/resources/3s`
+- `GET /api/v1/resources/1m`
+- `GET /api/v1/resources/60m`
+
+Responses carry `Cache-Control: no-store` and have this shape:
+
+```json
+{
+  "resolution": "3s",
+  "components": {
+    "web": {
+      "available": true,
+      "component": "web",
+      "resolution": "3s",
+      "intervalSeconds": 3,
+      "capacity": 300,
+      "running": true,
+      "latest": null,
+      "samples": []
+    },
+    "alerts": {"available": false, "error": "service_disconnected"},
+    "log2json": {"available": false, "error": "service_disconnected"}
+  }
+}
+```
+
+`latest` is the last entry in `samples`, or null before the first sample. A remote
+RPC failure reports `resource_sensing_unavailable` for that component while
+preserving the other components' results. Timestamps are Unix milliseconds for
+display; rate calculations use actual monotonic elapsed time. Each sample includes:
+
+| Fields | Meaning / units |
+| --- | --- |
+| `timestamp`, `processId`, `logicalProcessorCount` | Capture time and native process/host identity |
+| `processCpuPercent`, `systemCpuPercent` | Percent of total online host CPU capacity (0..100) |
+| `processCpuSeconds`, `processUptimeSeconds`, `systemUptimeSeconds` | Seconds |
+| `residentMemoryBytes`, `peakResidentMemoryBytes`, `virtualMemoryBytes`, `privateCommitBytes` | Bytes; platform-dependent counters can be null |
+| `processMemoryPercent` | RSS as a percentage of host physical RAM |
+| `systemMemory` | `totalBytes`, `availableBytes`, `usedPercent`, or null |
+| `threadCount`, `handleCount` | Threads and Linux file descriptors / Windows handles |
+| `processIO` | Cumulative `readBytes`, `writeBytes`, `storageReadBytes`, `storageWriteBytes`, plus corresponding `*BytesPerSecond` rates; or null |
+
+Logical I/O includes cached transfers (Linux `rchar`/`wchar`). Storage counters
+follow OS semantics, are unavailable on Windows, and do not represent device-wide
+throughput or network-interface traffic. CPU and memory capacity use host totals,
+without container/affinity adjustments. System measurements belong to each process's
+host; hosts need not be the same machine.
+
+The [System resources page](var/www/ulogeventaudit3/webroot/mods/system/resources.html),
+linked directly below Overview in the sidebar, has one resolution selector and six
+local SVG charts comparing Web,
+Alerts and Log2JSON: CPU, resident memory, logical I/O, storage I/O, threads, and
+descriptors/handles. I/O charts use solid reads and dashed writes. Pointer readouts,
+per-component PID/uptime/host details, null gaps and disconnected/stale indicators
+help inspect the measurements. Polling never overlaps, ignores obsolete resolution
+responses and pauses in hidden tabs. It runs every 3 seconds at `3s` resolution
+and every minute for coarser views, with backoff on errors.
 
 [Build and test instructions](../BUILD.md) include real-service integration checks.
 The fixture checks rendering, permissions and TLS/FastRPC1; the deployed
