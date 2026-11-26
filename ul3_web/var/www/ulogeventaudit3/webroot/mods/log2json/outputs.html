@@ -1,19 +1,40 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
-<script>
-
-
-  // Default Main View:
-  function auditReady() {
-    mainview_log2json_output_start();
-  }
-</script>
-
+<div id="endpoint-config" data-kind="outputs"></div>
+<div id="endpoint-restart" class="alert alert-warning" role="status" hidden>
+    Saved input or output settings differ from the running configuration. Restart the service to apply them.
+    <button id="endpoint-reload" class="btn btn-danger btn-sm" type="button" hidden>Restart service</button>
+</div>
+<div class="panel-toolbar"><h2 class="panel-title">Configured outputs</h2><button id="endpoint-add" class="btn btn-primary" type="button" disabled>New output</button></div>
+<table class="table table-hover" aria-label="Configured outputs" data-empty="No outputs configured.">
+    <thead><tr><th scope="col">Description</th><th scope="col">Remote host</th><th scope="col">TCP port</th><th scope="col">Controls</th></tr></thead>
+    <tbody id="endpoints-list"></tbody>
+</table>
+<p id="endpoints-message" role="status" aria-live="polite"></p>
+<p class="form-text">Saving and removing entries updates outputs.json. Changes take effect after restarting Log to JSON. A queue push timeout of zero discards overflow immediately.</p>
+<dialog id="endpoint-dialog" class="confirm-dialog module-dialog" aria-labelledby="endpoint-dialog-title">
+    <form id="endpoint-form" class="editor-form">
+        <h2 id="endpoint-dialog-title">Output settings</h2>
+        <div class="form-group"><label for="endpoint-Description">Description</label><input id="endpoint-Description" class="form-control" type="text" required autofocus></div>
+        <div class="form-group"><label for="endpoint-Host">Remote host</label><input id="endpoint-Host" class="form-control" type="text" required></div>
+        <div class="form-group"><label for="endpoint-Port">TCP port</label><input id="endpoint-Port" class="form-control" type="number" min="1" max="65535" step="1" required></div>
+        <div class="form-group"><label for="endpoint-TransmissionMode">Transmission mode</label><select id="endpoint-TransmissionMode" class="form-select"><option value="0">One JSON event per line</option><option value="1">Indented JSON</option></select></div>
+        <div class="form-group"><label for="endpoint-TimeoutSecs">Connection timeout (seconds)</label><input id="endpoint-TimeoutSecs" class="form-control" type="number" min="1" max="4294967295" step="1" required></div>
+        <div class="form-group"><label for="endpoint-ReconnectSleepTimeInSecs">Reconnect delay (seconds)</label><input id="endpoint-ReconnectSleepTimeInSecs" class="form-control" type="number" min="1" max="4294967295" step="1" required></div>
+        <div class="form-group"><label for="endpoint-MaxQueuedItems">Maximum queued events</label><input id="endpoint-MaxQueuedItems" class="form-control" type="number" min="1" max="9007199254740991" step="1" required></div>
+        <div class="form-group"><label for="endpoint-QueuePushTimeoutInMS">Queue push timeout (milliseconds)</label><input id="endpoint-QueuePushTimeoutInMS" class="form-control" type="number" min="0" max="4294967295" step="1" required></div>
+        <p id="endpoint-error" class="text-danger" role="alert"></p>
+        <div class="form-actions"><button id="endpoint-cancel" class="btn btn-outline-secondary" type="button">Cancel</button><button class="btn btn-primary" type="submit">Save configuration</button></div>
+    </form>
+</dialog>
+<section aria-labelledby="endpoint-activity-title">
+<h2 id="endpoint-activity-title">Running output activity</h2>
 <div id="span-log2json-output-body" data-empty="No JSON outputs configured.">
 </div>
 
 <script>
+    /** @brief Render counters for running outputs independently of pending configuration changes. */
     function drawLog2JSONOutputStats(outputStats) {
         document.getElementById("span-log2json-output-body").innerHTML = "";
         let i = 0;
@@ -82,7 +103,8 @@
         redrawProgressBars();
     }
 
-    function mainview_log2json_output_start() {
+    /** @brief Refresh the running outputs alongside their saved configuration. */
+    function loadEndpointActivity() {
         var payloadData = { "method": "GET", "resource": "log2json/outputs" }
         auditRequest(payloadData, {
             success: function (result) {
@@ -91,9 +113,8 @@
             error: commonFunctionError
         });
     }
-    function mainview_log2json_output_stop() {
-        //   alert('Stopping alert outputs');
-    }
 </script>
+</section>
+<script src="/assets/js/endpoints.js"></script>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

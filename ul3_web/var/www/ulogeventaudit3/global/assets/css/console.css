@@ -159,6 +159,7 @@ textarea.form-control { line-height: 1.7; min-height: 160px; }
 .toast-body { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1rem; }
 .confirm-dialog { border: 1px solid var(--line); border-radius: 1rem; padding: 2rem; width: min(460px, calc(100% - 2rem)); color: var(--ink); box-shadow: 0 24px 80px #102c4633; }
 .confirm-dialog::backdrop { background: #102c4680; }
+.module-dialog { width: min(850px, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow-y: auto; }
 .confirm-dialog h2 { font-size: 1.4rem; font-weight: 650; }
 .confirm-dialog p { color: var(--muted); }
 .dialog-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff0f2; color: #b3293b; font-weight: 700; margin-bottom: 1rem; }

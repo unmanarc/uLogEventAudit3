@@ -1,20 +1,36 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
-<script>
-
-  // Default Main View:
-  function auditReady() {
-    mainview_log2json_inputs_start();
-  }
-</script>
-
-
-
+<div class="panel-toolbar"><a class="btn btn-outline-secondary" href="/mods/log2json/modules.html">Syslog modules</a></div>
+<div id="endpoint-config" data-kind="inputs"></div>
+<div id="endpoint-restart" class="alert alert-warning" role="status" hidden>
+    Saved input or output settings differ from the running configuration. Restart the service to apply them.
+    <button id="endpoint-reload" class="btn btn-danger btn-sm" type="button" hidden>Restart service</button>
+</div>
+<div class="panel-toolbar"><h2 class="panel-title">Configured inputs</h2><button id="endpoint-add" class="btn btn-primary" type="button" disabled>New input</button></div>
+<table class="table table-hover" aria-label="Configured inputs" data-empty="No inputs configured.">
+    <thead><tr><th scope="col">Description</th><th scope="col">Listen address</th><th scope="col">TCP port</th><th scope="col">Controls</th></tr></thead>
+    <tbody id="endpoints-list"></tbody>
+</table>
+<p id="endpoints-message" role="status" aria-live="polite"></p>
+<p class="form-text">Saving and removing entries updates inputs.json. Changes take effect after restarting Log to JSON.</p>
+<dialog id="endpoint-dialog" class="confirm-dialog module-dialog" aria-labelledby="endpoint-dialog-title">
+    <form id="endpoint-form" class="editor-form">
+        <h2 id="endpoint-dialog-title">Input settings</h2>
+        <div class="form-group"><label for="endpoint-Description">Description</label><input id="endpoint-Description" class="form-control" type="text" required autofocus></div>
+        <div class="form-group"><label for="endpoint-ListenAddr">Listen address</label><input id="endpoint-ListenAddr" class="form-control" type="text" required></div>
+        <div class="form-group"><label for="endpoint-ListenPort">TCP port</label><input id="endpoint-ListenPort" class="form-control" type="number" min="1" max="65535" step="1" required></div>
+        <p id="endpoint-error" class="text-danger" role="alert"></p>
+        <div class="form-actions"><button id="endpoint-cancel" class="btn btn-outline-secondary" type="button">Cancel</button><button class="btn btn-primary" type="submit">Save configuration</button></div>
+    </form>
+</dialog>
+<section aria-labelledby="endpoint-activity-title">
+<h2 id="endpoint-activity-title">Running input activity</h2>
 <div id="span-log2json-input-body" data-empty="No inputs reporting activity yet."></div>
 
 <script>
 
+    /** @brief Render counters for running inputs independently of pending configuration changes. */
     function drawLog2JSONInputStats(inputStats) {
 
         document.getElementById("span-log2json-input-body").innerHTML = "";
@@ -50,7 +66,8 @@
         }
     }
 
-    function mainview_log2json_inputs_start() {
+    /** @brief Refresh the running inputs alongside their saved configuration. */
+    function loadEndpointActivity() {
         var payloadData = { "method": "GET", "resource": "log2json/inputs" }
         auditRequest(payloadData, {
             success: function (result) {
@@ -59,9 +76,8 @@
             error: commonFunctionError
         });
     }
-    function mainview_log2json_inputs_stop() {
-        //   alert('Stopping alert inputs');
-    }
 </script>
+</section>
+<script src="/assets/js/endpoints.js"></script>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}

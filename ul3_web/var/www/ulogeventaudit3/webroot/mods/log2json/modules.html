@@ -1,0 +1,221 @@
+{{#render[/includes/layout/inc.header.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
+{{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
+
+<p>Each module filters the process / logger name, matches the message and fills a JSON template from its captures. Every matching module emits one event. Unmatched messages are ignored; auditd uses its built-in parser.</p>
+<div class="panel-toolbar">
+    <div class="table-search">
+        <label for="table-search" class="visually-hidden">Search modules</label>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <input type="search" class="form-control" id="table-search" data-target="modules-list" placeholder="Search modules" aria-controls="modules-list" autocomplete="off">
+    </div>
+    <button id="module-add" class="btn btn-primary" type="button" disabled>New module</button>
+</div>
+<table class="table table-hover" aria-label="Syslog modules" data-empty="No syslog modules configured yet.">
+    <thead><tr><th scope="col">Module name</th><th scope="col">Process / logger regex</th><th scope="col">Message regex</th><th scope="col" class="text-end">Controls</th></tr></thead>
+    <tbody id="modules-list"></tbody>
+</table>
+<p class="empty-state" id="no-search-results" hidden>No matches. Try a different search.</p>
+<p class="table-count" id="table-count" role="status" aria-live="polite"></p>
+<p id="modules-message" role="status" aria-live="polite"></p>
+<p class="form-text">Saving or removing a module persists the configuration and applies it immediately.</p>
+
+<dialog id="module-dialog" class="confirm-dialog module-dialog" aria-labelledby="module-dialog-title">
+    <form id="module-form" class="editor-form">
+        <h2 id="module-dialog-title">New module</h2>
+        <div class="form-group">
+            <label for="module-name">Module name</label>
+            <input id="module-name" name="name" class="form-control" type="text" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="module-loggerRegex">Process / logger regex</label>
+            <input id="module-loggerRegex" name="loggerRegex" class="form-control code-input" type="text" required spellcheck="false" aria-describedby="module-regex-help">
+        </div>
+        <div class="form-group">
+            <label for="module-messageRegex">Message regex</label>
+            <input id="module-messageRegex" name="messageRegex" class="form-control code-input" type="text" required spellcheck="false" aria-describedby="module-regex-help">
+        </div>
+        <p id="module-regex-help" class="form-text">Filters search for a match; use <code>^</code> and <code>$</code> to match the entire value. The PID is excluded from the logger name.</p>
+        <div class="form-group">
+            <label for="module-jsonTemplate">JSON object template</label>
+            <textarea id="module-jsonTemplate" name="jsonTemplate" class="form-control code-input" rows="8" required spellcheck="false" aria-describedby="module-template-help"></textarea>
+        </div>
+        <details id="module-template-help">
+            <summary>Template syntax</summary>
+            <p class="form-text">Use whole template values such as <code>(string)&lt;$1&gt;</code> for text or <code>(integer)&lt;$2&gt;</code> for a number. Quotes around typed placeholders are optional. Bare <code>"$1"</code> is literal text. Supported types: <code>string</code>, <code>integer</code>, <code>unsigned</code>, <code>number</code>, <code>boolean</code> and <code>null</code>. Captures come from the message regex; <code>$0</code> is the entire match. Missing or invalid captures use type defaults.</p>
+        </details>
+        <p id="module-error" class="text-danger" role="alert"></p>
+        <div class="form-actions">
+            <button id="module-cancel" class="btn btn-outline-secondary" type="button">Cancel</button>
+            <button class="btn btn-primary" type="submit">Save and apply</button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+    let modulesLoaded = false;
+    let modulesBusy = false;
+    let syslogModules = [];
+    let editingModule = null;
+    const moduleFields = ["name", "loggerRegex", "messageRegex", "jsonTemplate"];
+    const moduleDialog = document.getElementById("module-dialog");
+    const moduleForm = document.getElementById("module-form");
+
+    /** @brief Keep mutation controls consistent with loading and scope checks. */
+    function updateModuleControls() {
+        const allowed = auditHasScope("control");
+        const disabled = !modulesLoaded || modulesBusy || !allowed;
+        document.getElementById("module-add").hidden = !allowed;
+        document.getElementById("module-add").disabled = disabled;
+        document.querySelectorAll("#modules-list button, #module-form input, #module-form textarea, #module-form button")
+            .forEach(control => { control.disabled = disabled; });
+    }
+
+    /** @brief Render the persisted snapshot using text nodes for backend values. */
+    function renderSyslogModules() {
+        const body = document.getElementById("modules-list");
+        body.replaceChildren();
+        syslogModules.forEach((definition, index) => {
+            const row = body.insertRow();
+            for (const key of ["name", "loggerRegex", "messageRegex"]) {
+                const cell = row.insertCell();
+                cell.textContent = definition[key];
+                if (key !== "name") {
+                    cell.className = "code-input";
+                }
+            }
+            const controls = row.insertCell();
+            controls.className = "text-end text-nowrap";
+            if (auditHasScope("control")) {
+                for (const [title, style, handler] of [
+                    ["Edit", "btn-outline-secondary", () => { openModuleEditor(index); }],
+                    ["Remove", "btn-outline-danger", () => { removeSyslogModule(index); }]
+                ]) {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = `btn btn-sm ${style}`;
+                    button.textContent = title;
+                    button.setAttribute("aria-label", `${title} module ${definition.name}`);
+                    button.addEventListener("click", handler);
+                    controls.appendChild(button);
+                }
+            }
+        });
+        auditEnhanceContent("ready");
+        updateModuleControls();
+    }
+
+    /** @brief Open an isolated draft; cancelling leaves the saved list intact. */
+    function openModuleEditor(index = null) {
+        if (!modulesLoaded || modulesBusy || !auditHasScope("control") || moduleDialog.open) {
+            return;
+        }
+        editingModule = index;
+        const definition = index === null ? {
+            name: "",
+            loggerRegex: "^sshd$",
+            messageRegex: "^Accepted (\\S+) for (\\S+) from (\\S+).*$",
+            jsonTemplate: '{\n  "source": "sshd",\n  "method": (string)<$1>,\n  "user": (string)<$2>,\n  "ip": (string)<$3>\n}'
+        } : syslogModules[index];
+        for (const key of moduleFields) {
+            document.getElementById(`module-${key}`).value = definition[key];
+        }
+        document.getElementById("module-dialog-title").textContent = index === null ? "New module" : "Edit module";
+        document.getElementById("module-error").textContent = "";
+        moduleDialog.showModal();
+    }
+
+    /** @brief Replace all modules atomically, committing the UI only after success. */
+    function saveSyslogModules(modules) {
+        if (!modulesLoaded || modulesBusy || !auditHasScope("control")) {
+            return;
+        }
+        modulesBusy = true;
+        updateModuleControls();
+        auditRequest({method: "PUT", resource: "log2json/modules", payload: {modules}}, {
+            success: result => {
+                const message = result.ok ? "Modules saved and applied." : (result.message || "Could not save modules");
+                document.getElementById("modules-message").textContent = message;
+                if (result.ok) {
+                    syslogModules = modules;
+                    moduleDialog.close();
+                    renderSyslogModules();
+                } else {
+                    document.getElementById("module-error").textContent = message;
+                }
+                showToast(message, result.ok ? "success" : "error");
+            },
+            error: xhr => {
+                const message = xhr.responseJSON?.message || "Could not save modules. Try again.";
+                document.getElementById("module-error").textContent = message;
+                document.getElementById("modules-message").textContent = message;
+                commonFunctionError(xhr);
+            },
+            complete: () => { modulesBusy = false; updateModuleControls(); }
+        });
+    }
+
+    /** @brief Confirm removal and persist the remaining modules immediately. */
+    async function removeSyslogModule(index) {
+        if (!modulesLoaded || modulesBusy || !auditHasScope("control")) {
+            return;
+        }
+        // Preserve the selected object if a refresh completes while confirming.
+        const definition = syslogModules[index];
+        if (!await auditConfirm(`Remove module "${definition.name}"? The change applies immediately.`)) {
+            return;
+        }
+        if (!syslogModules.includes(definition)) {
+            return;
+        }
+        saveSyslogModules(syslogModules.filter(module => module !== definition));
+    }
+
+    /** @brief Load modules without overwriting a draft in the open editor. */
+    function auditReady() {
+        if (modulesBusy || moduleDialog.open) {
+            return;
+        }
+        modulesBusy = true;
+        updateModuleControls();
+        auditRequest({method: "GET", resource: "log2json/modules"}, {
+            success: result => {
+                if (!result.ok) {
+                    showToast(result.message || "Could not load modules", "error");
+                    return;
+                }
+                syslogModules = result.modules;
+                modulesLoaded = true;
+                renderSyslogModules();
+                document.getElementById("modules-message").textContent = "Modules loaded.";
+            },
+            error: commonFunctionError,
+            complete: () => { modulesBusy = false; updateModuleControls(); }
+        });
+    }
+
+    document.getElementById("module-add").addEventListener("click", () => { openModuleEditor(); });
+    document.getElementById("module-cancel").addEventListener("click", () => { moduleDialog.close(); });
+    moduleDialog.addEventListener("cancel", event => {
+        if (modulesBusy) {
+            event.preventDefault();
+        }
+    });
+    moduleForm.addEventListener("submit", event => {
+        event.preventDefault();
+        if (!modulesLoaded || modulesBusy || !auditHasScope("control") || !moduleForm.reportValidity()) {
+            return;
+        }
+        const definition = Object.fromEntries(moduleFields.map(key => [key, document.getElementById(`module-${key}`).value]));
+        const modules = syslogModules.slice();
+        if (editingModule === null) {
+            modules.push(definition);
+        } else {
+            modules[editingModule] = definition;
+        }
+        document.getElementById("module-error").textContent = "";
+        saveSyslogModules(modules);
+    });
+</script>
+{{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
+{{#render[/includes/layout/inc.footer.html]!}}

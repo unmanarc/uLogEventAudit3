@@ -2,17 +2,17 @@
 
 const auditPages = {
     "alerts/stats": ["Alert statistics", "Queue capacity, processing speed and filter activity."],
-    "alerts/inputs": ["Input activity", "Incoming connections and JSON processing for each alert input."],
-    "alerts/inputsconfig": ["Input configuration", "Manage the TCP listeners that receive JSON events."],
+    "alerts/inputs": ["Inputs", "Configure TCP listeners and monitor incoming connections and JSON processing."],
     "alerts/rules": ["Rules & filters", "Define how events are evaluated. Rules run in the order shown."],
     "alerts/actions": ["Actions", "Manage the programs your alert rules can execute."],
-    "alerts/input-add": ["Add an input", "Configure a TCP listener for incoming JSON events.", "inputsconfig"],
+    "alerts/input-add": ["Add an input", "Configure a TCP listener for incoming JSON events.", "inputs"],
     "alerts/rule-add": ["Add a rule", "Choose a condition and what happens when an event matches.", "rules"],
     "alerts/action-add": ["Add an action", "Define a program and the arguments passed to it.", "actions"],
     "log2json/events": ["Event processing", "Monitor the auditd event queue and processing throughput."],
     "log2json/eventsph": ["Events by host", "Find pending, processed and dropped events for each source host."],
-    "log2json/inputs": ["Syslog & auditd inputs", "Monitor source connections, processed lines and invalid input."],
-    "log2json/outputs": ["JSON outputs", "Check destination connections and outgoing queue capacity."]
+    "log2json/inputs": ["Syslog & auditd inputs", "Configure TCP listeners and monitor source connections, processed lines and invalid input."],
+    "log2json/modules": ["Syslog modules", "Convert syslog messages to JSON using logger filters, message captures and templates."],
+    "log2json/outputs": ["JSON outputs", "Configure JSON destinations and monitor connections, outgoing queues and delivery."]
 };
 let auditPending = 0;
 let auditLoadFailed = false;

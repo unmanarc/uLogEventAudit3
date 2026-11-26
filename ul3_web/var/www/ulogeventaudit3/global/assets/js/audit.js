@@ -6,7 +6,7 @@ function auditHasScope(scope) {
         .some(item => item.textContent === scope);
 }
 
-// JSON GET arguments use Mantids30's encoded query convention. Identity stays in cookies.
+/** @brief Send a scoped JSON request, renewing the CSRF value before mutations. */
 function auditRequest(request, handlers = {}) {
     const method = request.method;
     if (!["GET", "POST", "PUT", "DELETE"].includes(method) ||
@@ -30,23 +30,34 @@ function auditRequest(request, handlers = {}) {
         auditRequestStarted(method);
         options.complete = (xhr, status) => {
             auditRequestFinished(!["success", "notmodified", "nocontent"].includes(status));
-            if (handlers.complete) handlers.complete(xhr, status);
+            if (handlers.complete) {
+                handlers.complete(xhr, status);
+            }
         };
     }
     if (method === "GET") {
-        if (request.payload) options.url += "?" + encodeURIComponent(JSON.stringify(request.payload));
+        if (request.payload) {
+            options.url += "?" + encodeURIComponent(JSON.stringify(request.payload));
+        }
         return $.ajax(options);
     }
     options.contentType = "application/json";
     options.data = JSON.stringify(request.payload || {});
     // The platform auth helper can renew the cookie at any time. Bind each mutation
     // to the current session's CSRF value instead of retaining an old JWT identifier.
-    return $.ajax({url: API_BASE + "/session", dataType: "json", cache: false}).then(session => {
+    // The server sends Cache-Control: no-store. Keep jQuery from adding its `_`
+    // cache-busting query parameter: Mantids30 expects the whole query to be JSON.
+    return $.ajax({url: API_BASE + "/session", dataType: "json", cache: true}).then(session => {
         options.headers = {"X-CSRF-Token": session.csrfToken};
         return $.ajax(options);
     }, xhr => {
-        if (track) auditRequestFinished(true);
+        if (track) {
+            auditRequestFinished(true);
+        }
         (handlers.error || commonFunctionError)(xhr);
+        if (handlers.complete) {
+            handlers.complete(xhr, "error");
+        }
     });
 }
 

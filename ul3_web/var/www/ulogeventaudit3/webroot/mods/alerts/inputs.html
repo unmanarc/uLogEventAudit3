@@ -3,16 +3,141 @@
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
 <script>
 
-  // Default Main View:
+  /** @brief Refresh saved listeners and running input activity on the same page. */
   function auditReady() {
-    mainview_alerts_inputs_start();
+    loadAlertInputConfig();
+    loadAlertInputActivity();
   }
+
+  /** @brief Apply saved listener changes through the alert service restart. */
+  function reloadAlerts()
+  {
+    var payloadData = { "method": "POST", "resource": "alerts/reload",
+                        "payload": {}
+                      }
+    auditRequest(payloadData, {
+      success: function (result) {
+        if (result == true)
+        {
+          document.getElementById("span-alerts-reload-body").style.visibility = "visible";
+          document.getElementById("span-alerts-reload-body").style.display = "block";
+
+          document.getElementById("span-alerts-inputsmodified-body").style.visibility = "collapse";
+          document.getElementById("span-alerts-inputsmodified-body").style.display = "none";
+
+          setTimeout(() => { location.reload(); }, 4000);
+        }
+        else
+        {
+          showToast("Internal error reloading the alerts service", "error");
+        }
+      },
+      error: commonFunctionError
+    });
+
+  }
+
 </script>
 
+<div class="alert alert-warning alert-dismissible fade show text-center" role="alert" id="span-alerts-reload-body"
+  style="visibility: collapse; display: none;">
+  <strong>Reloading!</strong> <br>
+  Please wait...<br>
+</div>
+
+
+<div class="alert alert-warning alert-dismissible fade show text-center" role="alert"
+  id="span-alerts-inputsmodified-body" style="visibility: collapse; display: none;">
+  <strong>The input configuration has been modified!</strong> <br>
+  Please reload the alert service to adopt the new changes.<br>
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button class="btn btn-danger btn-sm" role="button" onclick="javascript:reloadAlerts()">Reload service</button>{{/if}}{{/foreach}}
+</div>
+
+
+<div class="panel-toolbar"><h2 class="panel-title">Configured listeners</h2>
+  {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<a href="/mods/alerts/input-add.html" class="btn btn-primary" role="button">Add input</a>{{/if}}{{/foreach}}
+</div>
+
+<div id="span-alerts-inputsconfig-body" data-empty="No inputs configured. Add a listener to receive JSON events."></div>
+
+<script>
+  /** @brief Remove a saved listener and return to the unified inputs view. */
+  async function removeInput(localId)
+  {
+    if (!await auditConfirm("Remove this TCP input? Reload the alerts service afterwards to apply the change."))
+    {
+      return;
+    }
+    let id =  document.getElementById(`span-alerts-inputsconfig-id-${localId}`).value;
+    var payloadData = { "method": "DELETE", "resource": "alerts/inputs/config",
+                        "payload": {
+                          "id" : id
+                        }
+                      }
+    auditRequest(payloadData, {
+      success: function (result) {
+        if (result == true)
+        {
+          document.location = "/mods/alerts/inputs.html";
+        }
+        else
+        {
+          showToast("Internal Error Removing Input", "error");
+        }
+      },
+      error: commonFunctionError
+    });
+
+
+
+  }
+
+  /** @brief Render saved listeners and their configuration controls. */
+  function drawInputs(inputs) {
+
+    document.getElementById("span-alerts-inputsconfig-body").innerHTML = "";
+    let i = 0;
+
+    for (let input of inputs) {
+      $("#span-alerts-inputsconfig-body").append(
+        `
+        <section class="input-config-card">
+          <h2 id="span-alerts-inputsconfig-description-${i}"></h2>
+          <dl><div><dt>Listen address</dt><dd id="span-alerts-inputsconfig-laddr-${i}"></dd></div><div><dt>TCP port</dt><dd id="span-alerts-inputsconfig-lport-${i}"></dd></div></dl>
+          <input type="hidden" id="span-alerts-inputsconfig-id-${i}">
+          {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"control")]}}<button type="button" class="btn btn-danger btn-sm remove-input" onclick="removeInput('${i}')" aria-label="Remove input">Remove</button>{{/if}}{{/foreach}}
+        </section>`
+      );
+      $(`#span-alerts-inputsconfig-description-${i}`).text(input["Description"]);
+      $(`#span-alerts-inputsconfig-laddr-${i}`).text(input["ListenAddr"]);
+      $(`#span-alerts-inputsconfig-lport-${i}`).text(input["ListenPort"]);
+      document.getElementById(`span-alerts-inputsconfig-id-${i}`).value = input["id"];
+      i++;
+    }
+  }
+
+  /** @brief Load saved listeners and show whether a service restart is required. */
+  function loadAlertInputConfig() {
+    var payloadData = { "method": "GET", "resource": "alerts/inputs/config" }
+    auditRequest(payloadData, {
+      success: function (result) {
+        const notice = document.getElementById("span-alerts-inputsmodified-body");
+        notice.style.visibility = result.modified ? "visible" : "collapse";
+        notice.style.display = result.modified ? "block" : "none";
+
+        drawInputs(result["inputs"]);
+      },
+      error: commonFunctionError
+    });
+  }
+</script>
+<section aria-labelledby="input-activity-title">
+<h2 id="input-activity-title">Running input activity</h2>
 <div id="span-alerts-input-body" data-empty="No inputs reporting activity yet."></div>
 
 <script>
 
+  /** @brief Render running alert input connections and processing counters. */
   function drawInputStats(inputStats) {
 
     document.getElementById("span-alerts-input-body").innerHTML = "";
@@ -45,7 +170,8 @@
     }
   }
 
-  function mainview_alerts_inputs_start() {
+  /** @brief Refresh the active alert listeners and their client counters. */
+  function loadAlertInputActivity() {
     var payloadData = { "method": "GET", "resource": "alerts/inputs" }
     auditRequest(payloadData, {
       success: function (result) {
@@ -54,9 +180,7 @@
       error: commonFunctionError
     });
   }
-  function mainview_alerts_inputs_stop() {
-    //   alert('Stopping alert inputs');
-  }
 </script>
+</section>
 {{#render[/includes/layout/inc.layout.leftpanel.footer.html]!}}
 {{#render[/includes/layout/inc.footer.html]!}}
