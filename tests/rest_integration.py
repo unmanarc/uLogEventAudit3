@@ -234,7 +234,7 @@ WebService {{
             for path in ['/index.html', '/assets/js/jquery.min.js', '/mods/alerts/rules.html']:
                 assert request(path)[0] == 302, path
             for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js',
-                         '/assets/css/console.css', '/assets/js/console.js', '/assets/js/endpoints.js']:
+                         '/assets/css/console.css', '/assets/js/console.js', '/assets/js/endpoints.js', '/assets/js/actions.js']:
                 status, asset = request(path, reader)
                 assert status == 200 and len(asset) > 1000, (path, status)
             for path in ['/package.json', '/node_modules/jquery/dist/jquery.min.js']:
@@ -370,8 +370,31 @@ WebService {{
             status, body = request('/api/v1/alerts/actions/item', admin, data={'name': 'test-action'})
             assert status == 200 and json.loads(body)['name'] == 'test-action', (status, body)
             assert request('/api/v1/alerts/actions', admin, 'DELETE', {'name': 'test-action'}, 'test-csrf-id')[0] == 200
+            # Tokens are write-only across every read API, including saved-file reads.
+            telegram = {'name': 'telegram-secret', 'type': 'telegram', 'botToken': '123:test_secret',
+                        'chatId': '@security', 'messageTemplate': '{{#print_json[$]!}}'}
+            status, body = request('/api/v1/alerts/actions', admin, 'POST', telegram, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/actions/item', reader, data={'name': telegram['name']})
+            public_action = json.loads(body)
+            assert status == 200 and public_action['hasBotToken'] and 'botToken' not in public_action, body
+            public_action['description'] = 'Edited without retrieving the token'
+            status, body = request('/api/v1/alerts/actions', admin, 'PUT', public_action, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/actions/save', admin, 'POST', {}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            action_file = tmp/'ul3_alert/actions.json'
+            assert json.loads(action_file.read_text())[0]['botToken'] == telegram['botToken']
+            assert action_file.stat().st_mode & 0o777 == 0o600
+            for resource in ['actions', 'actions/config']:
+                status, body = request('/api/v1/alerts/' + resource, reader)
+                assert status == 200 and 'test_secret' not in body and 'botToken' not in body, (status, body)
+            status, body = request('/api/v1/alerts/actions/reload', admin, 'POST', {}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            status, body = request('/api/v1/alerts/actions', admin, 'DELETE', {'name': telegram['name']}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
             marker = tmp/'rule-executed'
-            capture = 'import json,sys; from pathlib import Path; Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))'
+            capture = 'import json,sys; from pathlib import Path; Path(sys.argv[1] + ".stdin").write_text(sys.stdin.read()); Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))'
             action = {'name': 'pipeline-action', 'path': sys.executable,
                       'args': [sys.executable, '-c', capture, str(marker),
                                '%-.INFO.id%', '%-.CWD[0].cwd%', '%+.CWD[0].cwd%',
@@ -415,6 +438,8 @@ WebService {{
                 incoming.sendall(('\n'.join(lines)+'\n').encode())
             eventually(marker.exists, 'audit input -> reconstructed JSON -> TCP output -> expression -> action')
             captured = json.loads(marker.read_text())
+            stdin_event = json.loads(Path(str(marker) + '.stdin').read_text())
+            assert stdin_event['INFO']['id'] == event_id and stdin_event['CWD'][0]['cwd'] == '/tmp', stdin_event
             assert captured[0] == str(event_id), captured
             assert json.loads(captured[1]) == '/tmp', captured
             assert json.loads(captured[2]) == '/TMP', captured

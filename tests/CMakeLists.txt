@@ -48,3 +48,25 @@ set_tests_properties(endpoint_config PROPERTIES
 if(AUDIT_NODE_EXECUTABLE)
     add_test(NAME endpoint_config_web COMMAND "${AUDIT_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/endpoint_config_web.test.js")
 endif()
+
+add_executable(actions_test
+    actions_test.cpp
+    ../ul3_alert/src/rules/action.cpp
+    ../ul3_alert/src/rules/rules.cpp
+    ../ul3_alert/src/globals.cpp)
+target_include_directories(actions_test PRIVATE ../ul3_alert/src)
+audit_target(actions_test
+    Mantids30_Runtime_Logs Mantids30_Core_Threads Mantids30_DataFormat_JSON
+    Mantids30_Scripting_JSONExprEval Mantids30_Scripting_MantidsLang Mantids30_Client_HTTPv1)
+add_test(NAME actions COMMAND actions_test)
+set_tests_properties(actions PROPERTIES
+    ENVIRONMENT "LD_LIBRARY_PATH=${Mantids30_DataFormat_JSON_LIBDIR}:$ENV{LD_LIBRARY_PATH}")
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME action_delivery COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/action_delivery_test.py" $<TARGET_FILE:actions_test>)
+    set_tests_properties(action_delivery PROPERTIES TIMEOUT 30
+        ENVIRONMENT "LD_LIBRARY_PATH=${Mantids30_DataFormat_JSON_LIBDIR}:$ENV{LD_LIBRARY_PATH}")
+endif()
+if(AUDIT_NODE_EXECUTABLE)
+    add_test(NAME actions_web COMMAND "${AUDIT_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/actions_web.test.js")
+endif()
