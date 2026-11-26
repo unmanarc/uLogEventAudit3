@@ -180,7 +180,7 @@ WebService {{
             assert request('/resources.conf', admin)[0] in (403,404)
             status, page = request('/mods/alerts/rules.html', admin)
             assert status == 200 and '<!doctype html>' in page and '<%include:' not in page and '{{' not in page, (status, page[:400])
-            assert 'Welcome, test-user' in page and 'ruleCmd(' in page
+            assert '<span id="welcome">test-user</span>' in page and 'ruleCmd(' in page
             assert '>Remove</a>' in page and '/assets/js/jquery.min.js' in page
             assert '/auth/assets/js/auth.js' in page
             assert 'cdn.jsdelivr.net' not in page and 'code.jquery.com' not in page
@@ -198,13 +198,43 @@ WebService {{
             status, page = request('/mods/alerts/rules.html', token(['stats', 'controller']))
             assert status == 200 and '>Remove</a>' not in page
             assert request('/mods/alerts/rule-add.html', token(['stats', 'controller']))[0] == 403
+            for jwt in [reader, admin]:
+                status, page = request('/mods/log2json/modules.html', jwt)
+                assert status == 200 and '{{' not in page, (status, page)
+                assert '<tbody id="modules-list">' in page and '<dialog id="module-dialog"' in page
             for path in ['/', '/index.html', '/mods/log2json/eventsph.html']:
                 status, page = request(path, admin)
-                assert status == 200 and '{{' not in page and 'Welcome, test-user' in page, (path, status)
+                assert status == 200 and '{{' not in page and '<span id="welcome">test-user</span>' in page, (path, status)
+            # Each endpoint page contains configuration and activity with one navigation entry.
+            for path, config_id, activity_id in [
+                    ('/mods/alerts/inputs.html', 'span-alerts-inputsconfig-body', 'span-alerts-input-body'),
+                    ('/mods/log2json/inputs.html', 'endpoints-list', 'span-log2json-input-body'),
+                    ('/mods/log2json/outputs.html', 'endpoints-list', 'span-log2json-output-body')]:
+                for jwt in [reader, admin]:
+                    status, page = request(path, jwt)
+                    assert status == 200 and '{{' not in page, (path, status)
+                    assert f'id="{config_id}"' in page and f'id="{activity_id}"' in page, path
+                    assert 'href="/mods/alerts/inputsconfig.html"' not in page
+                    assert 'href="/mods/log2json/inputsconfig.html"' not in page
+                    assert 'href="/mods/log2json/outputsconfig.html"' not in page
+                    if path.startswith('/mods/alerts/'):
+                        assert ('href="/mods/alerts/input-add.html"' in page) == (jwt == admin)
+                        assert ('class="btn btn-danger btn-sm remove-input"' in page) == (jwt == admin)
+            status, page = request('/mods/alerts/input-add.html', admin)
+            assert status == 200 and '/mods/alerts/inputsconfig.html' not in page
+            assert 'href="/mods/alerts/inputs.html"' in page
+            # Check navigation in rendered pages, including the independent overview shortcuts.
+            for path in ['/', '/mods/log2json/inputs.html']:
+                status, page = request(path, reader)
+                assert status == 200, (path, status)
+                assert 'id="mainview-log2json-modules-link"' in page, (path, 'missing sidebar module link')
+                assert 'id="mainview-alerts-rules-link"' in page, (path, 'missing alerts sidebar links')
+                content = page.split('<main ', 1)[1]
+                assert 'href="/mods/log2json/modules.html"' in content, (path, 'missing content module link')
             for path in ['/index.html', '/assets/js/jquery.min.js', '/mods/alerts/rules.html']:
                 assert request(path)[0] == 302, path
             for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js',
-                         '/assets/css/console.css', '/assets/js/console.js']:
+                         '/assets/css/console.css', '/assets/js/console.js', '/assets/js/endpoints.js']:
                 status, asset = request(path, reader)
                 assert status == 200 and len(asset) > 1000, (path, status)
             for path in ['/package.json', '/node_modules/jquery/dist/jquery.min.js']:
@@ -244,10 +274,12 @@ WebService {{
                         (directory/file).write_text('[]')
                     (directory/'inputs.json').write_text(json.dumps([{'Description':'test input', 'ListenAddr':'127.0.0.1', 'ListenPort':alert_port, 'id':'test-input'}]))
                 else:
-                    (directory/'receptors.d').mkdir()
-                    (directory/'dispatchers.d').mkdir()
-                    (directory/'receptors.d/test.ini').write_text(f'ListenAddr=127.0.0.1\nListenPort={input_port}\n')
-                    (directory/'dispatchers.d/test.ini').write_text(f'Host=127.0.0.1\nPort={alert_port}\nTransmitionMode=0\n')
+                    (directory/'inputs.json').write_text(json.dumps([{
+                        'id': 'syslog-test', 'Description': 'Test syslog input',
+                        'ListenAddr': '127.0.0.1', 'ListenPort': input_port}]))
+                    (directory/'outputs.json').write_text(json.dumps([{
+                        'id': 'alerts-test', 'Description': 'Test alert output',
+                        'Host': '127.0.0.1', 'Port': alert_port, 'TransmissionMode': 0}]))
                 launch(name, directory)
             eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
             eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
@@ -258,6 +290,44 @@ WebService {{
                 status, body = request('/api/v1/'+path, reader)
                 result = json.loads(body)
                 assert status == 200 and isinstance(result if member is None else result[member], list), (path, body)
+            # Endpoint edits validate and persist without changing running workers.
+            for kind, port_key, stats_key in [('inputs', 'ListenPort', 'inputs'), ('outputs', 'Port', 'outputs')]:
+                resource = '/api/v1/log2json/'+kind+'/config'
+                status, body = request(resource, reader)
+                original = json.loads(body)[kind]
+                assert status == 200 and not json.loads(body)['modified'], body
+                changed = [dict(original[0], Description='Updated λ "endpoint"')]
+                changed[0][port_key] = free_port()
+                assert request(resource, reader, 'PUT', {kind: changed}, 'test-csrf-id')[0] == 401
+                assert request(resource, admin, 'PUT', {kind: changed})[0] == 403
+                status, body = request(resource, admin, 'PUT', {kind: changed}, 'test-csrf-id')
+                result = json.loads(body)
+                assert status == 200 and result['ok'] and result['modified'] and result['restartRequired'], body
+                assert result[kind] == changed
+                file = tmp/'ul3_log2json'/(kind+'.json')
+                assert json.loads(file.read_text()) == changed
+                other = 'outputs' if kind == 'inputs' else 'inputs'
+                assert json.loads(request('/api/v1/log2json/'+other+'/config', reader)[1])['restartRequired']
+                for invalid in [None, {}, [42], [dict(changed[0], **{port_key: 65536})],
+                                [dict(changed[0], **{port_key: True})], changed+changed]:
+                    before = file.read_text()
+                    status, body = request(resource, admin, 'PUT', {kind: invalid}, 'test-csrf-id')
+                    assert status == 200 and not json.loads(body)['ok'], (status, body)
+                    assert file.read_text() == before
+                running = json.loads(request('/api/v1/log2json/'+kind, reader)[1])[stats_key]
+                if kind == 'inputs':
+                    assert running[0]['description'] == original[0]['Description']
+                else:
+                    assert running[0]['id'].endswith(':'+str(original[0]['Port']))
+                # Full-array writes also add and remove endpoints, including the last one.
+                second = dict(changed[0], id='second', **{port_key: free_port()})
+                for definitions in [changed+[second], changed, [], original]:
+                    status, body = request(resource, admin, 'PUT', {kind: definitions}, 'test-csrf-id')
+                    assert status == 200 and json.loads(body)['ok'], body
+                    assert json.loads(file.read_text()) == definitions
+                assert not json.loads(body)['modified'] and not json.loads(body)['restartRequired'], body
+            assert request('/api/v1/log2json/reload', reader, 'POST', {}, 'test-csrf-id')[0] == 401
+            assert request('/api/v1/log2json/reload', admin, 'POST', {})[0] == 403
             # Input configuration writes preserve Unicode, escapes, numbers and booleans.
             new_input = {'Description': 'test \u03bb "quoted"\ninput', 'ListenAddr': '127.0.0.1',
                          'ListenPort': 12345, 'enabled': False}
@@ -353,12 +423,68 @@ WebService {{
             assert json.loads(captured[6]) == ['echo', 'hello'], captured
             assert captured[7] == '%/pipeline-rule/pipeline-rule/\n/tail%', captured
             assert json.loads(captured[8]) == '%N%', captured
+            # GUI module configuration must survive REST/RPC and drive the same output pipeline.
+            modules = [{'name': 'syslog-pipeline', 'loggerRegex': '^sshd$',
+                        'messageRegex': r'^path=(\S+) id=(\d+) command=(.*)$',
+                        'jsonTemplate': '{"INFO":{"id":(unsigned)<$2>},"CWD":[{"cwd":(string)<$1>,"literal":"syslog"}],"EXECVE":[{"argv":[(string)<$3>]}]}'}]
+            module_payload = {'modules': modules}
+            assert request('/api/v1/log2json/modules', reader, 'PUT', module_payload, 'test-csrf-id')[0] == 401
+            assert request('/api/v1/log2json/modules', admin, 'PUT', module_payload)[0] == 403
+            status, body = request('/api/v1/log2json/modules', admin, 'PUT', module_payload, 'test-csrf-id')
+            assert status == 200 and json.loads(body)['ok'], (status, body)
+            module_file = tmp/'ul3_log2json/syslog-modules.json'
+            assert json.loads(module_file.read_text()) == modules
+            status, body = request('/api/v1/log2json/modules', reader)
+            assert status == 200 and json.loads(body)['modules'] == modules, (status, body)
+            invalid_modules = [dict(modules[0], messageRegex='(')]
+            status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': invalid_modules}, 'test-csrf-id')
+            assert status == 200 and not json.loads(body)['ok'], (status, body)
+            assert json.loads(module_file.read_text()) == modules
+            for serial, prefix in [(73, '<14>Jun 22 12:19:47 relay sshd[42]: '),
+                                   (74, '<14>1 2026-11-26T12:19:47Z relay sshd 42 auth [meta x="y"] ')]:
+                marker.unlink()
+                with socket.create_connection(('127.0.0.1', input_port), timeout=5) as incoming:
+                    incoming.sendall((prefix + f'path=/tmp id={serial} command=hello "λ"\n').encode())
+                eventually(marker.exists, 'syslog -> regex template -> shared queue -> TCP output -> action')
+                captured = json.loads(marker.read_text())
+                assert captured[0] == str(serial) and json.loads(captured[1]) == '/tmp', captured
+                assert json.loads(captured[6]) == ['hello "λ"'] and json.loads(captured[8]) == 'syslog', captured
+            status, body = request('/api/v1/log2json/modules', admin, 'PUT', {'modules': []}, 'test-csrf-id')
+            assert status == 200 and json.loads(body)['ok'] and json.loads(module_file.read_text()) == [], (status, body)
             for resource in ['actions', 'rules']:
                 status, body = request('/api/v1/alerts/'+resource+'/save', admin, 'POST', {}, 'test-csrf-id')
                 assert status == 200 and json.loads(body) is True, (status, body)
                 assert json.loads((tmp/'ul3_alert'/ (resource+'.json')).read_text())
+            # Emulate systemd after the authorized restart and verify saved endpoints become active.
+            restarted_port = free_port()
+            for kind in ['inputs', 'outputs']:
+                resource = '/api/v1/log2json/'+kind+'/config'
+                definitions = json.loads(request(resource, reader)[1])[kind]
+                definitions[0]['Description'] = 'Applied after restart'
+                if kind == 'inputs':
+                    definitions[0]['ListenPort'] = restarted_port
+                status, body = request(resource, admin, 'PUT', {kind: definitions}, 'test-csrf-id')
+                assert status == 200 and json.loads(body)['restartRequired'], body
+            request('/api/v1/log2json/modules', admin, 'PUT', module_payload, 'test-csrf-id')
+            converter = processes[-1]
+            status, body = request('/api/v1/log2json/reload', admin, 'POST', {}, 'test-csrf-id')
+            assert status == 200 and json.loads(body) is True, (status, body)
+            assert converter.wait(timeout=8) == 0
+            processes.remove(converter)
+            launch('ul3_log2json', tmp/'ul3_log2json')
+            eventually(lambda: request('/api/v1/log2json/inputs/config', reader)[0] == 200,
+                       'converter reconnect after restart')
+            for kind in ['inputs', 'outputs']:
+                result = json.loads(request('/api/v1/log2json/'+kind+'/config', reader)[1])
+                assert not result['modified'] and not result['restartRequired'], result
+                assert result[kind][0]['Description'] == 'Applied after restart'
+            marker.unlink()
+            with socket.create_connection(('127.0.0.1', restarted_port), timeout=5) as incoming:
+                incoming.sendall(b'<14>Jun 22 12:19:47 relay sshd: path=/tmp id=91 command=restarted\n')
+            eventually(marker.exists, 'saved endpoint configuration -> restart -> input -> output -> action')
+            assert json.loads(marker.read_text())[0] == '91'
             assert any(name == 'updateAccessControlContext'  for name, _ in AppSync.requests)
-            print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, GET parameters, persisted writes and audit-to-action pipeline')
+            print('PASS: JWT, scopes, CSRF, resources, APISync, TLS, both FastRPC1 backends, GET parameters, persisted endpoint edits, service restart, audit-to-action and configurable syslog-to-action pipelines')
         except Exception:
             for log in logfiles:
                 log.flush()

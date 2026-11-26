@@ -7,11 +7,13 @@ const root = path.resolve(__dirname, '..');
 let captured;
 let scopes = ['stats', 'control'];
 let sessionReads = 0;
+let sessionOptions;
 const context = vm.createContext({
     document: {querySelectorAll: () => scopes.map(textContent => ({textContent}))},
     $: {ajax: options => {
         if (options.url === '/api/v1/session') {
             sessionReads++;
+            sessionOptions = options;
             return Promise.resolve({csrfToken: 'csrf-' + sessionReads});
         }
         captured = options;
@@ -62,6 +64,10 @@ async function request(value, handlers = {}) {
     assert.deepEqual(JSON.parse(options.data), {pos: 0});
     assert.equal(options.headers['X-CSRF-Token'], 'csrf-1');
     assert.equal(options.contentType, 'application/json');
+    // jQuery cache:false appends a non-JSON `?_=...` query rejected by Mantids30.
+    // The session endpoint already sends Cache-Control: no-store.
+    assert.equal(sessionOptions.cache, true);
+    assert.equal(sessionOptions.data, undefined);
     options = await request({method: 'POST', resource: 'alerts/rules/save'});
     assert.equal(options.headers['X-CSRF-Token'], 'csrf-2');
     await assert.rejects(request({method: 'GET', resource: '../session'}));
@@ -86,8 +92,17 @@ async function request(value, handlers = {}) {
     context.$.ajax = options => options.url === '/api/v1/session'
         ? Promise.reject({status: 503}) : originalAjax(options);
     let renewalError = false;
-    await request({method: 'POST', resource: 'alerts/rules/save'}, {error: () => { renewalError = true; }});
+    let renewalComplete = 0;
+    await request({method: 'POST', resource: 'alerts/rules/save'}, {
+        error: () => { renewalError = true; },
+        complete: (xhr, status) => {
+            assert.equal(xhr.status, 503);
+            assert.equal(status, 'error');
+            renewalComplete++;
+        }
+    });
     assert.equal(renewalError, true);
+    assert.equal(renewalComplete, 1);
     assert.deepEqual(starts, ['GET', 'POST']);
     assert.deepEqual(finishes, [true, true]);
 
@@ -132,6 +147,56 @@ async function request(value, handlers = {}) {
     assert.equal(appended[0].selector, '#tbody-log2json-eventsperhost');
     assert.equal(hostElements.get('#log2json-eventsperhost-0-0'), 'audit-01/127.0.0.1');
     assert.equal(hostElements.get('#log2json-eventsperhost-0-2'), 42);
+    // Combined input/output pages load saved configuration and running activity together.
+    for (const [subsystem, kind] of [['alerts', 'inputs'], ['log2json', 'inputs'], ['log2json', 'outputs']]) {
+        const requests = [], values = new Map(), pageElements = new Map();
+        /** @brief Preserve element state across configuration and activity renderers. */
+        function pageElement(id) {
+            if (!pageElements.has(id)) {
+                pageElements.set(id, {innerHTML: '', style: {}});
+            }
+            return pageElements.get(id);
+        }
+        const pageContext = vm.createContext({
+            document: {getElementById: pageElement},
+            $: selector => ({append() {}, text: value => values.set(selector, value)}),
+            auditRequest: (request, handlers) => { requests.push({request, handlers}); },
+            commonFunctionError() {},
+            fillPercentage() {},
+            redrawProgressBars() {}
+        });
+        const page = fs.readFileSync(path.join(root, `ul3_web/var/www/ulogeventaudit3/webroot/mods/${subsystem}/${kind}.html`), 'utf8');
+        const pageScripts = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+            .map(match => match[1].replace(/\{\{[\s\S]*?\}\}/g, '')).join('\n');
+        vm.runInContext(pageScripts, pageContext);
+        if (subsystem === 'alerts') {
+            vm.runInContext('auditReady()', pageContext);
+            assert.deepEqual(requests.map(item => item.request.resource), ['alerts/inputs/config', 'alerts/inputs']);
+            requests[0].handlers.success({modified: true, inputs: [{id: 'test', Description: 'Saved listener', ListenAddr: '127.0.0.1', ListenPort: 9999}]});
+            requests[1].handlers.success([{description: 'Running listener', clients: [{ip: '192.0.2.1', processedLinesCount: 7, droppedElements: 2}]}]);
+            assert.equal(values.get('#span-alerts-inputsconfig-description-0'), 'Saved listener');
+            assert.equal(values.get('#span-alerts-input-description-0'), 'Running listener');
+            assert.equal(values.get('#alerts-inputs-0-0-1'), 7);
+            assert.equal(pageElement('span-alerts-inputsmodified-body').style.display, 'block');
+            requests[0].handlers.success({modified: false, inputs: []});
+            assert.equal(pageElement('span-alerts-inputsmodified-body').style.display, 'none');
+        } else {
+            assert.match(page, /id="endpoints-list"/);
+            assert.match(page, /src="\/assets\/js\/endpoints.js"/);
+            vm.runInContext('loadEndpointActivity()', pageContext);
+            assert.equal(requests[0].request.resource, `log2json/${kind}`);
+            if (kind === 'inputs') {
+                requests[0].handlers.success({inputs: [{description: 'Running input', processedLinesCount: 42, invalidLinesCount: 3, clients: []}]});
+                assert.equal(values.get('#span-log2json-input-proclines-0'), 42);
+            } else {
+                requests[0].handlers.success({outputs: [{id: '127.0.0.1:9999', connected: true, queue: {size: 1, maxItems: 10, dropped: 2, processed: 42}}]});
+                assert.equal(values.get('#span-log2json-output-processed-0'), 42);
+                assert.equal(values.get('#span-log2json-output-perctext-0'), '1/10');
+            }
+        }
+    }
+    assert.doesNotMatch(header, /\/mods\/(alerts|log2json)\/(inputsconfig|outputsconfig)\.html/);
+    await require('./syslog_modules_web.test.js')();
     console.log('PASS: JSON requests, Unicode query arguments, fresh CSRF after renewal, and scope gating');
     console.log('PASS: nested-page auth path, profile display name, and page initialization');
     console.log('PASS: UI request lifecycle, queue reset/unavailable states, and per-host rendering');
