@@ -177,7 +177,7 @@ public:
 
         try
         {
-            Input::SyslogModules::load(mainConfig.get<std::string>("Syslog.ModulesFile", "syslog-modules.json"));
+            Input::SyslogModules::load(mainConfig.get<std::string>("Syslog.ModulesFile", "syslog_modules.d"));
         }
         catch (const std::exception &error)
         {
@@ -187,8 +187,8 @@ public:
 
         try
         {
-            Input::Inputs::loadConfig(mainConfig.get<std::string>("Inputs.File", "inputs.json"));
-            Output::Outputs::loadConfig(mainConfig.get<std::string>("Outputs.File", "outputs.json"));
+            Input::Inputs::loadConfig(mainConfig.get<std::string>("Inputs.File", "inputs.d"));
+            Output::Outputs::loadConfig(mainConfig.get<std::string>("Outputs.File", "outputs.d"));
         }
         catch (const std::exception &error)
         {

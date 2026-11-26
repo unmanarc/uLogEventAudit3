@@ -65,20 +65,18 @@ This configuration is designed to add the fromhost-ip property/variable to the r
 
 ### Input configuration
 
-`inputs.json` is a JSON array in `/etc/ulogeventaudit3/ul3_log2json`. Open **Log to JSON → Syslog & auditd inputs** to add, edit or remove TCP listeners. Each entry has a unique `id`, a `Description`, a `ListenAddr` and a numeric `ListenPort` between 1 and 65535.
+`inputs.d/` stores one JSON object per `.json` file in `/etc/ulogeventaudit3/ul3_log2json`. Open **Log to JSON → Syslog & auditd inputs** to add, edit or remove TCP listeners. Each entry has a unique `id`, a `Description`, a `ListenAddr` and a numeric `ListenPort` between 1 and 65535.
 
 ```json
-[
     {
         "id": "rsyslog-auditd",
         "Description": "SYSLOG+AUDITD listener",
         "ListenAddr": "0.0.0.0",
         "ListenPort": 10514
     }
-]
 ```
 
-Use `0.0.0.0` to listen on all IPv4 interfaces or specify a local address. An empty array disables all listeners.
+Use `0.0.0.0` to listen on all IPv4 interfaces or specify a local address. An empty directory disables all listeners.
 
 ### Syslog modules
 
@@ -114,16 +112,15 @@ The libMantids30 `RegexTemplate` renderer handles escaping and typed substitutio
 
 Each matching module emits one event through the same bounded distribution queue and configured outputs as auditd. The template controls the complete output object; no metadata is added. Unmatched messages are ignored. Input counters count matched lines once even if multiple modules emit events; the distribution queue tracks event delivery and drops.
 
-**Save and apply** validates all regexes and templates, atomically persists the definitions, and activates them for subsequent messages without restarting. Existing messages finish with their configuration snapshot. Invalid definitions or write failures leave the saved and running configuration intact. The module file defaults to `syslog-modules.json` in the service configuration directory and can be overridden with `[Syslog] ModulesFile`. A missing file means no custom modules. The service account needs write access to that file's parent directory.
+**Save and apply** validates all regexes and templates, atomically persists the definitions, and activates them for subsequent messages without restarting. Existing messages finish with their configuration snapshot. Invalid definitions or write failures leave the saved and running configuration intact. The module directory defaults to `syslog_modules.d/` in the service configuration directory and can be overridden with `[Syslog] ModulesFile`. A missing or empty directory means no custom modules. The service account needs write access to the collection's parent directory.
 
 The authenticated REST endpoints are `GET /api/v1/log2json/modules` (requires `stats`) and `PUT /api/v1/log2json/modules` (requires `control` and a CSRF token). PUT accepts `{"modules":[{"name":"ssh","loggerRegex":"^sshd$","messageRegex":"...","jsonTemplate":"..."}]}`; success returns `{"ok":true}` and validation or persistence failures return `{"ok":false,"message":"..."}`. Sending an empty modules array removes all custom parsers.
 
 ### Output configuration
 
-`outputs.json` is a JSON array in the same directory. Open **Log to JSON → JSON outputs** to add, edit or remove JSON TCP destinations and adjust their queues and connection settings.
+`outputs.d/` stores one JSON object per `.json` file in the same directory. Open **Log to JSON → JSON outputs** to add, edit or remove JSON TCP destinations and adjust their queues and connection settings.
 
 ```json
-[
     {
         "id": "alerts",
         "Description": "Output for Alert Engine",
@@ -135,7 +132,6 @@ The authenticated REST endpoints are `GET /api/v1/log2json/modules` (requires `s
         "MaxQueuedItems": 500000,
         "QueuePushTimeoutInMS": 0
     }
-]
 ```
 
 - **id**: Unique, stable destination identity.
@@ -147,7 +143,7 @@ The authenticated REST endpoints are `GET /api/v1/log2json/modules` (requires `s
 - **MaxQueuedItems**: Positive queue capacity (default `500000`).
 - **QueuePushTimeoutInMS**: Enqueue wait in milliseconds; `0` discards overflow immediately (default).
 
-An empty array disables all destinations. For alerts integration, set the destination port to the JSON listener configured in `ul3_alert`.
+An empty directory disables all destinations. For alerts integration, set the destination port to the JSON listener configured in `ul3_alert`.
 
 ### Saving and applying endpoint settings
 
@@ -155,9 +151,9 @@ Each inputs/outputs page shows saved entries and running activity together. Runn
 
 A pending-changes notice includes **Restart service**, which applies both files through the service manager (`Restart=always` in the supplied systemd unit). Processing briefly stops during the restart. When running the binary manually, start it again after requesting a restart. Saving alone leaves active connections, workers and queued events unchanged. Reverting all saved changes clears the notice.
 
-`config.ini` accepts `[Inputs] File=inputs.json` and `[Outputs] File=outputs.json` overrides, relative to the service configuration directory. Both files must exist and contain valid JSON arrays at startup. The old per-endpoint INI directories are no longer loaded.
+`config.ini` accepts `[Inputs] File=inputs.d` and `[Outputs] File=outputs.d` overrides, relative to the service configuration directory. Each `.json` file must contain one object; missing directories are empty collections. The old per-endpoint INI directories are no longer loaded.
 
-`GET /api/v1/log2json/inputs/config` and `GET /api/v1/log2json/outputs/config` require `stats`. Each returns `ok`, its endpoint array, `modified` (this file differs from startup) and `restartRequired` (either file differs). `PUT` on the same resources requires `control` and CSRF protection, accepting `{"inputs":[...]}` or `{"outputs":[...]}` and returning the saved configuration. IDs must be unique and descriptions and addresses nonempty. Numeric values must be integers in range. Invalid changes return `{"ok":false,"message":"..."}`. `POST /api/v1/log2json/reload` requires `control` and CSRF protection and requests the service restart.
+`GET /api/v1/log2json/inputs/config` and `GET /api/v1/log2json/outputs/config` require `stats`. Each returns `ok`, its endpoint array, `modified` (this collection differs from startup) and `restartRequired` (either collection differs). `PUT` on the same resources requires `control` and CSRF protection, accepting `{"inputs":[...]}` or `{"outputs":[...]}` and returning the saved configuration. IDs must be unique and descriptions and addresses nonempty. Numeric values must be integers in range. Invalid changes return `{"ok":false,"message":"..."}`. `POST /api/v1/log2json/reload` requires `control` and CSRF protection and requests the service restart.
 
 ### Input/Output example:
 
@@ -191,3 +187,23 @@ A pending-changes notice includes **Restart service**, which applies both files 
     # if you require another port, please repeat the last line modifiying the port
     firewall-cmd --reload
     ```
+
+### Configuration directories
+
+Configuration collections use one JSON object per `.json` file. Copy an object file
+into the matching directory to reuse it, then reload or restart the service as
+required for that collection. Only immediate regular `.json` files are loaded,
+in lexicographic filename order. Missing or empty directories contain no entries.
+Other extensions (for example `.json.disabled`) are ignored and preserved on save.
+
+The converter uses `inputs.d/`, `outputs.d/` and `syslog_modules.d/`. The alert engine
+uses `inputs.d/`, `rules.d/` and `actions.d/`; each rule contains its filter expression.
+Nested arrays such as command `args` remain part of their containing object.
+Definitions must retain unique IDs or names where required by their schema.
+
+GUI saves generate filenames such as `00000000-alerts.json`, using the entry's ID
+or name and a numeric prefix to preserve order, including rule moves. File names
+may change on save. Files are private (0600); the service account needs write
+access to the parent directory to atomically replace the collection. REST payloads
+continue to use arrays. Existing INI path keys now refer to directories; legacy
+array files are no longer loaded.

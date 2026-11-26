@@ -1,20 +1,13 @@
 /** @file @brief Compile filters and libMantids30 templates outside the receive loop. */
 #include "syslogmodules.h"
+#include "../../../common/config_directory.h"
 
 #include <Mantids30/DataFormat/JSON/regex_template.h>
 #include <boost/regex.hpp>
-#include <cerrno>
-#include <cstdio>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <stdexcept>
-#include <system_error>
-#include <unistd.h>
 
 namespace UL3::LOG2JSON::Input {
 namespace {
@@ -94,70 +87,12 @@ std::shared_ptr<const Configuration> snapshot()
     return active;
 }
 
-/** @brief Atomically replace the JSON file using a private temporary file in its directory. */
-void persist(const std::string &path, const std::string &document)
-{
-    std::string temporary = path + ".XXXXXX";
-    const int descriptor = mkstemp(temporary.data());
-    if (descriptor < 0)
-    {
-        throw std::system_error(errno, std::generic_category(), "Cannot create module configuration");
-    }
-    int failure = 0;
-    size_t offset = 0;
-    while (offset < document.size())
-    {
-        const auto written = write(descriptor, document.data() + offset, document.size() - offset);
-        if (written < 0 && errno == EINTR)
-        {
-            continue;
-        }
-        if (written <= 0)
-        {
-            failure = written < 0 ? errno : EIO;
-            break;
-        }
-        offset += static_cast<size_t>(written);
-    }
-    if (!failure && fsync(descriptor) != 0)
-    {
-        failure = errno;
-    }
-    if (close(descriptor) != 0 && !failure)
-    {
-        failure = errno;
-    }
-    if (!failure && std::rename(temporary.c_str(), path.c_str()) != 0)
-    {
-        failure = errno;
-    }
-    if (failure)
-    {
-        std::remove(temporary.c_str());
-        throw std::system_error(failure, std::generic_category(), "Cannot save module configuration");
-    }
-}
 } // namespace
 
 void SyslogModules::load(const std::string &path)
 {
     std::scoped_lock lock(registryMutex);
-    boost::json::array definitions;
-    if (std::filesystem::exists(path))
-    {
-        std::ifstream input(path);
-        if (!input)
-        {
-            throw std::runtime_error("Cannot read module configuration: " + path);
-        }
-        const std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
-        const auto value = boost::json::parse(text);
-        if (!value.is_array())
-        {
-            throw std::invalid_argument("Module configuration must be an array");
-        }
-        definitions = value.as_array();
-    }
+    const auto definitions = UL3::JSON::readConfigDirectory(path);
     auto compiled = std::make_shared<Configuration>(definitions);
     configPath = path;
     active = std::move(compiled);
@@ -171,13 +106,12 @@ boost::json::array SyslogModules::getConfig()
 void SyslogModules::replace(const boost::json::array &modules)
 {
     auto compiled = std::make_shared<Configuration>(modules);
-    const auto document = boost::json::serialize(modules);
     std::scoped_lock lock(registryMutex);
     if (configPath.empty())
     {
         throw std::runtime_error("Module configuration path is not initialized");
     }
-    persist(configPath, document);
+    UL3::JSON::writeConfigDirectory(configPath, modules);
     active = std::move(compiled);
 }
 
