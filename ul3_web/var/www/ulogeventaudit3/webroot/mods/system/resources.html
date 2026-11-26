@@ -1,0 +1,27 @@
+{{#render[/includes/layout/inc.header.html]!}}
+
+<section class="resource-dashboard" id="resource-dashboard" aria-labelledby="resource-title">
+    <link rel="stylesheet" href="/assets/css/resources.css">
+    <div class="resource-heading">
+        <div><div class="page-eyebrow">Application health</div><h2 id="resource-title">OS resource usage</h2></div>
+        <label for="resource-resolution">Resolution <select class="form-select" id="resource-resolution"><option value="3s">3 seconds</option><option value="1m">1 minute</option><option value="60m">60 minutes</option></select></label>
+    </div>
+    <p class="resource-note" id="resource-message" role="status" aria-live="polite">Loading process measurements…</p>
+    <div class="resource-legend" aria-label="Chart components"><span><i style="--component-color:#2264c5" aria-hidden="true"></i>Web</span><span><i style="--component-color:#a34b13" aria-hidden="true"></i>Alerts</span><span><i style="--component-color:#188363" aria-hidden="true"></i>Log2JSON</span></div>
+    <div class="resource-charts">
+        <figure class="card resource-chart"><h3>CPU usage <small>% of host capacity</small></h3><svg id="resource-chart-cpu" viewBox="0 0 660 240" role="img" aria-label="Process CPU history" aria-describedby="resource-readout-cpu"></svg><figcaption class="resource-readout" id="resource-readout-cpu"></figcaption></figure>
+        <figure class="card resource-chart"><h3>Resident memory <small>MiB</small></h3><svg id="resource-chart-memory" viewBox="0 0 660 240" role="img" aria-label="Process resident memory history" aria-describedby="resource-readout-memory"></svg><figcaption class="resource-readout" id="resource-readout-memory"></figcaption></figure>
+        <figure class="card resource-chart"><h3>Logical I/O <small>KiB/s · includes cached I/O</small></h3><svg id="resource-chart-io" viewBox="0 0 660 240" role="img" aria-label="Process read and write I/O history" aria-describedby="resource-readout-io"></svg><figcaption class="resource-readout" id="resource-readout-io"></figcaption></figure>
+        <figure class="card resource-chart"><h3>Storage I/O <small>KiB/s · OS storage counters</small></h3><svg id="resource-chart-storage" viewBox="0 0 660 240" role="img" aria-label="Process storage read and write history" aria-describedby="resource-readout-storage"></svg><figcaption class="resource-readout" id="resource-readout-storage"></figcaption></figure>
+        <figure class="card resource-chart"><h3>Threads</h3><svg id="resource-chart-threads" viewBox="0 0 660 240" role="img" aria-label="Process thread count history" aria-describedby="resource-readout-threads"></svg><figcaption class="resource-readout" id="resource-readout-threads"></figcaption></figure>
+        <figure class="card resource-chart"><h3>Open descriptors / handles</h3><svg id="resource-chart-handles" viewBox="0 0 660 240" role="img" aria-label="Process descriptor and handle history" aria-describedby="resource-readout-handles"></svg><figcaption class="resource-readout" id="resource-readout-handles"></figcaption></figure>
+    </div>
+    <div class="resource-components">
+        <article class="card resource-component"><h3>Web <span id="resource-status-web">Connecting</span></h3><dl id="resource-details-web"></dl><p class="resource-samples" id="resource-samples-web"></p></article>
+        <article class="card resource-component"><h3>Alerts <span id="resource-status-alerts">Connecting</span></h3><dl id="resource-details-alerts"></dl><p class="resource-samples" id="resource-samples-alerts"></p></article>
+        <article class="card resource-component"><h3>Log2JSON <span id="resource-status-log2json">Connecting</span></h3><dl id="resource-details-log2json"></dl><p class="resource-samples" id="resource-samples-log2json"></p></article>
+    </div>
+    <p class="resource-note">Histories are kept in each process and restart empty. CPU and I/O rates become available after two samples of the selected resolution. Move over a chart to inspect measurements.</p>
+    <script src="/assets/js/resources.js"></script>
+</section>
+{{#render[/includes/layout/inc.footer.html]!}}

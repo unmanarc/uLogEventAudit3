@@ -1,6 +1,7 @@
 "use strict";
 
 const auditPages = {
+    "system/resources": ["System resources", "Compare OS resource usage across Web, Alerts and Log2JSON."],
     "alerts/stats": ["Alert statistics", "Queue capacity, processing speed and filter activity."],
     "alerts/inputs": ["Inputs", "Configure TCP listeners and monitor incoming connections and JSON processing."],
     "alerts/rules": ["Rules & filters", "Define how events are evaluated. Rules run in the order shown."],
@@ -125,7 +126,8 @@ function auditInitUI() {
         document.getElementById("apptitle").textContent = title;
         document.title = title + " · uLogEventAudit3";
         document.getElementById("page-description").textContent = page[1];
-        document.getElementById("page-section").textContent = key.startsWith("alerts/") ? "Rules & alerts" : "Log to JSON";
+        document.getElementById("page-section").textContent = key.startsWith("alerts/") ? "Rules & alerts"
+            : key.startsWith("log2json/") ? "Log to JSON" : "Workspace";
         const activeKey = page[2] ? key.split("/")[0] + "/" + page[2] : key;
         const active = document.querySelector(`.app-sidebar .nav-link[href="/mods/${activeKey}.html"]`);
         active?.classList.add("active");

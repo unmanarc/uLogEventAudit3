@@ -9,8 +9,9 @@ function auditHasScope(scope) {
 /** @brief Send a scoped JSON request, renewing the CSRF value before mutations. */
 function auditRequest(request, handlers = {}) {
     const method = request.method;
+    const resourceHistory = method === "GET" && /^resources\/(3s|1m|60m)$/.test(request.resource);
     if (!["GET", "POST", "PUT", "DELETE"].includes(method) ||
-        !/^(alerts|log2json)\/[a-z/]+$/.test(request.resource)) {
+        (!resourceHistory && !/^(alerts|log2json)\/[a-z/]+$/.test(request.resource))) {
         throw new Error("Unknown audit resource");
     }
     const requiredScope = method === "GET" ? "stats" : "control";

@@ -58,6 +58,7 @@
         <nav>
             <a class="sidebar-home nav-link" href="/" data-page="home"><span class="nav-symbol" data-icon="home" aria-hidden="true"></span>Overview</a>
             {{#foreach [$session.scopes as scope]}}{{#if [IS_EQUAL($scope,"stats")]}}
+            <a class="nav-link" id="mainview-system-resources-link" href="/mods/system/resources.html"><span class="nav-symbol" data-icon="activity" aria-hidden="true"></span>System resources</a>
             <a class="nav-section-label" href="/mods/alerts/stats.html">Rules &amp; alerts</a>
             <ul class="nav flex-column">
 <li class="nav-item"><a class="nav-link" id="mainview-alerts-stats-link" href="/mods/alerts/stats.html"><span class="nav-symbol" data-icon="chart" aria-hidden="true"></span>Alert statistics</a></li>
