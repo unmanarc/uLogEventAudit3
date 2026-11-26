@@ -1,0 +1,6 @@
+{
+   "action": "EXEC",
+   "actionId": "SendMSG",
+   "filter": "IS_EQUAL($.INFO.key,\"L5_INTEL\")",
+   "name": "Database Access"
+}

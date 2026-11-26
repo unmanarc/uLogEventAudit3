@@ -1,11 +1,13 @@
-[
-    {
-        "name": "SendMSG",
-        "description": "Write the event to the system log through stdin",
-        "type": "command",
-        "path": "/usr/bin/logger",
-        "args": ["logger", "--tag", "ul3-alert"],
-        "appendNewLineToEachArgv": false,
-        "stdinTemplate": "{{#print_json[$]!}}\n"
-    }
-]
+{
+   "name": "SendMSG",
+   "description": "Write the event to the system log through stdin",
+   "type": "command",
+   "path": "/usr/bin/logger",
+   "args": [
+      "logger",
+      "--tag",
+      "ul3-alert"
+   ],
+   "appendNewLineToEachArgv": false,
+   "stdinTemplate": "{{#print_json[$]!}}\n"
+}

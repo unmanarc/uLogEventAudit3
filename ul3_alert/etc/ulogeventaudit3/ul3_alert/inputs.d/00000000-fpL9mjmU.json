@@ -1,8 +1,6 @@
-[
-	{
-		"Description" : "Alert JSON TCP Input",
-		"ListenAddr" : "0.0.0.0",
-		"ListenPort" : 9999,
-		"id" : "fpL9mjmU"
-	}
-]
+{
+   "Description": "Alert JSON TCP Input",
+   "ListenAddr": "0.0.0.0",
+   "ListenPort": 9999,
+   "id": "fpL9mjmU"
+}

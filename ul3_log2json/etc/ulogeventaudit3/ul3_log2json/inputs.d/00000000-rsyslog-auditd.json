@@ -1,8 +1,6 @@
-[
-    {
-        "id": "rsyslog-auditd",
-        "Description": "SYSLOG+AUDITD Receptor listening @TCP/10514",
-        "ListenAddr": "0.0.0.0",
-        "ListenPort": 10514
-    }
-]
+{
+   "id": "rsyslog-auditd",
+   "Description": "SYSLOG+AUDITD Receptor listening @TCP/10514",
+   "ListenAddr": "0.0.0.0",
+   "ListenPort": 10514
+}
