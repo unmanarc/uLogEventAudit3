@@ -1,133 +1,42 @@
 {{#render[/includes/layout/inc.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.header.html]!}}
 {{#render[/includes/layout/inc.layout.leftpanel.middle.html]!}}
-<script>
-  let argn = 1;
-
-  // Default Main View:
-  function auditReady() {
-
-    let actionId = decodeURIComponent(escape(atob(decodeURIComponent(window.location.search.substr(1)))));
-
-    if (actionId != "")
-      displayAction(actionId);
-  }
-
-  function displayAction(actionId) {
-
-    var payloadData = {
-      "method": "GET", "resource": "alerts/actions/item",
-      "payload": {
-        "name": actionId
-      }
-    }
-
-    auditRequest(payloadData, {
-      success: function (result) {
-        if (result == null)
-        {
-          showToast("Error loading action (2)...", "error");
-          return;
-        }
-
-        document.getElementById("EditButton").style.visibility = "visible";
-        document.getElementById("EditButton").style.display = "block";
-
-        document.getElementById("AddButton").style.visibility = "collapse";
-        document.getElementById("AddButton").style.display = "none";
-
-        document.getElementById("appendNewLineToEachArgv").checked = result['appendNewLineToEachArgv'];
-        document.getElementById("actionName").value = result['name'];
-        document.getElementById("actionName").readOnly = true;
-        document.getElementById("actionDescription").value = result['description'];
-        document.getElementById("actionExecPath").value = result['path'];
-        document.getElementById("inputArg0").value = result['args'][0];
-
-        for(var i = 1; i < result['args'].length; i++) {
-          addNewArgument();
-          document.getElementById(`inputArg${i}`).value = result['args'][i];
-        }
-      },
-      error: commonFunctionError
-    });
-
-    return true;
-  }
-
-  function addAction(editMode) {
-    if (!document.getElementById("editor-form").reportValidity()) return false;
-
-    let httpMethod;
-    if (editMode == "add")
-    {
-      httpMethod = "POST";
-    }
-    else
-    {
-      httpMethod = "PUT";
-    }
-
-    var payloadData = {
-      "method": httpMethod, "resource": "alerts/actions",
-      "payload": {
-        "name": $("#actionName").val(),
-        "appendNewLineToEachArgv": document.getElementById("appendNewLineToEachArgv").checked,
-        "description": $("#actionDescription").val(),
-        "path" :  $("#actionExecPath").val(),
-        "args": [$("#inputArg0").val()]
-      }
-    }
-
-    for (let i = 1; i < argn; i++) {
-      payloadData["payload"]["args"][i] = $(`#inputArg${i}`).val();
-    }
-
-    auditRequest(payloadData, {
-      success: function (result) {
-        if (result == true)
-          document.location = "/mods/alerts/actions.html";
-        else {
-          showToast("Internal Error Adding new Action", "error");
-        }
-      },
-      error: commonFunctionError
-    });
-
-    return true;
-  }
-
-  function addNewArgument() {
-    $("#arguments").append(
-      `    <div class="form-group" id="formArg${argn}">
-             <label for="inputArg${argn}">Argument ${argn}</label><input type="text" class="form-control" value="" id="inputArg${argn}" style="font-family:monospace;" placeholder="Enter Argument ${argn}">
-             </div> `
-    );
-    argn = argn + 1;
-    document.getElementById("remove-argument").disabled = false;
-  }
-
-  function remLastArgument() {
-    if (argn > 1) {
-      argn = argn - 1;
-      document.getElementById(`formArg${argn}`).remove();
-      document.getElementById("remove-argument").disabled = argn <= 1;
-    }
-  }
-</script>
-
-<form id="editor-form" class="editor-form">
+<script src="/assets/js/actions.js"></script>
+<form id="editor-form" class="editor-form" autocomplete="off">
     <fieldset class="form-section"><legend>Action details</legend>
-        <div class="form-group"><label for="actionName">Name / key</label><input type="text" class="form-control" id="actionName" placeholder="e.g. notify-security" required aria-describedby="name-help"><div class="form-text" id="name-help">The unique name used by rules to reference this action.</div></div>
+        <div class="form-group"><label for="actionName">Name / key</label><input type="text" class="form-control" id="actionName" placeholder="e.g. notify-security" required><div class="form-text">The unique name used by rules to reference this action.</div></div>
         <div class="form-group"><label for="actionDescription">Description</label><input type="text" class="form-control" id="actionDescription" placeholder="e.g. Notify the security team"></div>
+        <div class="form-group"><label for="actionType">Action type</label><select class="form-select" id="actionType" onchange="updateActionType()"><option value="command">Run command</option><option value="http_post">HTTP POST</option><option value="telegram">Telegram message</option></select></div>
     </fieldset>
-    <fieldset class="form-section"><legend>Program</legend>
-        <div class="form-group"><label for="actionExecPath">Executable path</label><input type="text" class="form-control code-input" id="actionExecPath" placeholder="/usr/bin/sendmsg.sh" required aria-describedby="path-help"><div class="form-text" id="path-help">Absolute path to the program on the alerts server.</div></div>
-        <div class="form-check"><input class="form-check-input" type="checkbox" id="appendNewLineToEachArgv" checked><label class="form-check-label" for="appendNewLineToEachArgv">Append a newline to each program argument</label></div>
-    </fieldset>
-    <fieldset class="form-section"><legend>Program arguments</legend><p class="form-text">Argument 0 is the program name. Add subsequent arguments in the order the program expects.</p>
-        <div id="arguments"><div class="form-group"><label for="inputArg0">Argument 0 · program name</label><input type="text" class="form-control code-input" id="inputArg0" placeholder="e.g. sendmsg.sh"></div></div>
+    <fieldset class="form-section" data-action-types="command"><legend>Program</legend>
+        <div class="form-group"><label for="actionExecPath">Executable path</label><input type="text" class="form-control code-input" id="actionExecPath" placeholder="/usr/bin/sendmsg.sh" required><div class="form-text">Program on the alerts server. The rendered input is sent through stdin without a shell.</div></div>
+        <div class="form-group"><label for="stdinTemplate">Standard input template</label><textarea class="form-control code-input" id="stdinTemplate" rows="6">&#123;&#123;#print_json[$]!&#125;&#125;
+</textarea><div class="form-text">Defaults to the complete event JSON. Leave empty to send no input.</div></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" id="appendNewLineToEachArgv"><label class="form-check-label" for="appendNewLineToEachArgv">Append a newline to each program argument</label></div>
+        <p class="form-text">Arguments are optional and retain legacy percent placeholders. Event content belongs in the stdin template.</p>
+        <div id="arguments"><div class="form-group"><label for="inputArg0">Argument 0 · program name</label><input type="text" class="form-control code-input" id="inputArg0" placeholder="Defaults to the executable path"></div></div>
         <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary" onclick="addNewArgument()">Add argument</button><button type="button" class="btn btn-outline-secondary" id="remove-argument" onclick="remLastArgument()" disabled>Remove last argument</button></div>
     </fieldset>
+    <fieldset class="form-section" data-action-types="http_post" hidden><legend>HTTP POST</legend>
+        <div class="form-group"><label for="url">Destination URL</label><input type="url" class="form-control" id="url" placeholder="https://alerts.example.com/events" required><div class="form-text">A fixed HTTP or HTTPS destination. Redirects are not followed.</div></div>
+        <div class="form-group"><label for="contentType">Content type</label><input type="text" class="form-control" id="contentType" value="application/json" required></div>
+        <div class="form-group"><label for="bearerToken">Bearer token</label><input type="password" class="form-control" id="bearerToken" autocomplete="new-password" spellcheck="false"><div class="form-text">Optional; requires HTTPS. Leave blank when editing to keep the stored token.</div></div>
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="clearBearerToken"><label class="form-check-label" for="clearBearerToken">Remove stored bearer token</label></div>
+        <div class="form-group"><label for="bodyTemplate">Request body template</label><textarea class="form-control code-input" id="bodyTemplate" rows="8" required>&#123;&#123;#print_json[$]!&#125;&#125;</textarea></div>
+    </fieldset>
+    <fieldset class="form-section" data-action-types="telegram" hidden><legend>Telegram bot and destination</legend>
+        <div class="form-group"><label for="botToken">Bot API token</label><input type="password" class="form-control" id="botToken" autocomplete="new-password" spellcheck="false" required><div class="form-text">Obtain a token from BotFather. Each action has its own token. Leave blank when editing to keep the stored token.</div></div>
+        <div class="form-group"><label for="chatId">Channel or chat</label><input type="text" class="form-control" id="chatId" placeholder="@security_channel or -1001234567890" required><div class="form-text">For a channel, add the bot as an administrator with permission to post messages.</div></div>
+        <div class="form-group"><label for="parseMode">Message formatting</label><select class="form-select" id="parseMode"><option value="">Plain text (recommended)</option><option value="HTML">HTML</option><option value="MarkdownV2">MarkdownV2</option></select><div class="form-text">Formatted messages require escaping event values for the selected format.</div></div>
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="disableNotification"><label class="form-check-label" for="disableNotification">Send silently</label></div>
+        <div class="form-group"><label for="messageTemplate">Message template</label><textarea class="form-control code-input" id="messageTemplate" rows="8" required>Alert from &#123;&#123;#print_raw[$INFO.host]!&#125;&#125;
+&#123;&#123;#print_json[$]!&#125;&#125;</textarea><div class="form-text">Only the message text is templated. The Telegram JSON is escaped automatically. Telegram accepts up to 4096 characters after formatting.</div></div>
+    </fieldset>
+    <fieldset class="form-section" data-action-types="http_post telegram" hidden><legend>Connection</legend>
+        <div class="form-group"><label for="timeoutSeconds">Timeout per connection / read / write (seconds)</label><input type="number" class="form-control" id="timeoutSeconds" value="15" min="1" max="300" step="1" required></div>
+        <p class="form-text">HTTPS verifies the server certificate and hostname. Stored credentials are hidden from read APIs and saved in a private configuration file.</p>
+    </fieldset>
+    <details class="form-section"><summary>Template help</summary><p class="form-text">Templates use MantidsLang with the input event JSON as the root context. JSON output: <code>&#123;&#123;#print_json[$]!&#125;&#125;</code>. Text field: <code>&#123;&#123;#print_raw[$INFO.host]!&#125;&#125;</code>. HTML-escaped field: <code>&#123;&#123;#print_htmlescaped[$INFO.host]!&#125;&#125;</code>. Conditions and foreach loops are supported. File includes are disabled. Use print_json for values embedded in a JSON body.</p></details>
     <p class="form-text">Changes apply to the running configuration. Use Save to disk on the actions page to keep them after a restart.</p>
     <div class="form-actions"><a class="btn btn-outline-secondary" href="/mods/alerts/actions.html">Cancel</a><button class="btn btn-primary" id="AddButton" type="submit">Add action</button><button class="btn btn-primary" id="EditButton" type="submit" style="display: none; visibility: collapse;">Save changes</button></div>
 </form>
