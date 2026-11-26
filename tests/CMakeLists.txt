@@ -21,8 +21,15 @@ target_link_libraries(audit_line_parser_test PRIVATE Boost::regex)
 add_test(NAME audit_line_parser COMMAND audit_line_parser_test)
 
 find_program(AUDIT_NODE_EXECUTABLE node)
+add_executable(resource_sensing_test resource_sensing_test.cpp)
+target_link_libraries(resource_sensing_test PRIVATE audit_resource_sensing)
+audit_target(resource_sensing_test Mantids30_Core_Helpers Mantids30_Protocol_FastRPC1 Mantids30_DataFormat_JSON)
+add_test(NAME resource_sensing COMMAND resource_sensing_test)
+set_tests_properties(resource_sensing PROPERTIES TIMEOUT 15
+    ENVIRONMENT "LD_LIBRARY_PATH=${Mantids30_DataFormat_JSON_LIBDIR}:$ENV{LD_LIBRARY_PATH}")
 if(AUDIT_NODE_EXECUTABLE)
     add_test(NAME audit_web_client COMMAND "${AUDIT_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/web_client.test.js")
+    add_test(NAME resources_web COMMAND "${AUDIT_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/resources_web.test.js")
 endif()
 
 add_executable(syslog_modules_test

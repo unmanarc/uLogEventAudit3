@@ -109,6 +109,7 @@ def main():
             web_port, rpc_port, alert_port, input_port = [free_port() for _ in range(4)]
             config = f'''
 Logs {{ ShowColors false ShowDate false }}
+ResourceMonitor {{ SamplesPerSeries 2 }}
 Authentication {{ AppName ULOGEVENTAUDIT3 APIKey integration-app-key }}
 RPCServer {{
     AlertsApiKey integration-alert-key
@@ -188,6 +189,14 @@ WebService {{
                 assert request('/api/v1/session', jwt)[0] == 403
             assert request('/api/v1/alerts/stats', token([]))[0] == 401
             assert request('/api/v1/alerts/stats', reader)[0] == 503
+            assert request('/api/v1/resources/3s', token([]))[0] == 401
+            assert request('/api/v1/resources/3s')[0] == 403
+            assert request('/api/v1/resources/5m', reader)[0] == 404
+            status, body = request('/api/v1/resources/3s', reader)
+            resources = json.loads(body)['components']
+            assert status == 200 and resources['web']['available'], (status, body)
+            assert resources['web']['capacity'] == 2 and resources['web']['component'] == 'web'
+            assert not resources['alerts']['available'] and not resources['log2json']['available'], body
             assert request('/api/v1/alerts/rules/save', reader, 'POST', {}, 'test-csrf-id')[0] == 401
             assert request('/api/v1/alerts/rules/save', admin, 'POST', {})[0] == 403
             assert request('/api/v1/not-a-resource', admin)[0] == 404
@@ -209,6 +218,12 @@ WebService {{
                 status, page = request(path, admin)
                 assert status == 200 and '{{' not in page and 'id="editor-form"' in page, (path, status)
             assert request('/mods/alerts/stats.html', token([]))[0] == 403
+            assert request('/mods/system/resources.html', token([]))[0] == 403
+            for jwt in [reader, admin]:
+                status, page = request('/mods/system/resources.html', jwt)
+                assert status == 200 and '{{' not in page, (status, page)
+                assert 'id="resource-dashboard"' in page and '/assets/js/resources.js' in page
+                assert page.index('>Overview</a>') < page.index('>System resources</a>') < page.index('>Rules &amp; alerts</a>')
             status, page = request('/mods/alerts/rules.html', token(['stats', 'controller']))
             assert status == 200 and '>Remove</a>' not in page
             assert request('/mods/alerts/rule-add.html', token(['stats', 'controller']))[0] == 403
@@ -219,6 +234,8 @@ WebService {{
             for path in ['/', '/index.html', '/mods/log2json/eventsph.html']:
                 status, page = request(path, admin)
                 assert status == 200 and '{{' not in page and '<span id="welcome">test-user</span>' in page, (path, status)
+                if path in ['/', '/index.html']:
+                    assert 'id="resource-dashboard"' not in page and '/assets/js/resources.js' not in page
             # Each endpoint page contains configuration and activity with one navigation entry.
             for path, config_id, activity_id in [
                     ('/mods/alerts/inputs.html', 'span-alerts-inputsconfig-body', 'span-alerts-input-body'),
@@ -248,7 +265,8 @@ WebService {{
             for path in ['/index.html', '/assets/js/jquery.min.js', '/mods/alerts/rules.html']:
                 assert request(path)[0] == 302, path
             for path in ['/assets/js/jquery.min.js', '/assets/css/bootstrap.min.css', '/assets/js/bootstrap.bundle.min.js',
-                         '/assets/css/console.css', '/assets/js/console.js', '/assets/js/endpoints.js', '/assets/js/actions.js']:
+                         '/assets/css/console.css', '/assets/js/console.js', '/assets/js/endpoints.js', '/assets/js/actions.js',
+                         '/assets/js/resources.js', '/assets/css/resources.css']:
                 status, asset = request(path, reader)
                 assert status == 200 and len(asset) > 1000, (path, status)
             for path in ['/package.json', '/node_modules/jquery/dist/jquery.min.js']:
@@ -281,6 +299,7 @@ WebService {{
                 ini = ini.replace('RemotePort=33001', f'RemotePort={rpc_port}')
                 ini = re.sub(key_name+'=.*', key_name+'='+key, ini)
                 ini = ini.replace('ToSyslog=true', 'ToSyslog=false')
+                ini = ini.replace('SamplesPerSeries=300', 'SamplesPerSeries=2')
                 (directory/'config.ini').write_text(ini)
                 (directory/'config.ini').chmod(0o600)
                 if name == 'ul3_alert':
@@ -297,6 +316,35 @@ WebService {{
                 launch(name, directory)
             eventually(lambda: request('/api/v1/alerts/stats', reader)[0] == 200, 'alert backend TLS / FastRPC1')
             eventually(lambda: request('/api/v1/log2json/inputs', reader)[0] == 200, 'converter TLS / FastRPC1')
+            # Every process owns its histories and exposes them through its own FastRPC handler.
+            for resolution, interval in [('3s', 3), ('1m', 60), ('60m', 3600)]:
+                status, body = request('/api/v1/resources/' + resolution, reader)
+                resources = json.loads(body)['components']
+                assert status == 200, (status, body)
+                pids = set()
+                for component, history in resources.items():
+                    assert history['available'] and history['component'] == component, body
+                    assert history['capacity'] == 2 and history['intervalSeconds'] == interval, body
+                    assert 1 <= len(history['samples']) <= 2, body
+                    assert history['latest'] == history['samples'][-1], body
+                    latest = history['latest']
+                    assert latest['residentMemoryBytes'] > 0 and latest['threadCount'] > 0, body
+                    assert 'systemMemory' in latest and 'processIO' in latest and 'handleCount' in latest, body
+                    pids.add(latest['processId'])
+                    if resolution != '3s':
+                        assert latest['processCpuPercent'] is None and latest['processIO']['readBytesPerSecond'] is None, body
+                assert len(pids) == 3, 'ResourceMonitor sampled the web process on behalf of a backend'
+
+            def resource_rates_ready():
+                """Wait for interval deltas from all three independent sensor threads."""
+                status, body = request('/api/v1/resources/3s', reader)
+                return status == 200 and all(
+                    history.get('available') and history['latest']['processCpuPercent'] is not None
+                    and history['latest']['processIO']['readBytesPerSecond'] is not None
+                    for history in json.loads(body)['components'].values())
+
+            eventually(resource_rates_ready, 'resource CPU and I/O baselines for all three processes')
+            original_converter_pid = json.loads(request('/api/v1/resources/1m', reader)[1])['components']['log2json']['latest']['processId']
             # Numeric GET arguments must survive encoded JSON and FastRPC1.
             for path, member in [('alerts/rules', None), ('alerts/actions', None),
                                  ('log2json/hosts', 'hosts'), ('log2json/inputs', 'inputs'),
@@ -509,9 +557,15 @@ WebService {{
             assert status == 200 and json.loads(body) is True, (status, body)
             assert converter.wait(timeout=8) == 0
             processes.remove(converter)
+            eventually(lambda: not json.loads(request('/api/v1/resources/3s', reader)[1])['components']['log2json']['available'],
+                       'resource overview degrades gracefully after converter disconnect')
             launch('ul3_log2json', tmp/'ul3_log2json')
             eventually(lambda: request('/api/v1/log2json/inputs/config', reader)[0] == 200,
                        'converter reconnect after restart')
+            restarted_resources = json.loads(request('/api/v1/resources/1m', reader)[1])['components']['log2json']
+            assert restarted_resources['available'] and len(restarted_resources['samples']) == 1
+            assert restarted_resources['latest']['processId'] != original_converter_pid
+            assert restarted_resources['latest']['processCpuPercent'] is None
             for kind in ['inputs', 'outputs']:
                 result = json.loads(request('/api/v1/log2json/'+kind+'/config', reader)[1])
                 assert not result['modified'] and not result['restartRequired'], result
