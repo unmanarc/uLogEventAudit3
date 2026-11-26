@@ -30,7 +30,7 @@
     }
 
     function mainview_log2json_eventsperhost_start() {
-        var payloadData = { "method": "GET", "resource": "log2json/hosts" }
+        var payloadData = { scope: "stats", target: "LOG2JSON", method: "EventsPerHost" }
         auditRequest(payloadData, {
             success: function (result) {
                 drawEventsPerHostStats(result["hosts"]);

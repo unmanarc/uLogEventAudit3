@@ -5,9 +5,9 @@ const resourceDashboard = {
     resolution: "3s", pending: false, timer: null, stopped: false, initialized: false,
     intervals: {"3s": 3, "1m": 60, "60m": 3600},
     components: [
-        {id: "web", label: "Web", color: "#2264c5"},
-        {id: "alerts", label: "Alerts", color: "#a34b13"},
-        {id: "log2json", label: "Log2JSON", color: "#188363"}
+        {id: "web", target: "WEB", label: "Web", color: "#2264c5"},
+        {id: "alerts", target: "ALERTS", label: "Alerts", color: "#a34b13"},
+        {id: "log2json", target: "LOG2JSON", label: "Log2JSON", color: "#188363"}
     ],
     metrics: [
         {id: "cpu", title: "CPU usage", unit: "%", fields: ["processCpuPercent"], maximum: 100},
@@ -212,32 +212,47 @@ function resourceRefresh() {
     }
     const resolution = resourceDashboard.resolution;
     resourceDashboard.pending = true;
-    let failed = false;
-    auditRequest({method: "GET", resource: "resources/" + resolution}, {
-        success: response => {
-            if (resolution === resourceDashboard.resolution && !resourceDashboard.stopped) {
-                resourceRender(response);
+    const components = {};
+    let remaining = resourceDashboard.components.length;
+    let failures = 0;
+    // Independent requests isolate backend failures while sharing one polling cycle.
+    for (const component of resourceDashboard.components) {
+        components[component.id] = {available: false};
+        auditRequest({scope: "stats", target: component.target, method: "ResourceMonitor", payload: {resolution}}, {
+            success: history => {
+                if (Array.isArray(history?.samples)) {
+                    components[component.id] = {...history, available: true};
+                } else {
+                    failures++;
+                }
+            },
+            error: xhr => {
+                failures++;
+                if ((xhr.status === 401 || xhr.status === 403) && !resourceDashboard.stopped) {
+                    resourceDashboard.stopped = true;
+                    commonFunctionError(xhr);
+                }
+            },
+            complete: () => {
+                if (--remaining !== 0) {
+                    return;
+                }
+                resourceDashboard.pending = false;
+                if (!resourceDashboard.stopped) {
+                    if (resolution === resourceDashboard.resolution) {
+                        resourceRender({resolution, components});
+                        if (failures === resourceDashboard.components.length) {
+                            document.getElementById("resource-message").textContent = "Refresh failed. Measurements are unavailable; retrying.";
+                        }
+                    }
+                    const delay = resolution !== resourceDashboard.resolution ? 0
+                        : failures === resourceDashboard.components.length ? 10000
+                            : Math.min(60, resourceDashboard.intervals[resolution]) * 1000;
+                    resourceDashboard.timer = setTimeout(resourceRefresh, delay);
+                }
             }
-        },
-        error: xhr => {
-            failed = true;
-            if (resolution === resourceDashboard.resolution) {
-                document.getElementById("resource-message").textContent = "Refresh failed. Displayed measurements may be stale; retrying.";
-            }
-            if (xhr.status === 401 || xhr.status === 403) {
-                resourceDashboard.stopped = true;
-                commonFunctionError(xhr);
-            }
-        },
-        complete: () => {
-            resourceDashboard.pending = false;
-            if (!resourceDashboard.stopped) {
-                const delay = resolution !== resourceDashboard.resolution ? 0
-                    : failed ? 10000 : Math.min(60, resourceDashboard.intervals[resolution]) * 1000;
-                resourceDashboard.timer = setTimeout(resourceRefresh, delay);
-            }
-        }
-    });
+        });
+    }
 }
 
 /** @brief Initialize scoped dashboard controls after authentication, or refresh an existing view. */

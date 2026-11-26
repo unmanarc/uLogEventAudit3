@@ -86,7 +86,7 @@ function saveEndpoints(definitions) {
     }
     endpointsBusy = true;
     updateEndpointControls();
-    auditRequest({method: "PUT", resource: `log2json/${endpointKind}/config`, payload: {[endpointKind]: definitions}}, {
+    auditRequest({scope: "control", target: "LOG2JSON", method: endpointInputs ? "WriteInputsFileConfig" : "WriteOutputsFileConfig", payload: {[endpointKind]: definitions}}, {
         success: result => {
             const message = result.ok ? (result.restartRequired ? "Configuration saved. Restart the service to apply changes." : "Configuration saved. No restart needed.") : (result.message || "Could not save endpoints");
             document.getElementById("endpoints-message").textContent = message;
@@ -134,7 +134,7 @@ function auditReady() {
     loadEndpointActivity();
     endpointsBusy = true;
     updateEndpointControls();
-    auditRequest({method: "GET", resource: `log2json/${endpointKind}/config`}, {
+    auditRequest({scope: "stats", target: "LOG2JSON", method: endpointInputs ? "ReadInputsFileConfig" : "ReadOutputsFileConfig"}, {
         success: result => {
             if (!result.ok) {
                 showToast(result.message || "Could not load endpoints", "error");
@@ -189,7 +189,7 @@ async function restartLog2JSON() {
     updateEndpointControls();
     document.getElementById("endpoint-reload").disabled = true;
     let restarting = false;
-    auditRequest({method: "POST", resource: "log2json/reload", payload: {}}, {
+    auditRequest({scope: "control", target: "LOG2JSON", method: "ReloadApp", payload: {}}, {
         success: result => {
             if (result === true) {
                 restarting = true;

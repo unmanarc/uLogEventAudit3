@@ -33,7 +33,7 @@ function updateActionType() {
 
 /** Populate public fields; stored credentials are deliberately never returned. */
 function displayAction(actionId) {
-    auditRequest({method: "GET", resource: "alerts/actions/item", payload: {name: actionId}}, {
+    auditRequest({scope: "stats", target: "ALERTS", method: "ReadRunningAction", payload: {name: actionId}}, {
         success: function (result) {
             if (!result) {
                 showToast("Unable to load action.", "error");
@@ -114,7 +114,7 @@ function addAction(editMode) {
     if (!document.getElementById("editor-form").reportValidity()) {
         return false;
     }
-    auditRequest({method: editMode === "add" ? "POST" : "PUT", resource: "alerts/actions", payload: actionPayload()}, {
+    auditRequest({scope: "control", target: "ALERTS", method: editMode === "add" ? "AddAction" : "EditAction", payload: actionPayload()}, {
         success: function (result) {
             if (result === true) {
                 document.getElementById("botToken").value = "";

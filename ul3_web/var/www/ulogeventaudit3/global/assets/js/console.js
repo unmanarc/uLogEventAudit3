@@ -26,13 +26,13 @@ function auditStatus(message, state = "ready") {
     status.dataset.state = state;
 }
 
-function auditRequestStarted(method) {
+function auditRequestStarted(scope) {
     if (auditPending === 0) auditLoadFailed = false;
     auditPending++;
-    auditStatus(method === "GET" ? "Loading data…" : "Saving changes…", "loading");
+    auditStatus(scope === "stats" ? "Loading data…" : "Saving changes…", "loading");
     document.getElementById("refresh-data").disabled = true;
     document.querySelector(".panel-content")?.setAttribute("aria-busy", "true");
-    if (method !== "GET") {
+    if (scope === "control") {
         auditMutationPending = true;
         document.querySelectorAll(".editor-form button[type=submit]").forEach(button => { button.disabled = true; });
     }

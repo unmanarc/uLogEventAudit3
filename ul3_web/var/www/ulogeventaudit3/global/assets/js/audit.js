@@ -8,13 +8,12 @@ function auditHasScope(scope) {
 
 /** @brief Send a scoped JSON request, renewing the CSRF value before mutations. */
 function auditRequest(request, handlers = {}) {
-    const method = request.method;
-    const resourceHistory = method === "GET" && /^resources\/(3s|1m|60m)$/.test(request.resource);
-    if (!["GET", "POST", "PUT", "DELETE"].includes(method) ||
-        (!resourceHistory && !/^(alerts|log2json)\/[a-z/]+$/.test(request.resource))) {
-        throw new Error("Unknown audit resource");
+    if (!["stats", "control"].includes(request.scope) ||
+        !["WEB", "ALERTS", "LOG2JSON"].includes(request.target) ||
+        typeof request.method !== "string" || !/^[A-Za-z0-9_]+$/.test(request.method)) {
+        throw new Error("Invalid audit RPC request");
     }
-    const requiredScope = method === "GET" ? "stats" : "control";
+    const requiredScope = request.scope;
     if (!auditHasScope(requiredScope)) {
         (handlers.error || commonFunctionError)({status: 403, responseJSON: {message: "Permission denied"}});
         return;
@@ -22,13 +21,13 @@ function auditRequest(request, handlers = {}) {
     const options = {
         error: commonFunctionError,
         ...handlers,
-        url: API_BASE + "/" + request.resource,
-        type: method,
+        url: API_BASE + "/remote." + request.scope,
+        type: "POST",
         dataType: "json"
     };
     const track = typeof auditRequestStarted === "function";
     if (track) {
-        auditRequestStarted(method);
+        auditRequestStarted(requiredScope);
         options.complete = (xhr, status) => {
             auditRequestFinished(!["success", "notmodified", "nocontent"].includes(status));
             if (handlers.complete) {
@@ -36,14 +35,11 @@ function auditRequest(request, handlers = {}) {
             }
         };
     }
-    if (method === "GET") {
-        if (request.payload) {
-            options.url += "?" + encodeURIComponent(JSON.stringify(request.payload));
-        }
+    options.contentType = "application/json";
+    options.data = JSON.stringify({target: request.target, method: request.method, payload: request.payload || {}});
+    if (requiredScope === "stats") {
         return $.ajax(options);
     }
-    options.contentType = "application/json";
-    options.data = JSON.stringify(request.payload || {});
     // The platform auth helper can renew the cookie at any time. Bind each mutation
     // to the current session's CSRF value instead of retaining an old JWT identifier.
     // The server sends Cache-Control: no-store. Keep jQuery from adding its `_`

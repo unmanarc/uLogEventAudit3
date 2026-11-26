@@ -68,7 +68,7 @@
 
     /** @brief Refresh the running inputs alongside their saved configuration. */
     function loadEndpointActivity() {
-        var payloadData = { "method": "GET", "resource": "log2json/inputs" }
+        var payloadData = { scope: "stats", target: "LOG2JSON", method: "Inputs" }
         auditRequest(payloadData, {
             success: function (result) {
                 drawLog2JSONInputStats(result["inputs"]);

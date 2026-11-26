@@ -13,7 +13,7 @@
     {
       return false;
     }
-    var payloadData = { "method": "POST", "resource": "alerts/inputs/config",
+    var payloadData = { scope: "control", target: "ALERTS", method: "AddInputToFileConfig",
                         "payload": {
                           "Description" : $("#inputDescription").val(),
                           "ListenAddr" : $("#inputAddress").val(),

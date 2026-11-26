@@ -19,7 +19,7 @@
 
   function saveToDisk()
   {
-    var payloadData = { "method": "POST", "resource": "alerts/actions/save",
+    var payloadData = { scope: "control", target: "ALERTS", method: "SaveRunningActions",
                       }
     auditRequest(payloadData, {
       success: function (result) {
@@ -74,7 +74,7 @@
       return;
     }
     let actionName = decodeURIComponent(escape(atob(decodeURIComponent(actionId))));
-    var payloadData = { "method": "DELETE", "resource": "alerts/actions",
+    var payloadData = { scope: "control", target: "ALERTS", method: "RemoveAction",
                         "payload" : {
                           "name" : actionName
                         }
@@ -96,7 +96,7 @@
 
   function drawRunningActionsStart()
   {
-    var payloadData = { "method": "GET", "resource": "alerts/actions" }
+    var payloadData = { scope: "stats", target: "ALERTS", method: "ReadRunningActions" }
     auditRequest(payloadData, {
       success: function (result) {
         drawActions(result);
@@ -107,7 +107,7 @@
 
   function drawIfModified()
   {
-    var payloadData = { "method": "GET", "resource": "alerts/actions/modified" }
+    var payloadData = { scope: "stats", target: "ALERTS", method: "AreActionsModified" }
     auditRequest(payloadData, {
       success: function (result) {
         if (result == true)

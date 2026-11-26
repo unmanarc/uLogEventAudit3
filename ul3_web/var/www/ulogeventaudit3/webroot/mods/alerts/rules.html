@@ -19,7 +19,7 @@
 
 function saveToDisk()
 {
-  var payloadData = { "method": "POST", "resource": "alerts/rules/save",
+  var payloadData = { scope: "control", target: "ALERTS", method: "SaveRunningRules",
                     }
   auditRequest(payloadData, {
     success: function (result) {
@@ -69,8 +69,8 @@ function drawRules(result)
 async function ruleCmd(ruleId, cmd)
 {
   if (cmd === "remove" && !await auditConfirm("Remove this rule from the running configuration? Save to disk afterwards to keep the change.")) return;
-  var payloadData = { "method": cmd === "remove" ? "DELETE" : "POST",
-                      "resource": "alerts/rules" + (cmd === "remove" ? "" : "/" + cmd),
+  var payloadData = { scope: "control", target: "ALERTS",
+                      method: cmd === "remove" ? "RemoveRule" : cmd === "up" ? "RuleUp" : "RuleDown",
                       "payload" : {
                         "pos" : parseInt(ruleId)
                       }
@@ -92,7 +92,7 @@ async function ruleCmd(ruleId, cmd)
 
 function drawRunningRulesStart()
 {
-  var payloadData = { "method": "GET", "resource": "alerts/rules" }
+  var payloadData = { scope: "stats", target: "ALERTS", method: "ReadRunningRules" }
   auditRequest(payloadData, {
     success: function (result) {
       drawRules(result);
@@ -103,7 +103,7 @@ function drawRunningRulesStart()
 
 function drawIfModified()
 {
-  var payloadData = { "method": "GET", "resource": "alerts/rules/modified" }
+  var payloadData = { scope: "stats", target: "ALERTS", method: "AreRulesModified" }
   auditRequest(payloadData, {
     success: function (result) {
       if (result == true)

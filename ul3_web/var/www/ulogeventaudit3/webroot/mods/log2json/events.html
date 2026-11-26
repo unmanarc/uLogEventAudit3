@@ -33,7 +33,7 @@ $(`#log2json-eventsQueueSize`).text( filterStats["eventsQueue"]["curSize"] + "/"
 }
 
   function mainview_log2json_events_start() {
-    var payloadData = { "method": "GET", "resource": "log2json/distribution" }
+    var payloadData = { scope: "stats", target: "LOG2JSON", method: "OutputsDistributionThreads" }
     auditRequest(payloadData, {
       success: function (result) {
         drawLog2JSONFilterStats(result["events"]);

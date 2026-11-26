@@ -43,7 +43,7 @@
     }
 
     function mainview_alerts_stats_start() {
-      var payloadData = { "method": "GET", "resource": "alerts/stats" }
+      var payloadData = { scope: "stats", target: "ALERTS", method: "SystemStats" }
       auditRequest(payloadData, {
         success: function (result) {
           drawFilterStats(result);

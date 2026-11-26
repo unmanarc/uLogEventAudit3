@@ -105,7 +105,7 @@
 
     /** @brief Refresh the running outputs alongside their saved configuration. */
     function loadEndpointActivity() {
-        var payloadData = { "method": "GET", "resource": "log2json/outputs" }
+        var payloadData = { scope: "stats", target: "LOG2JSON", method: "Outputs" }
         auditRequest(payloadData, {
             success: function (result) {
                 drawLog2JSONOutputStats(result["outputs"]);

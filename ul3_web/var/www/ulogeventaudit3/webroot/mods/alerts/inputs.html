@@ -12,7 +12,7 @@
   /** @brief Apply saved listener changes through the alert service restart. */
   function reloadAlerts()
   {
-    var payloadData = { "method": "POST", "resource": "alerts/reload",
+    var payloadData = { scope: "control", target: "ALERTS", method: "ReloadApp",
                         "payload": {}
                       }
     auditRequest(payloadData, {
@@ -69,7 +69,7 @@
       return;
     }
     let id =  document.getElementById(`span-alerts-inputsconfig-id-${localId}`).value;
-    var payloadData = { "method": "DELETE", "resource": "alerts/inputs/config",
+    var payloadData = { scope: "control", target: "ALERTS", method: "RemInputFromFileConfig",
                         "payload": {
                           "id" : id
                         }
@@ -118,7 +118,7 @@
 
   /** @brief Load saved listeners and show whether a service restart is required. */
   function loadAlertInputConfig() {
-    var payloadData = { "method": "GET", "resource": "alerts/inputs/config" }
+    var payloadData = { scope: "stats", target: "ALERTS", method: "ReadInputsFileConfig" }
     auditRequest(payloadData, {
       success: function (result) {
         const notice = document.getElementById("span-alerts-inputsmodified-body");
@@ -172,7 +172,7 @@
 
   /** @brief Refresh the active alert listeners and their client counters. */
   function loadAlertInputActivity() {
-    var payloadData = { "method": "GET", "resource": "alerts/inputs" }
+    var payloadData = { scope: "stats", target: "ALERTS", method: "ReadRunningInputs" }
     auditRequest(payloadData, {
       success: function (result) {
         drawInputStats(result);

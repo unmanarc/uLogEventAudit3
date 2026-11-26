@@ -133,7 +133,7 @@
         }
         modulesBusy = true;
         updateModuleControls();
-        auditRequest({method: "PUT", resource: "log2json/modules", payload: {modules}}, {
+        auditRequest({scope: "control", target: "LOG2JSON", method: "SyslogModules", payload: {modules}}, {
             success: result => {
                 const message = result.ok ? "Modules saved and applied." : (result.message || "Could not save modules");
                 document.getElementById("modules-message").textContent = message;
@@ -179,7 +179,7 @@
         }
         modulesBusy = true;
         updateModuleControls();
-        auditRequest({method: "GET", resource: "log2json/modules"}, {
+        auditRequest({scope: "stats", target: "LOG2JSON", method: "SyslogModules"}, {
             success: result => {
                 if (!result.ok) {
                     showToast(result.message || "Could not load modules", "error");

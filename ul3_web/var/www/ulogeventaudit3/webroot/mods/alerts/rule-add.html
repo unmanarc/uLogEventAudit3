@@ -13,7 +13,7 @@
   function displayRule(pos) {
 
     var payloadData = {
-      "method": "GET", "resource": "alerts/rules/item",
+      scope: "stats", target: "ALERTS", method: "ReadRunningRule",
       "payload": {
         "id": pos
       }
@@ -72,7 +72,7 @@
   /** @brief Load all actions before restoring an existing rule's configuration. */
   function loadActions() {
     var payloadData = {
-      "method": "GET", "resource": "alerts/actions"
+      scope: "stats", target: "ALERTS", method: "ReadRunningActions"
     }
     auditRequest(payloadData, {
       success: function (result) {
@@ -131,20 +131,20 @@
     if (document.getElementById("bEXECANDABORT").checked) action = "EXECANDABORT";
     else if (document.getElementById("bABORT").checked) action = "ABORT";
 
-    let httpMethod;
+    let rpcMethod;
     if (editMode == "add")
     {
-      httpMethod = "POST";
+      rpcMethod = "AddRule";
     }
     else
     {
-      httpMethod = "PUT";
+      rpcMethod = "EditRule";
     }
     var payloadData = {};
 
     if (document.getElementById("bEXECANDABORT").checked || document.getElementById("bEXEC").checked) {
       payloadData = {
-        "method": httpMethod, "resource": "alerts/rules",
+        scope: "control", target: "ALERTS", method: rpcMethod,
         "payload": {
           "pos": parseInt($("#rulePos").val()),
           "rule": {
@@ -158,7 +158,7 @@
     }
     else {
       payloadData = {
-        "method": httpMethod, "resource": "alerts/rules",
+        scope: "control", target: "ALERTS", method: rpcMethod,
         "payload": {
           "pos": parseInt($("#rulePos").val()),
           "rule": {
