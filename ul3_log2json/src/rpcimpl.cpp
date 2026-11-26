@@ -10,14 +10,68 @@
 #include "events/events_distributionthreads.h"
 #include "events/events_manager.h"
 #include "input/inputs.h"
+#include "input/syslogmodules.h"
 #include "output/outputs.h"
 
 #include <Mantids30/Network/Sockets/socket_tls.h>
 #include <Mantids30/Protocol/FastRPC1/fastrpc.h>
 #include <cinttypes>
+#include <stdexcept>
+#include <thread>
 
 using namespace Mantids30::Runtime;
 using namespace UL3::LOG2JSON;
+
+namespace {
+/** @brief Read endpoint definitions and the pending restart status of both endpoint files. */
+template <bool inputs>
+boost::json::object readEndpointConfig(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+{
+    const auto inputConfig = Input::Inputs::readConfig();
+    const auto outputConfig = Output::Outputs::readConfig();
+    auto response = inputs ? inputConfig : outputConfig;
+    response["restartRequired"] = inputConfig.at("modified").as_bool() || outputConfig.at("modified").as_bool();
+    return response;
+}
+
+/** @brief Validate and persist GUI endpoint settings for the next service restart. */
+template <bool inputs>
+boost::json::object writeEndpointConfig(void *, const std::string &, const boost::json::value &request, void *, const std::string &)
+{
+    try
+    {
+        const auto *definitions = request.is_object() ? request.as_object().if_contains(inputs ? "inputs" : "outputs") : nullptr;
+        if (!definitions || !definitions->is_array())
+        {
+            throw std::invalid_argument("Expected an endpoint array");
+        }
+        if constexpr (inputs)
+        {
+            Input::Inputs::writeConfig(definitions->as_array());
+        }
+        else
+        {
+            Output::Outputs::writeConfig(definitions->as_array());
+        }
+        return readEndpointConfig<inputs>(nullptr, {}, {}, nullptr, {});
+    }
+    catch (const std::exception &error)
+    {
+        return {{"ok", false}, {"message", error.what()}};
+    }
+}
+
+/** @brief Reply before exiting so systemd restarts the service with its saved endpoints. */
+bool reloadApp(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+{
+    LOG_APP->log0(__func__, Logs::WARNING, "Service restart requested via RPC");
+    std::thread([] {
+        sleep(2);
+        _exit(0);
+    }).detach();
+    return true;
+}
+} // namespace
 
 RpcImpl::RpcImpl() = default;
 
@@ -33,6 +87,13 @@ void RpcImpl::runRpcClient()
     fastRpc.addMethod("stats.OutputsDistributionThreads", UL3::JSON::rpcMethod<&statOutputsDistributionThreads>());
     fastRpc.addMethod("stats.Outputs", UL3::JSON::rpcMethod<&statOutputs>());
     fastRpc.addMethod("stats.Inputs", UL3::JSON::rpcMethod<&statInputs>());
+    fastRpc.addMethod("stats.ReadInputsFileConfig", UL3::JSON::rpcMethod<&readEndpointConfig<true>>());
+    fastRpc.addMethod("control.WriteInputsFileConfig", UL3::JSON::rpcMethod<&writeEndpointConfig<true>>());
+    fastRpc.addMethod("stats.ReadOutputsFileConfig", UL3::JSON::rpcMethod<&readEndpointConfig<false>>());
+    fastRpc.addMethod("control.WriteOutputsFileConfig", UL3::JSON::rpcMethod<&writeEndpointConfig<false>>());
+    fastRpc.addMethod("control.ReloadApp", UL3::JSON::rpcMethod<&reloadApp>());
+    fastRpc.addMethod("stats.SyslogModules", UL3::JSON::rpcMethod<&readSyslogModules>());
+    fastRpc.addMethod("control.SyslogModules", UL3::JSON::rpcMethod<&writeSyslogModules>());
 
     for (;;)
     {
@@ -84,4 +145,27 @@ boost::json::object RpcImpl::statInputs(void *, const std::string &, const boost
 {
     boost::json::object response{{"ok", true}, {"inputs", Input::Inputs::getStats()}};
     return response;
+}
+
+boost::json::object RpcImpl::readSyslogModules(void *, const std::string &, const boost::json::value &, void *, const std::string &)
+{
+    return {{"ok", true}, {"modules", Input::SyslogModules::getConfig()}};
+}
+
+boost::json::object RpcImpl::writeSyslogModules(void *, const std::string &, const boost::json::value &input, void *, const std::string &)
+{
+    try
+    {
+        const auto *modules = input.is_object() ? input.as_object().if_contains("modules") : nullptr;
+        if (!modules || !modules->is_array())
+        {
+            throw std::invalid_argument("Expected a modules array");
+        }
+        Input::SyslogModules::replace(modules->as_array());
+        return {{"ok", true}};
+    }
+    catch (const std::exception &error)
+    {
+        return {{"ok", false}, {"message", error.what()}};
+    }
 }

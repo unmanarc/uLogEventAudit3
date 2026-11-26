@@ -23,6 +23,10 @@ public:
     static void runRpcClient();
 
 private:
+    /** @brief Return the editable syslog module definitions. */
+    static boost::json::object readSyslogModules(void *, const std::string &, const boost::json::value &, void *, const std::string &);
+    /** @brief Validate, persist and activate a complete syslog module configuration. */
+    static boost::json::object writeSyslogModules(void *, const std::string &, const boost::json::value &, void *, const std::string &);
     /**
      * @brief Return per-host pending, processed and dropped event counts.
      */
