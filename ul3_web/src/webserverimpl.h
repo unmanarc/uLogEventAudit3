@@ -4,7 +4,7 @@
  */
 #pragma once
 namespace UL3::WEB {
-/** @brief Create the authenticated REST console and its fixed backend route mappings. */
+/** @brief Create the authenticated web console and scoped RPC forwarding endpoints. */
 class WebServerImpl
 {
 public:

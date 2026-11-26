@@ -4,68 +4,21 @@
  */
 #include "webserverimpl.h"
 #include "globals.h"
-#include "resource_sensing.h"
 #include <Mantids30/Client/APISync/apisync.h>
 #include <Mantids30/ConfigBuilder/Server_WebRESTFul/config_builder.h>
+#include <atomic>
 #include <boost/algorithm/string/predicate.hpp>
+#include <chrono>
 #include <config.h>
 #include <cstdlib>
-#include <future>
 using namespace Mantids30;
 using namespace UL3::WEB;
 using namespace Server::WebRESTFul;
 using namespace Protocol::HTTP;
 namespace {
-/** @brief Fixed mapping from an HTTP endpoint to an allowed backend method. */
-struct Route
-{
-    Method verb;
-    const char *path;
-    const char *target;
-    const char *method;
-};
-Route routes[] = {
-#include "rest_routes.inc"
-};
-/** @brief Fixed supported resource resolutions; callers cannot choose arbitrary RPC targets. */
-std::string resourceResolutions[] = {"3s", "1m", "60m"};
-
-/** @brief Fetch a remote process history while isolating disconnected or failed services. */
-boost::json::object remoteResources(const char *target, const std::string &resolution)
-{
-    if (!Globals::fastRpc->checkConnectionKey(target))
-    {
-        return {{"available", false}, {"error", "service_disconnected"}};
-    }
-    boost::json::value error;
-    auto result = Globals::fastRpc->runRemoteRPCMethod(target, "stats.ResourceMonitor",
-                                                      boost::json::object{{"resolution", resolution}}, &error, false);
-    if (!DataFormat::JSON::ASBOOL(error, "succeed", false) || !result.is_object()
-        || !result.as_object().if_contains("samples"))
-    {
-        return {{"available", false}, {"error", "resource_sensing_unavailable"}};
-    }
-    auto history = std::move(result.as_object());
-    history["available"] = true;
-    return history;
-}
-
-/** @brief Combine three independent process histories under the authenticated stats scope. */
-APIReturn resourceOverview(void *context, const RESTful::RequestContext &, Sessions::ClientDetails &)
-{
-    const auto &resolution = *static_cast<std::string *>(context);
-    // Parallel calls bound the wait to one RPC timeout if both peers are unresponsive.
-    auto alerts = std::async(std::launch::async, remoteResources, "ALERTS", resolution);
-    auto log2json = std::async(std::launch::async, remoteResources, "LOG2JSON", resolution);
-    auto web = UL3::ResourceSensing::instance().history(resolution);
-    web["available"] = true;
-    APIReturn response(boost::json::object{
-        {"resolution", resolution},
-        {"components", boost::json::object{{"web", std::move(web)},
-                                            {"alerts", alerts.get()}, {"log2json", log2json.get()}}}});
-    response.httpExtraHeaders["Cache-Control"] = "no-store";
-    return response;
-}
+/** @brief Endpoint-owned prefixes keep read and write RPC permissions separate. */
+std::string statsScope = "stats";
+std::string controlScope = "control";
 /**
  * @brief Return authenticated session metadata and prevent response caching.
  * @param request Mantids30 request with a validated JWT token.
@@ -81,38 +34,198 @@ APIReturn sessionInfo(void *, const RESTful::RequestContext &request, Sessions::
     return result;
 }
 /**
- * @brief Forward an authenticated REST operation using its fixed route-table entry.
- * @param context Borrowed Route entry registered when constructing the endpoints.
+ * @brief Forward a JSON call to the endpoint's stats or control RPC namespace.
+ * @param context Endpoint-owned scope used as the RPC method prefix.
  * @param request Authenticated request containing the JSON payload and session token.
  * @param client Client address used in backend failure diagnostics.
  * @return Backend result, or an HTTP error for CSRF, payload, connection or RPC failures.
+ * @note Debug traces correlate routing stages and elapsed time without recording payload contents.
  */
-APIReturn forward(void *context, const RESTful::RequestContext &request, Sessions::ClientDetails &client)
+static APIReturn forward(void *context, const RESTful::RequestContext &request, Sessions::ClientDetails &client)
 {
-    // Only the fixed route table selects backend names and methods; request data is payload.
-    const auto &route = *static_cast<Route *>(context);
+    const auto &scope = *static_cast<const std::string *>(context);
+    // Correlate interleaved requests without logging session tokens or payload contents.
+    static std::atomic<unsigned long long> nextRequestId{1};
+    const auto requestId = nextRequestId.fetch_add(1, std::memory_order_relaxed);
+    const auto started = std::chrono::steady_clock::now();
+    LOG_APP->log2(__func__,
+                  request.jwtToken->getSubject(),
+                  client.ipAddress,
+                  Runtime::Logs::DEBUG,
+                  "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                  requestId,
+                  "received",
+                  scope.c_str(),
+                  "",
+                  "",
+                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
     // JWT authentication identifies the session; mutations also bind to its CSRF token.
-    if (route.verb != Method::GET && (request.jwtToken->getJwtId().empty() || request.clientRequest->headers.getOptionValueStringByName("X-CSRF-Token") != request.jwtToken->getJwtId()))
+    if (scope == "control" && (request.jwtToken->getJwtId().empty() || request.clientRequest->headers.getOptionValueStringByName("X-CSRF-Token") != request.jwtToken->getJwtId()))
     {
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "invalid_csrf_token",
+                      scope.c_str(),
+                      "",
+                      "",
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
         return {Status::Code::S_403_FORBIDDEN, "invalid_csrf_token", "Refresh the audit session and try again"};
     }
-    if (!request.inputJSON->is_null() && !request.inputJSON->is_object() && !request.inputJSON->is_array())
+    if (!request.inputJSON->is_object())
     {
-        return {Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected a JSON object or array"};
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "invalid_request_body",
+                      scope.c_str(),
+                      "",
+                      "",
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        return {Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected target, method and optional payload"};
     }
-    if (!Globals::fastRpc->checkConnectionKey(route.target))
+    const std::string target(DataFormat::JSON::ASSTRING(*request.inputJSON, "target", ""));
+    const std::string method(DataFormat::JSON::ASSTRING(*request.inputJSON, "method", ""));
+    // A bare method name cannot override the namespace fixed by the endpoint's permission.
+    if ((target != "WEB" && target != "ALERTS" && target != "LOG2JSON") || method.empty()
+        || method.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") != std::string::npos)
     {
-        return {Status::Code::S_503_SERVICE_UNAVAILABLE, "service_unavailable", "Audit service is disconnected"};
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "invalid_target_or_method",
+                      scope.c_str(),
+                      "",
+                      "",
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        return {Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected an audit service and a bare RPC method name"};
     }
+    const auto *payload = request.inputJSON->as_object().if_contains("payload");
+    if (payload && !payload->is_null() && !payload->is_object() && !payload->is_array())
+    {
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "invalid_payload_type",
+                      scope.c_str(),
+                      target.c_str(),
+                      method.c_str(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        return {Status::Code::S_400_BAD_REQUEST, "invalid_request", "Expected a JSON object or array payload"};
+    }
+    const auto rpcMethod = scope + "." + method;
+    const auto &parameters = payload ? *payload : boost::json::value(boost::json::object{});
+    boost::json::value result;
+    // Keep transport diagnostics until the failure is logged, without exposing them to clients.
     boost::json::value rpcError;
-    auto result = Globals::fastRpc->runRemoteRPCMethod(route.target, route.method, *request.inputJSON, &rpcError, false);
-    if (!DataFormat::JSON::ASBOOL(rpcError, "succeed", false))
+    bool succeeded = false;
+    if (target == "WEB")
     {
-        LOG_APP->log2(__func__, request.jwtToken->getSubject(), client.ipAddress, Runtime::Logs::ERROR, "Backend call failed: %s", route.method);
+        // Dispatch through the same registry and namespace without a loopback connection.
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "local_dispatch",
+                      scope.c_str(),
+                      target.c_str(),
+                      rpcMethod.c_str(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        result = Globals::fastRpc->runLocalRPCMethod(rpcMethod, "WEB", "", nullptr, parameters, &succeeded);
+    }
+    else
+    {
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "checking_connection",
+                      scope.c_str(),
+                      target.c_str(),
+                      rpcMethod.c_str(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        if (!Globals::fastRpc->checkConnectionKey(target))
+        {
+            LOG_APP->log2(__func__,
+                          request.jwtToken->getSubject(),
+                          client.ipAddress,
+                          Runtime::Logs::DEBUG,
+                          "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                          requestId,
+                          "service_disconnected",
+                          scope.c_str(),
+                          target.c_str(),
+                          rpcMethod.c_str(),
+                          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+            return {Status::Code::S_503_SERVICE_UNAVAILABLE, "service_unavailable", "Audit service is disconnected"};
+        }
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::DEBUG,
+                      "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                      requestId,
+                      "remote_dispatch",
+                      scope.c_str(),
+                      target.c_str(),
+                      rpcMethod.c_str(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        result = Globals::fastRpc->runRemoteRPCMethod(target, rpcMethod, parameters, &rpcError, false);
+        succeeded = DataFormat::JSON::ASBOOL(rpcError, "succeed", false);
+    }
+    LOG_APP->log2(__func__,
+                  request.jwtToken->getSubject(),
+                  client.ipAddress,
+                  Runtime::Logs::DEBUG,
+                  "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                  requestId,
+                  succeeded ? "rpc_succeeded" : "rpc_failed",
+                  scope.c_str(),
+                  target.c_str(),
+                  rpcMethod.c_str(),
+                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+    if (!succeeded)
+    {
+        LOG_APP->log2(__func__,
+                      request.jwtToken->getSubject(),
+                      client.ipAddress,
+                      Runtime::Logs::ERROR,
+                      "Backend call failed: requestId=%llu target=%s method=%s error=%s",
+                      requestId,
+                      target.c_str(),
+                      rpcMethod.c_str(),
+                      boost::json::serialize(rpcError).c_str());
         return {Status::Code::S_502_BAD_GATEWAY, "backend_error", "Audit service could not complete the request"};
     }
     APIReturn response(result);
     response.httpExtraHeaders["Cache-Control"] = "no-store";
+    LOG_APP->log2(__func__,
+                  request.jwtToken->getSubject(),
+                  client.ipAddress,
+                  Runtime::Logs::DEBUG,
+                  "RPC forward: requestId=%llu stage=%s scope=%s target=%s method=%s elapsedMs=%.3f",
+                  requestId,
+                  "response_ready",
+                  scope.c_str(),
+                  target.c_str(),
+                  rpcMethod.c_str(),
+                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
     return response;
 }
 } // namespace
@@ -162,16 +275,8 @@ bool WebServerImpl::createWebServer()
     }
     auto endpoints = std::make_shared<RESTful::Endpoints>();
     endpoints->addEndpoint(Method::GET, "session", Security::JWT_COOKIE_AUTH, {}, nullptr, &sessionInfo);
-    for (auto &resolution : resourceResolutions)
-    {
-        endpoints->addEndpoint(Method::GET, "resources/" + resolution, Security::JWT_COOKIE_AUTH,
-                               {"stats"}, &resolution, &resourceOverview);
-    }
-    for (auto &route : routes)
-    {
-        const std::string scope = route.verb == Method::GET ? "stats" : "control";
-        endpoints->addEndpoint(route.verb, route.path, Security::JWT_COOKIE_AUTH, {scope}, &route, &forward);
-    }
+    endpoints->addEndpoint(Method::POST, "remote.stats", Security::JWT_COOKIE_AUTH, {"stats"}, &statsScope, &forward);
+    endpoints->addEndpoint(Method::POST, "remote.control", Security::JWT_COOKIE_AUTH, {"control"}, &controlScope, &forward);
     auto &engine = Globals::webServer;
     engine->config.appName = appName;
     engine->config.setSoftwareVersion(atoi(PROJECT_VER_MAJOR), atoi(PROJECT_VER_MINOR), atoi(PROJECT_VER_PATCH), "stable");

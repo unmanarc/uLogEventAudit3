@@ -79,17 +79,29 @@ The web root now ends in `/webroot`; `/assets` must map to `global/assets`.
 Upgrade the deployed web tree and `ResourcesPath`/`OverlappedDirectories` together.
 Merge those path changes into existing configuration during upgrades.
 
-## REST contract
+## JSON API contract
 
 Endpoints use `/api/v1/`, cookie JWT authentication and JSON results. `GET session`
-returns user, CSRF value, remaining lifetime and version. Read operations require
-`stats`; writes require `control` plus `X-CSRF-Token`. JSON GET arguments use the
-Mantids30 convention `?` followed by URL-encoded JSON. Mutations send a JSON body.
+returns user, CSRF value, remaining lifetime and version. Two POST endpoints
+forward calls to the internal FastRPC services:
 
-The backend forwarding allowlist is [rest_routes.inc](src/rest_routes.inc).
-Resources cover `alerts/rules`, `alerts/actions`, `alerts/inputs`, their
-configuration, save/reload operations, `alerts/stats`, and the `log2json` hosts,
-inputs, outputs and distribution statistics. There is no browser RPC gateway.
+- `POST remote.stats` requires `stats` and calls `stats.<method>`.
+- `POST remote.control` requires `control` plus `X-CSRF-Token` and calls `control.<method>`.
+
+Both accept a JSON body such as:
+
+```json
+{"target":"ALERTS","method":"ReadRunningRules","payload":{}}
+```
+
+`target` is `WEB`, `ALERTS` or `LOG2JSON`; `method` is a bare RPC method name,
+without a namespace or dots. The endpoint supplies the namespace so a stats
+request cannot select a control method. `payload` is optional and defaults to
+an empty object. The response is the backend result with `Cache-Control: no-store`.
+For example, saving rules uses `remote.control` with `method: "SaveRunningRules"`;
+reading converter inputs uses `remote.stats`, `target: "LOG2JSON"` and `method: "Inputs"`.
+`WEB` dispatches through the local FastRPC method registry; the other targets use
+their existing internal connections. No per-method HTTP route registration is needed.
 
 ## OS resource dashboard and sensing API
 
@@ -125,40 +137,35 @@ copy stored measurements and do not trigger sensing. Shutdown wakes the sensor
 immediately rather than waiting for its next deadline.
 
 All three FastRPC instances register `stats.ResourceMonitor`, accepting
-`{"resolution":"3s"}` (or `1m` / `60m`) over their existing authenticated internal
-connections. Invalid arguments return `{"error":"invalid_resolution"}`.
-The web reads its local sensor and calls both remote services concurrently.
-Authenticated readers with `stats` scope can fetch:
+`{"resolution":"3s"}` (or `1m` / `60m`). Invalid arguments return
+`{"error":"invalid_resolution"}`. Authenticated readers with `stats` scope use
+`POST /api/v1/remote.stats` with this body:
 
-- `GET /api/v1/resources/3s`
-- `GET /api/v1/resources/1m`
-- `GET /api/v1/resources/60m`
+```json
+{"target":"WEB","method":"ResourceMonitor","payload":{"resolution":"3s"}}
+```
 
-Responses carry `Cache-Control: no-store` and have this shape:
+Use `ALERTS` or `LOG2JSON` as the target for the other processes. Each response
+carries `Cache-Control: no-store` and contains one process history:
 
 ```json
 {
+  "component": "web",
   "resolution": "3s",
-  "components": {
-    "web": {
-      "available": true,
-      "component": "web",
-      "resolution": "3s",
-      "intervalSeconds": 3,
-      "capacity": 300,
-      "running": true,
-      "latest": null,
-      "samples": []
-    },
-    "alerts": {"available": false, "error": "service_disconnected"},
-    "log2json": {"available": false, "error": "service_disconnected"}
-  }
+  "intervalSeconds": 3,
+  "capacity": 300,
+  "running": true,
+  "latest": null,
+  "samples": []
 }
 ```
 
-`latest` is the last entry in `samples`, or null before the first sample. A remote
-RPC failure reports `resource_sensing_unavailable` for that component while
-preserving the other components' results. Timestamps are Unix milliseconds for
+The dashboard requests all three targets concurrently and combines their results
+in the browser. Disconnected services return HTTP 503; RPC failures return HTTP
+502. Failed components are marked unavailable while successful components keep
+updating. Polling cycles do not overlap, and obsolete resolution results are discarded.
+`latest` is the last entry in `samples`, or null before the first sample.
+Timestamps are Unix milliseconds for
 display; rate calculations use actual monotonic elapsed time. Each sample includes:
 
 | Fields | Meaning / units |
