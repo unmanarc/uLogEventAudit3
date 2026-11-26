@@ -14,7 +14,7 @@ using namespace UL3::LOG2JSON::AuditdEvents;
 using namespace UL3::LOG2JSON;
 
 // Shared queue used by producers and distribution workers.
-Mantids30::Core::Threads::Safe::Queue<AuditdEvent> EventDistribution::eventsQueue;
+Mantids30::Core::Threads::Safe::Queue<Events::Event> EventDistribution::eventsQueue;
 uint32_t EventDistribution::pushTimeoutMs = 0;
 
 std::atomic<uint64_t> EventDistribution::eventsProcessed;
@@ -23,7 +23,7 @@ std::atomic<uint64_t> EventDistribution::eventsProcessedThisPeriod;
 std::atomic<uint64_t> EventDistribution::eventsDropped;
 
 /**
- * @brief Parse queued audit events and dispatch their JSON to every output.
+ * @brief Parse queued events and dispatch their JSON to every output.
  * @param workerId Worker number used to identify timeout diagnostics.
  * @note A queue timeout emits the existing noEventsAlert heartbeat payload.
  */
@@ -36,7 +36,7 @@ void runEventDistribution(int workerId)
 
     for (;;)
     {
-        auto event = EventDistribution::popAuditEvent(Globals::getMainConfig()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs", 10000));
+        auto event = EventDistribution::popEvent(Globals::getMainConfig()->get<uint32_t>("Processor.EventsFlushTimeoutInMSecs", 10000));
 
         if (event)
         {
@@ -108,9 +108,9 @@ void EventDistribution::startDistributionThreads(const size_t &threads)
     }
 }
 
-bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditdEvent> event)
+bool EventDistribution::pushEvent(std::unique_ptr<Events::Event> event)
 {
-    bool queued = eventsQueue.push(std::shared_ptr<AuditdEvent>(std::move(event)), pushTimeoutMs);
+    bool queued = eventsQueue.push(std::shared_ptr<Events::Event>(std::move(event)), pushTimeoutMs);
     if (!queued)
     {
         eventsDropped++;
@@ -118,7 +118,7 @@ bool EventDistribution::pushAuditEvent(std::unique_ptr<AuditdEvent> event)
     return queued;
 }
 
-std::shared_ptr<AuditdEvent> EventDistribution::popAuditEvent(const uint32_t &popTimeoutMs)
+std::shared_ptr<Events::Event> EventDistribution::popEvent(const uint32_t &popTimeoutMs)
 {
     return eventsQueue.pop(popTimeoutMs);
 }

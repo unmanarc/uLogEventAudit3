@@ -5,6 +5,7 @@
 #pragma once
 
 #include "auditd_record.h"
+#include "event.h"
 #include <chrono>
 #include <list>
 
@@ -32,7 +33,7 @@ struct AuditdHostId
 };
 
 /** @brief Own auditd records sharing one timestamp and serial number. */
-class AuditdEvent
+class AuditdEvent : public Events::Event
 {
 public:
     /**
@@ -42,7 +43,7 @@ public:
     /**
      * @brief Release the resources owned by this AuditdEvent instance.
      */
-    ~AuditdEvent() = default;
+    ~AuditdEvent() override = default;
 
     /**
      * @brief Return the elapsed whole seconds since event creation using a monotonic clock.
@@ -61,7 +62,7 @@ public:
     /**
      * @brief Return the audit timestamp, milliseconds and 64-bit serial number.
      */
-    [[nodiscard]] std::tuple<time_t, uint32_t, uint64_t> getEventId() const;
+    [[nodiscard]] std::tuple<time_t, uint32_t, uint64_t> getEventId() const override;
     /**
      * @brief Set the timestamp and serial number identifying this event.
      * @param value Timestamp and serial number to store.
@@ -82,7 +83,7 @@ public:
      * @brief Parse the variables in every buffered auditd record.
      * @return True after all buffered records have been processed.
      */
-    bool process();
+    bool process() override;
 
     /**
      * @brief Return the distinct auditd record types held by this event.
@@ -110,7 +111,7 @@ public:
     /**
      * @brief Serialize parsed auditd data using the existing event JSON schema.
      */
-    boost::json::object getJson();
+    boost::json::object getJson() override;
 
 private:
     // eventType -> AuditdRecord

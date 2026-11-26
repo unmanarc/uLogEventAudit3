@@ -49,7 +49,7 @@ void AuditdHost::insertRecord(const tuple<time_t, uint32_t, uint64_t> &eventId, 
         // Detach ownership before a queue push that may wait for capacity.
         lock.unlock();
         const auto eventLabel = formatEventId(*event);
-        if (!EventDistribution::pushAuditEvent(std::move(event)))
+        if (!EventDistribution::pushEvent(std::move(event)))
         {
             LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...", eventLabel.c_str());
             ++droppedEventsCount;
@@ -109,7 +109,7 @@ void AuditdHost::flushExpiredEvents(const uint64_t &maxEventAgeSeconds)
     for (auto &event : expired)
     {
         const auto eventLabel = formatEventId(*event);
-        if (!EventDistribution::pushAuditEvent(std::move(event)))
+        if (!EventDistribution::pushEvent(std::move(event)))
         {
             LOG_APP->log0(__func__, Mantids30::Runtime::Logs::ERROR, "Queue full, Event %s Dropped...", eventLabel.c_str());
             ++droppedEventsCount;

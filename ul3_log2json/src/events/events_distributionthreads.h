@@ -7,10 +7,10 @@
 #include <Mantids30/Core/Threads/safe_queue.h>
 #include <memory>
 
-#include "../events/auditd_event.h"
+#include "event.h"
 
 namespace UL3::LOG2JSON::AuditdEvents {
-/** @brief Distribute owned audit events through the Mantids30 queue to output workers. */
+/** @brief Distribute owned events through the Mantids30 queue to output workers. */
 class EventDistribution
 {
 public:
@@ -41,13 +41,13 @@ public:
      * @param event Unique owner consumed by this call, including on queue rejection.
      * @return True if Mantids30 accepted ownership; false if the event was dropped.
      */
-    static bool pushAuditEvent(std::unique_ptr<AuditdEvent> event);
+    static bool pushEvent(std::unique_ptr<Events::Event> event);
     /**
      * @brief Wait for a queued event and receive its shared ownership from Mantids30.
      * @param popTimeoutMs Maximum wait in milliseconds for a queued event.
      * @return Shared owner of the popped event, or nullptr on timeout.
      */
-    static std::shared_ptr<AuditdEvent> popAuditEvent(const uint32_t &popTimeoutMs);
+    static std::shared_ptr<Events::Event> popEvent(const uint32_t &popTimeoutMs);
 
     /**
      * @brief Count one event delivered to the configured outputs.
@@ -60,7 +60,7 @@ public:
 
 private:
     static std::atomic<uint64_t> eventsProcessed, eventsProcessedLastTenSeconds, eventsProcessedThisPeriod, eventsDropped;
-    static Mantids30::Core::Threads::Safe::Queue<AuditdEvent> eventsQueue;
+    static Mantids30::Core::Threads::Safe::Queue<Events::Event> eventsQueue;
     static uint32_t pushTimeoutMs;
 };
 
