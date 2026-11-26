@@ -51,7 +51,7 @@ The configuration **/etc/ulogeventaudit3/ul3_alert/inputs.json** define the rece
 - **ListenPort**: TCP port number for incoming connections.
 - **id**: Unique identifier for the receptor (required).
 
-> Note: Each receptor must be configured manually via these `.json` files. The web interface does not support receptor configuration at this time.
+Open **Rules & alerts → Inputs** to inspect saved listeners and running client activity on one page. Users with control access can add or remove listeners and reload the service to apply saved changes.
 
 ### Actions Configuration
 

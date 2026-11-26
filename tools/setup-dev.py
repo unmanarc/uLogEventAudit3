@@ -93,10 +93,15 @@ def main():
     write_new(alert / 'actions.json', '[]\n')
     converter = config / 'ul3_log2json'
     source = repo / 'ul3_log2json/etc/ulogeventaudit3/ul3_log2json'
-    text = (source / 'receptors.d/rsyslogauditd.ini').read_text()
-    write_new(converter / 'receptors.d/rsyslogauditd.ini', text.replace('0.0.0.0', '127.0.0.1').replace('10514', '11514'))
-    text = (source / 'dispatchers.d/alerts.ini').read_text().replace('9999', '19999')
-    write_new(converter / 'dispatchers.d/alerts.ini', text)
+    inputs = json.loads((source / 'inputs.json').read_text())
+    for endpoint in inputs:
+        endpoint['ListenAddr'] = '127.0.0.1'
+        endpoint['ListenPort'] = 11514
+    write_new(converter / 'inputs.json', json.dumps(inputs, indent=2) + '\n')
+    outputs = [endpoint for endpoint in json.loads((source / 'outputs.json').read_text())
+               if endpoint['id'] == 'alerts']
+    outputs[0]['Port'] = 19999
+    write_new(converter / 'outputs.json', json.dumps(outputs, indent=2) + '\n')
     link_new(prefix / 'var/www/ulogeventaudit3', repo / 'ul3_web/var/www/ulogeventaudit3')
     for name in ['ul3_web', 'ul3_alert', 'ul3_log2json']:
         binary = build / name / name
@@ -109,7 +114,9 @@ def main():
                   + f'exec {shlex.quote(str(prefix / "bin" / name))} -c {shlex.quote(str(config / name))} "$@"\n', 0o755)
         write_new(prefix / 'lib/systemd/user' / (name + '-dev.service'),
                   f'[Unit]\nDescription=uLogEventAudit3 development {name}\n\n'
-                  f'[Service]\nExecStart={shlex.quote(str(launcher))}\nRestart=on-failure\nRestartSec=5\n\n'
+                  f'[Service]\nExecStart={shlex.quote(str(launcher))}\n'
+                  + ('Restart=always\n' if name == 'ul3_log2json' else 'Restart=on-failure\n')
+                  + 'RestartSec=5\n\n'
                   '[Install]\nWantedBy=default.target\n', 0o644)
     write_new(config / 'README.txt', f'''Instalación local de desarrollo de uLogEventAudit3
 
