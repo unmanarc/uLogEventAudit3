@@ -7,6 +7,7 @@
 #include <cinttypes>
 
 #include "globals.h"
+#include "resource_sensing.h"
 
 #include "input/inputs.h"
 #include "rules/rules.h"
@@ -26,6 +27,7 @@ void RpcImpl::runRpcClient()
     std::string rpcApiKey = Globals::getMainConfig()->get<std::string>("RPCConnector.AlertsApiKey", "REPLACEME_XABCXAPIX_ALERT");
 
     Mantids30::Protocol::FastRPC1 fastRpc;
+    fastRpc.addMethod("stats.ResourceMonitor", UL3::ResourceSensing::rpcMethod());
 
     fastRpc.addMethod("control.RulesReload", UL3::JSON::rpcMethod<&controlRulesReload>());
     fastRpc.addMethod("control.RulesActions", UL3::JSON::rpcMethod<&controlActionsReload>());
