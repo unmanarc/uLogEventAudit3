@@ -4,10 +4,14 @@ HTTPS console built with libMantids30 `Server::WebRESTFul::Engine`. uFastAuthD3
 provides cookie authentication, JWT validation and APISync scopes and roles.
 The console monitors the converter and configures alerts over internal TLS/FastRPC1.
 
-The frontend follows [MANTIDSLANG-GUIDE.md](../MANTIDSLANG-GUIDE.md): server-rendered
+The frontend follows [MANTIDSLANG-GUIDE.md](../../../libs/libMantids30/docs/MANTIDSLANG-GUIDE.md): server-rendered
 HTML5 shell and partials, with plain JavaScript and jQuery fetching REST/JSON data.
 There is no bundler or browser framework. All scripts, styles and images are
 served locally; Bootstrap and jQuery are included in the repository.
+
+See [BACKEND-GUIDE.md](../../../libs/libMantids30/docs/BACKEND-GUIDE.md) for a service built from scratch and
+[WEBAPP-PROGRAMMING-STYLE.md](../../../libs/libMantids30/docs/WEBAPP-PROGRAMMING-STYLE.md) for the current
+implementation conventions and agent verification requirements.
 
 ## Files and assets
 
@@ -97,7 +101,9 @@ Both accept a JSON body such as:
 `target` is `WEB`, `ALERTS` or `LOG2JSON`; `method` is a bare RPC method name,
 without a namespace or dots. The endpoint supplies the namespace so a stats
 request cannot select a control method. `payload` is optional and defaults to
-an empty object. The response is the backend result with `Cache-Control: no-store`.
+an empty object. The response is the backend result. Callbacks request `Cache-Control: no-store`;
+see the [runtime cache compatibility note](../../../libs/libMantids30/docs/MANTIDSLANG-GUIDE.md#browserapi-contract)
+for the installed HTTP writer's override behavior.
 For example, saving rules uses `remote.control` with `method: "SaveRunningRules"`;
 reading converter inputs uses `remote.stats`, `target: "LOG2JSON"` and `method: "Inputs"`.
 `WEB` dispatches through the local FastRPC method registry; the other targets use
@@ -146,7 +152,8 @@ All three FastRPC instances register `stats.ResourceMonitor`, accepting
 ```
 
 Use `ALERTS` or `LOG2JSON` as the target for the other processes. Each response
-carries `Cache-Control: no-store` and contains one process history:
+requests `Cache-Control: no-store` through the callback (subject to the runtime
+compatibility note above) and contains one process history:
 
 ```json
 {

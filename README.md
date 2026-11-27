@@ -27,6 +27,12 @@ See [BUILD.md](BUILD.md) for local builds and integration tests, and
 [ul3_web/README.md](ul3_web/README.md) for the REST API, uFastAuthD3 registration and
 configuration changes. The three services must be upgraded together.
 
+## Mantids30 web application development
+
+- [MantidsLang and frontend guide](../../libs/libMantids30/docs/MANTIDSLANG-GUIDE.md): verified syntax, page composition, permissions and browser/API contracts.
+- [Backend from scratch](../../libs/libMantids30/docs/BACKEND-GUIDE.md): complete C++17 bootstrap, CMake, HTTPS/APISync configuration and gateway extensions.
+- [Programming style for agents](../../libs/libMantids30/docs/WEBAPP-PROGRAMMING-STYLE.md): current code, UI, ownership, documentation and verification conventions.
+
 ## Build Requirements 
 
 This should be built on top of:

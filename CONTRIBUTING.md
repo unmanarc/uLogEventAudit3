@@ -1,5 +1,10 @@
 # C++ conventions
 
+For Mantids30 web application work, also follow
+[WEBAPP-PROGRAMMING-STYLE.md](../../libs/libMantids30/docs/WEBAPP-PROGRAMMING-STYLE.md). Language/frontend
+contracts are in [MANTIDSLANG-GUIDE.md](../../libs/libMantids30/docs/MANTIDSLANG-GUIDE.md); a complete new-service
+example is in [BACKEND-GUIDE.md](../../libs/libMantids30/docs/BACKEND-GUIDE.md).
+
 Use ISO C++17 and keep libMantids30 as the implementation of its existing
 networking, parsing, RPC, JSON helper, expression evaluation and queue facilities.
 
